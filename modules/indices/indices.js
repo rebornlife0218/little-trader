@@ -1,5 +1,6 @@
 /* 指數 · 跌深反彈量能分析 / K棒型態分析
-   資料：data/global_indices_ohlcv.csv(由 GitHub Actions 每個工作日更新) */
+   資料集：data/indices/(scripts/indices/update.py，排程見 .github/workflows/data-indices.yml) */
+const INDICES_DATASET = 'indices';
 /* ============================== 常數與設定 ============================== */
 // 指數代碼與中文名稱(下拉選單依此順序排列)
 const INDICES = [
@@ -20,7 +21,7 @@ const DEFAULT_PARAMS = { dropPct:-10, windowDays:5, bottomSearchDays:10, followU
 
 let state = {
   dataStatus: 'loading', // 'loading' | 'ok' | 'error'
-  dataMeta: null,  // data/meta.json
+  dataMeta: null,  // data/indices/meta.json
   active: 'TAIEX',
   theme: 'crash',  // 'crash' | 'candle'
   regimeDef: 'ma_pos', // 多頭/盤整/空頭的定義，見 REGIME_DEFS
@@ -478,15 +479,12 @@ function bucketByRatio(events){
 }
 
 /* ============================== 資料載入 ==============================
-   每個指數一個 JSON(data/<代號>.json)，先載入正在看的指數，其餘於背景預先下載 */
-const META_URL = 'data/meta.json';
+   每個指數一個 JSON(data/indices/<代號>.json)，先載入正在看的指數，其餘於背景預先下載 */
 async function init(){
   try{ const d=localStorage.getItem('lt.regimeDef'); if (REGIME_DEFS.find(x=>x.key===d)) state.regimeDef=d; }catch(e){}
   render();
   try{
-    const res = await fetch(META_URL, {cache:'no-cache'});
-    if (!res.ok) throw new Error('HTTP '+res.status);
-    state.dataMeta = await res.json();
+    state.dataMeta = await LT.dataset(INDICES_DATASET);
     const avail = state.dataMeta.indices || {};
     state.indexList = INDICES.filter(c=>avail[c.key]).map(c=>({key:c.key, name:c.name}));
     if (!state.indexList.length) throw new Error('沒有可用的指數資料');
@@ -506,8 +504,7 @@ async function init(){
 function loadIndex(key){
   if (state.data[key]) return Promise.resolve();
   if (state.loading[key]) return state.loading[key];
-  const v = state.dataMeta && state.dataMeta.version ? '?v='+state.dataMeta.version : '';
-  state.loading[key] = fetch(`data/${key}.json${v}`).then(r=>{
+  state.loading[key] = fetch(LT.dataUrl(INDICES_DATASET, key+'.json', state.dataMeta)).then(r=>{
     if (!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
   }).then(j=>{
@@ -876,7 +873,7 @@ function render(){
   const events = state.active ? (state.events[state.active]||[]) : [];
   const dm = state.dataMeta;
   const avail = (dm && dm.indices) || {};
-  const updatedLine = dm ? `<div class="updated">資料更新：${dm.updated_at} (台北時間) · 每個工作日 05:30、15:30 自動更新</div>`
+  const updatedLine = dm ? LT.sourceLine(dm)
     : (state.dataStatus==='error' ? `<div class="updated">無法載入資料(${state.dataError||''})</div>` : '');
   const rd = regimeDef();
 

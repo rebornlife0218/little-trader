@@ -1,19 +1,20 @@
 """
-下載全球 10 大指數 OHLCV (yfinance)，每個指數輸出一個 JSON 給網頁讀取，並記錄更新時間。
-由 GitHub Actions 排程執行，也可在本機手動執行：python scripts/update_data.py
+資料集 indices：全球 10 大指數 OHLCV (yfinance)，每個指數輸出一個 JSON → data/indices/
+排程：.github/workflows/data-indices.yml；本機手動：python scripts/indices/update.py
 """
-import json
 import sys
 import time
-from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 import pandas as pd
 import yfinance as yf
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from common import dataset_dir, write_json, write_meta  # noqa: E402
+
+DATASET = 'indices'
+
 START_DATE = '1991-01-01'
-OUT_DIR = Path(__file__).resolve().parent.parent / 'data'
-META_PATH = OUT_DIR / 'meta.json'
 
 tickers = {
     # 美國
@@ -58,10 +59,7 @@ def main():
     data = data.rename(columns=tickers, level=1)
     dates = pd.to_datetime(data.index).strftime('%Y-%m-%d')
 
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    for old in OUT_DIR.glob('*'):  # 清掉舊檔(含過去的整合 CSV)
-        if old.is_file():
-            old.unlink()
+    out_dir = dataset_dir(DATASET)
 
     # 每個指數各存一個精簡 JSON(欄位式陣列)，網頁只需載入正在看的指數
     index_meta = {}
@@ -80,19 +78,13 @@ def main():
             'c': df['Close'].round(2).tolist(),
             'v': df['Volume'].fillna(0).round(0).astype('int64').tolist(),
         }
-        (OUT_DIR / f'{name}.json').write_text(json.dumps(payload, separators=(',', ':')), encoding='utf-8')
+        write_json(out_dir / f'{name}.json', payload)
         index_meta[name] = {'rows': len(df), 'first': df.index[0], 'last': df.index[-1],
                             'has_volume': bool((df['Volume'] > 0).any())}
 
-    tw_now = datetime.now(timezone(timedelta(hours=8)))
-    META_PATH.write_text(json.dumps({
-        'updated_at': tw_now.strftime('%Y-%m-%d %H:%M'),
-        'version': tw_now.strftime('%Y%m%d%H%M'),
-        'timezone': 'Asia/Taipei',
-        'indices': index_meta,
-    }, ensure_ascii=False, indent=2), encoding='utf-8')
-
-    print(f'已更新 {len(index_meta)} 個指數，更新時間 {tw_now:%Y-%m-%d %H:%M}')
+    meta = write_meta(DATASET, 'Yahoo Finance', 'https://finance.yahoo.com/',
+                      '每個工作日 05:30、15:30', indices=index_meta)
+    print(f"已更新 {len(index_meta)} 個指數，更新時間 {meta['updated_at']}")
     for k, m in index_meta.items():
         print(f"  {k:8s} {m['rows']:5d} 筆  {m['first']} ~ {m['last']}")
 

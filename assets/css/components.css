@@ -133,3 +133,11 @@
   table.stattable tr.allrow td{background:rgba(240,185,77,.06);}
   table.stattable tbody tr{cursor:default;}
   @media (max-width:860px){ .patdetail-inner{position:sticky;left:8px;max-width:calc(100vw - 72px);} }
+
+  /* 資料來源列連結、ETF 表格 */
+  .updated a{color:var(--dim);text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;}
+  .updated a:hover{color:var(--amber);}
+  td.na, span.na{color:var(--mute);}
+  table.etftable td{font-family:'Inter',sans-serif;font-size:13px;}
+  table.etftable td.fund{font-weight:600;white-space:normal;min-width:240px;}
+  table.etftable tbody tr{cursor:default;}

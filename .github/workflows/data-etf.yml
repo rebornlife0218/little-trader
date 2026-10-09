@@ -1,0 +1,38 @@
+name: 資料 · 即將發行ETF
+
+# 資料集 etf_upcoming：scripts/etf_upcoming/update.py → data/etf_upcoming/
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '30 0 * * 1-5'    # 台北 週一~週五 08:30
+    - cron: '30 9 * * 1-5'    # 台北 週一~週五 17:30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: data-branch        # 各資料集輪流寫入 data 分支
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 爬取即將發行ETF
+        run: python scripts/etf_upcoming/update.py
+      - name: 發佈到 data 分支
+        run: bash scripts/publish_data.sh etf_upcoming
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: update
+    uses: ./.github/workflows/deploy.yml

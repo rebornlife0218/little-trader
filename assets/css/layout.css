@@ -45,3 +45,6 @@ footer.copy{border-top:1px solid var(--border);color:var(--mute);font-size:12px;
   body.nav-open::after{content:'';position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:25;}
   #content{padding:16px;}
 }
+.side-link.ext{display:flex;justify-content:space-between;align-items:center;}
+.side-link .ext-ico{color:var(--mute);font-size:12px;}
+.side-link.ext:hover .ext-ico{color:var(--amber);}

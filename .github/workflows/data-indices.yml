@@ -1,0 +1,38 @@
+name: 資料 · 指數
+
+# 資料集 indices：scripts/indices/update.py → data/indices/
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '30 7 * * 1-5'    # 台北 週一~週五 15:30
+    - cron: '30 21 * * 0-4'   # 台北 週一~週五 05:30 (= UTC 前一日 21:30)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: data-branch        # 各資料集輪流寫入 data 分支
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 下載指數資料
+        run: python scripts/indices/update.py
+      - name: 發佈到 data 分支
+        run: bash scripts/publish_data.sh indices
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: update
+    uses: ./.github/workflows/deploy.yml
