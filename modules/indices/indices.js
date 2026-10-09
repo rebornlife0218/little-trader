@@ -340,29 +340,6 @@ function summarizePatternGroup(occurrences){
 }
 
 // 反彈期間逐一檢查是否站上/遇壓每一條均線(收盤價需連續holdDays天不跌破才算站穩)
-function analyzeReboundStructure(closes, ma, bottomIdx, fEnd, holdDays, regimes){
-  const levels = MA_PERIODS.map(period=>{
-    const arr = ma[period];
-    let crossIdx=-1, held=null, rejectIdx=null;
-    for (let k=bottomIdx+1;k<=fEnd;k++){
-      if (!Number.isNaN(arr[k]) && closes[k]>=arr[k]){ crossIdx=k; break; }
-    }
-    if (crossIdx>-1){
-      let ok=true;
-      const holdEnd = Math.min(crossIdx+holdDays, fEnd);
-      for (let k=crossIdx+1;k<=holdEnd;k++){
-        if (!Number.isNaN(arr[k]) && closes[k]<arr[k]){ ok=false; rejectIdx=k; break; }
-      }
-      held = ok;
-    }
-    return {period, crossIdx, held, rejectIdx};
-  });
-  const r = regimes[fEnd];
-  const finalDir = r==='多頭'?'多方':r==='空頭'?'空方':r==='盤整'?'盤整':'N/A';
-  return { levels, finalDir };
-}
-// 反彈無力點：從底部起，追蹤收盤價創的區間新高，第一次從某個高點回落達PULLBACK_PCT(預設3%)時，
-// 視為該波反彈第一次出現「無力」訊號，回傳當時高點那一天的乖離率(20MA/60MA)
 const STALL_PULLBACK_PCT = 0.02;
 function findStallPoint(closes, ma, bottomIdx, fEnd){
   let peakIdx = bottomIdx, peakClose = closes[bottomIdx];
@@ -379,7 +356,6 @@ function findStallPoint(closes, ma, bottomIdx, fEnd){
 
 /* ============================== 崩跌/反彈偵測演算法 ============================== */
 function computeEvents(data, p, ma, regimes){
-  const HOLD_DAYS = 5;
   const n = data.length;
   const dropPct = p.dropPct/100, windowDays = p.windowDays, bottomSearchDays = p.bottomSearchDays, followUpDays = p.followUpDays;
   const closes = data.map(d=>d.close), lows = data.map(d=>d.low), vols = data.map(d=>d.volume||0);
@@ -426,14 +402,13 @@ function computeEvents(data, p, ma, regimes){
       // 谷底乖離率：底部收盤價相對於20日線/60日線偏離的幅度，越負代表跌得越深、越可能超跌
       const bias20 = (ma && !Number.isNaN(ma[20][bottomIdx])) ? (closes[bottomIdx]-ma[20][bottomIdx])/ma[20][bottomIdx] : NaN;
       const bias60 = (ma && !Number.isNaN(ma[60][bottomIdx])) ? (closes[bottomIdx]-ma[60][bottomIdx])/ma[60][bottomIdx] : NaN;
-      const structure = ma ? analyzeReboundStructure(closes, ma, bottomIdx, fEnd, HOLD_DAYS, regimes) : null;
       const stall = ma ? findStallPoint(closes, ma, bottomIdx, fEnd) : null;
       events.push({ peakIdx, peakVal, bottomIdx, bottomVal,
         dropActual:(bottomVal-peakVal)/peakVal, daysToBottom: bottomIdx-peakIdx,
         recoverIdx, daysToRecover: recoverIdx>-1? recoverIdx-bottomIdx: null,
         newHighIdx, daysToNewHigh: newHighIdx>-1? newHighIdx-bottomIdx: null,
         downVol, upVol, ratio, ret5, ret10, ret20, ret60, reDecline,
-        bias20, bias60, structure, stall, bottomRegime: regimes[bottomIdx] });
+        bias20, bias60, stall, bottomRegime: regimes[bottomIdx] });
       lastBottom = bottomIdx;
       idx = Math.max(bottomIdx+1, idx+1); // 確保索引恆向前推進，避免異常資料造成無窮迴圈
     } else { idx += 1; }
@@ -456,8 +431,6 @@ function computeSummary(events){
   const withBias60 = events.filter(e=>!Number.isNaN(e.bias60));
   const avgBias20 = withBias20.length? withBias20.reduce((a,e)=>a+e.bias20,0)/withBias20.length : NaN;
   const avgBias60 = withBias60.length? withBias60.reduce((a,e)=>a+e.bias60,0)/withBias60.length : NaN;
-  const dirCounts = {'多方':0,'空方':0,'盤整':0,'N/A':0};
-  events.forEach(e=>{ const d=(e.structure&&e.structure.finalDir)||'N/A'; dirCounts[d]=(dirCounts[d]||0)+1; });
   const withStall = events.filter(e=>e.stall && !Number.isNaN(e.stall.stallBias20));
   const withStall60 = events.filter(e=>e.stall && !Number.isNaN(e.stall.stallBias60));
   const avgStallBias20 = withStall.length? withStall.reduce((a,e)=>a+e.stall.stallBias20,0)/withStall.length : NaN;
@@ -466,7 +439,7 @@ function computeSummary(events){
   return {count:events.length,
     win5:s5.win, avg5:s5.avg, win10:s10.win, avg10:s10.avg,
     win20:s20.win, avg20:s20.avg, win60:s60.win, avg60:s60.avg,
-    newHighProb, reDeclineProb, avgBias20, avgBias60, dirCounts,
+    newHighProb, reDeclineProb, avgBias20, avgBias60,
     avgStallBias20, avgStallBias60, stallSampleCount:withStall.length, noStallCount};
 }
 /* ============================== 資料載入 ==============================
@@ -488,10 +461,9 @@ async function init(){
     state.dataError = String(err && err.message || err);
   }
   render();
-  // 背景預載其他指數(只下載不計算)，切換時幾乎即時
-  const idle = window.requestIdleCallback || (f=>setTimeout(f, 800));
-  idle(()=>state.indexList.forEach(c=>loadIndex(c.key).catch(()=>{})));
 }
+// 使用者準備切換指數時(滑過/點開選單)才預先下載其他指數，節省流量又能快速切換
+function prefetchIndices(){ state.indexList.forEach(c=>loadIndex(c.key).catch(()=>{})); }
 function loadIndex(key){
   if (state.data[key]) return Promise.resolve();
   if (state.loading[key]) return state.loading[key];
@@ -545,7 +517,13 @@ function setZoomPreset(key, tradingDays){
   render();
 }
 
-const MA_COLORS = {5:'#F0B94D', 20:'#5B8DEF', 60:'#C08CF0', 240:'#C9CED8'};
+// 圖表配色：讀取目前主題的 CSS 變數(暗色/淺色)，紅漲綠跌
+function hexA(hex, a){ const h=hex.replace('#',''); const n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+function chartColors(){
+  const v = LT.cssVar;
+  return { grid:v('--grid'), text:v('--mute'), up:v('--candle-up'), down:v('--candle-down'), blue:v('--blue'), amber:v('--amber'),
+    ma:{5:v('--ma5'), 20:v('--ma20'), 60:v('--ma60'), 240:v('--ma240')} };
+}
 /* ============================== Canvas 圖表 ============================== */
 function drawChart(key){
   const rows = state.data[key]; if(!rows) return;
@@ -558,6 +536,7 @@ function drawChart(key){
   const dpr = window.devicePixelRatio||1;
   const wrapW = priceCanvas.parentElement.clientWidth;
   const priceH = 340, volH = 100;
+  const C = chartColors();
   priceCanvas.width = wrapW*dpr; priceCanvas.height = priceH*dpr; priceCanvas.style.height=priceH+'px';
   const pctx = priceCanvas.getContext('2d'); pctx.scale(dpr,dpr);
   pctx.clearRect(0,0,wrapW,priceH);
@@ -588,7 +567,7 @@ function drawChart(key){
   const pad=(pmax-pmin)*0.08 || pmax*0.02; pmin-=pad; pmax+=pad;
   const yAt = (v)=> 10 + (priceH-30)*(1-(v-pmin)/(pmax-pmin));
 
-  pctx.strokeStyle='#1a1f2a'; pctx.fillStyle='#5B6472'; pctx.font='10px IBM Plex Mono'; pctx.lineWidth=1;
+  pctx.strokeStyle=C.grid; pctx.fillStyle=C.text; pctx.font='10px IBM Plex Mono'; pctx.lineWidth=1;
   for (let g=0; g<=4; g++){
     const v = pmin + (pmax-pmin)*g/4; const y = yAt(v);
     pctx.beginPath(); pctx.moveTo(padL,y); pctx.lineTo(wrapW-padR,y); pctx.stroke();
@@ -600,8 +579,8 @@ function drawChart(key){
     const declEndIdx = ev.bottomIdx;
     const reboundEndIdx = ev.recoverIdx>-1 ? ev.recoverIdx : Math.min(ev.bottomIdx + state.params[key].followUpDays, e);
     const x1 = xAt(clamp(ev.peakIdx,s,e)-s), x2 = xAt(clamp(declEndIdx,s,e)-s), x3 = xAt(clamp(reboundEndIdx,s,e)-s);
-    pctx.fillStyle = 'rgba(229,72,77,0.10)'; pctx.fillRect(Math.min(x1,x2), 10, Math.abs(x2-x1)||1, priceH-30);
-    pctx.fillStyle = 'rgba(42,200,160,0.08)'; pctx.fillRect(Math.min(x2,x3), 10, Math.abs(x3-x2)||1, priceH-30);
+    pctx.fillStyle = hexA(C.down,0.10); pctx.fillRect(Math.min(x1,x2), 10, Math.abs(x2-x1)||1, priceH-30);
+    pctx.fillStyle = hexA(C.up,0.08); pctx.fillRect(Math.min(x2,x3), 10, Math.abs(x3-x2)||1, priceH-30);
     const markAt=(idx,color,shape)=>{
       if (idx<s || idx>e) return;
       const x = xAt(idx-s), y = yAt(rows[idx].close);
@@ -613,16 +592,16 @@ function drawChart(key){
       else { pctx.arc(x,y-10,3.5,0,7); }
       pctx.closePath(); pctx.fill();
     };
-    markAt(ev.peakIdx, '#E5484D','down');
-    markAt(ev.bottomIdx, '#5B8DEF','up');
-    if (ev.recoverIdx>-1) markAt(ev.recoverIdx,'#2AC8A0','diamond');
-    if (ev.newHighIdx>-1) markAt(ev.newHighIdx,'#F0B94D','star');
+    markAt(ev.peakIdx, C.down,'down');
+    markAt(ev.bottomIdx, C.blue,'up');
+    if (ev.recoverIdx>-1) markAt(ev.recoverIdx,C.up,'diamond');
+    if (ev.newHighIdx>-1) markAt(ev.newHighIdx,C.amber,'star');
   });
 
   if (meta.hasOHLC){
     slice.forEach((d,i)=>{
       const x = xAt(i); const up = d.close>=d.open;
-      pctx.strokeStyle= up? '#E5484D':'#2ECC71'; pctx.fillStyle= up? '#E5484D':'#2ECC71'; pctx.lineWidth=1;
+      pctx.strokeStyle= up? C.up:C.down; pctx.fillStyle= up? C.up:C.down; pctx.lineWidth=1;
       pctx.beginPath(); pctx.moveTo(x,yAt(d.high)); pctx.lineTo(x,yAt(d.low)); pctx.stroke();
       const yo=yAt(d.open), yc=yAt(d.close);
       const bw = Math.max(cw*0.62,1);
@@ -631,14 +610,14 @@ function drawChart(key){
   } else {
     pctx.beginPath();
     slice.forEach((d,i)=>{ const x=xAt(i), y=yAt(d.close); if(i===0) pctx.moveTo(x,y); else pctx.lineTo(x,y); });
-    pctx.strokeStyle='#5B8DEF'; pctx.lineWidth=1.6; pctx.stroke();
+    pctx.strokeStyle=C.blue; pctx.lineWidth=1.6; pctx.stroke();
     pctx.lineTo(xAt(n-1), priceH-20); pctx.lineTo(xAt(0), priceH-20); pctx.closePath();
     const grad = pctx.createLinearGradient(0,10,0,priceH-20);
-    grad.addColorStop(0,'rgba(91,141,239,0.28)'); grad.addColorStop(1,'rgba(91,141,239,0.02)');
+    grad.addColorStop(0,hexA(C.blue,0.28)); grad.addColorStop(1,hexA(C.blue,0.02));
     pctx.fillStyle=grad; pctx.fill();
   }
 
-  pctx.fillStyle='#5B6472'; pctx.font='10px IBM Plex Mono';
+  pctx.fillStyle=C.text; pctx.font='10px IBM Plex Mono';
   const labelEvery = Math.max(1, Math.floor(n/6));
   for (let i=0;i<n;i+=labelEvery){ pctx.fillText(slice[i].date, xAt(i)-24, priceH-4); }
 
@@ -654,7 +633,7 @@ function drawChart(key){
         const x=xAt(i), y=yAt(v);
         if (!started){ pctx.moveTo(x,y); started=true; } else { pctx.lineTo(x,y); }
       }
-      pctx.strokeStyle = MA_COLORS[p];
+      pctx.strokeStyle = C.ma[p];
       pctx.lineWidth = p===240? 1.8 : (p===60? 1.4 : 1.1);
       pctx.globalAlpha = 0.9;
       pctx.stroke();
@@ -664,10 +643,10 @@ function drawChart(key){
 
   if (vctx){
     let vmax=0; slice.forEach(d=>vmax=Math.max(vmax,d.volume||0));
-    vctx.strokeStyle='#1a1f2a'; vctx.beginPath(); vctx.moveTo(padL,volH-14); vctx.lineTo(wrapW-padR,volH-14); vctx.stroke();
+    vctx.strokeStyle=C.grid; vctx.beginPath(); vctx.moveTo(padL,volH-14); vctx.lineTo(wrapW-padR,volH-14); vctx.stroke();
     slice.forEach((d,i)=>{
       const x=xAt(i); const h=(vmax>0)? (d.volume/vmax)*(volH-24):0;
-      vctx.fillStyle = d.close>=d.open? 'rgba(229,72,77,0.55)':'rgba(46,204,113,0.55)';
+      vctx.fillStyle = d.close>=d.open? hexA(C.up,0.55):hexA(C.down,0.55);
       const bw=Math.max(cw*0.62,1);
       vctx.fillRect(x-bw/2, volH-14-h, bw, h);
     });
@@ -731,15 +710,6 @@ function biasTag(bias){
   const cls = bias==='偏多'?'yes':bias==='偏空'?'no':'na';
   return `<span class="tag ${cls}">${bias}</span>`;
 }
-// 訊號應驗率：偏多型態看之後上漲比例，偏空型態看之後下跌比例
-function hitRate(bias, win){
-  if (Number.isNaN(win) || bias==='中性') return NaN;
-  return bias==='偏多'? win : 1-win;
-}
-function hitCell(v){
-  if (Number.isNaN(v)) return '<span class="tag na">—</span>';
-  return `<b class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</b>`;
-}
 function togglePattern(k){ state.openPattern = state.openPattern===k ? null : k; render(); }
 function renderCandleTheme(){
   const key = state.active;
@@ -775,10 +745,10 @@ function renderCandleTheme(){
       <h3>型態總覽(點選型態查看詳細統計)</h3>
       <div class="tablewrap">
         <table class="pattable">
-          <thead><tr><th>圖示</th><th>型態</th><th>類型</th><th>出現次數</th><th>10日上漲機率</th><th>平均10日報酬</th><th>10日應驗率</th><th></th></tr></thead>
+          <thead><tr><th>圖示</th><th>型態</th><th>類型</th><th>出現次數</th><th>10日上漲機率</th><th>平均10日報酬</th><th></th></tr></thead>
           <tbody>
           ${CANDLE_GROUPS.filter(g=>hasVol || g.key!=='volume').map(g=>`
-            <tr class="grouprow"><td colspan="8">${g.name}</td></tr>
+            <tr class="grouprow"><td colspan="7">${g.name}</td></tr>
             ${CANDLE_PATTERNS.filter(p=>p.group===g.key).map(p=>{
               const occ = patterns[p.key];
               const s = summarizePatternGroup(occ);
@@ -788,17 +758,16 @@ function renderCandleTheme(){
                 <td style="font-family:'Inter',sans-serif;font-weight:600;">${p.name}</td>
                 <td>${biasTag(p.bias)}</td>
                 <td>${s.count}</td>
-                <td>${fmtPct(s.win10,0).replace('+','')}</td>
+                <td class="${s.win10>=0.5?'up':'down'}">${Number.isNaN(s.win10)?'—':(s.win10*100).toFixed(0)+'%'}</td>
                 <td class="${s.avg10>=0?'up':'down'}">${fmtPct(s.avg10)}</td>
-                <td>${hitCell(hitRate(p.bias, s.win10))}</td>
                 <td class="chev">${open?'▴':'▾'}</td>
               </tr>
-              ${open ? `<tr class="patdetail"><td colspan="8">${renderPatternDetail(p, occ)}</td></tr>` : ''}`;
+              ${open ? `<tr class="patdetail"><td colspan="7">${renderPatternDetail(p, occ)}</td></tr>` : ''}`;
             }).join('')}`).join('')}
           </tbody>
         </table>
       </div>
-      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例。應驗率：偏多型態＝上漲機率、偏空型態＝下跌機率(高於50%以綠色顯示)；十字線為中性不計。</div>
+      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例(紅漲綠跌：高於50%紅色、低於50%綠色)。</div>
     </div>
   `;
   return html;
@@ -878,7 +847,7 @@ function render(){
       <div class="pickers">
         <div class="pickrow">
           <label for="indexPick">指數</label>
-          <select id="indexPick" class="indexpick" onchange="switchTab(this.value)">
+          <select id="indexPick" class="indexpick" onchange="switchTab(this.value)" onfocus="prefetchIndices()" onpointerenter="prefetchIndices()">
             ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${avail[c.key]?' · '+avail[c.key].rows+'筆':''}</option>`).join('')}
           </select>
         </div>
@@ -930,17 +899,16 @@ function render(){
         ${meta.hasVolume ? `<canvas id="volCanvas"></canvas>` : ''}
       </div>
       <div class="legend">
-        <span><i class="dot" style="background:#E5484D"></i>起跌點(峰)</span>
-        <span><i class="dot" style="background:#5B8DEF"></i>底部</span>
-        <span><i class="dot" style="background:#2AC8A0"></i>回到起跌點</span>
-        <span><i class="dot" style="background:#F0B94D"></i>創歷史新高</span>
-        <span><i class="dot" style="background:rgba(229,72,77,.4)"></i>下跌區間</span>
-        <span><i class="dot" style="background:rgba(42,200,160,.4)"></i>反彈區間</span>
-        <span style="color:var(--mute)">｜K棒與成交量：紅漲綠跌｜</span>
-        <span><i class="dot" style="background:#F0B94D"></i>MA5</span>
-        <span><i class="dot" style="background:#5B8DEF"></i>MA20</span>
-        <span><i class="dot" style="background:#C08CF0"></i>MA60</span>
-        <span><i class="dot" style="background:#C9CED8"></i>MA240</span>
+        <span><i class="dot" style="background:var(--candle-down)"></i>起跌點(峰)</span>
+        <span><i class="dot" style="background:var(--blue)"></i>底部</span>
+        <span><i class="dot" style="background:var(--candle-up)"></i>回到起跌點</span>
+        <span><i class="dot" style="background:var(--amber)"></i>創歷史新高</span>
+        <span><i class="dot" style="background:var(--candle-down);opacity:.45"></i>下跌區間</span>
+        <span><i class="dot" style="background:var(--candle-up);opacity:.45"></i>反彈區間</span>
+        <span><i class="dot" style="background:var(--ma5)"></i>MA5</span>
+        <span><i class="dot" style="background:var(--ma20)"></i>MA20</span>
+        <span><i class="dot" style="background:var(--ma60)"></i>MA60</span>
+        <span><i class="dot" style="background:var(--ma240)"></i>MA240</span>
         <span style="color:var(--mute)">滾輪縮放 · 拖曳平移 · 點下方表格列可跳轉</span>
       </div>
     </div>
@@ -973,23 +941,6 @@ function render(){
     </div>
 
     ${renderCrashStats(events, meta)}
-
-    <div class="panel">
-      <h3>反彈結束時的方向</h3>
-      <div class="note" style="margin-top:0;margin-bottom:6px;">追蹤期間最後一天，依上方多空定義「${regimeDef().name}」判定(多頭＝多方、空頭＝空方)：</div>
-      <div class="splitbar" style="height:22px;">
-        ${dirBarSegment(summary.dirCounts,'多方','var(--up)')}
-        ${dirBarSegment(summary.dirCounts,'盤整','var(--mute)')}
-        ${dirBarSegment(summary.dirCounts,'空方','var(--down)')}
-        ${dirBarSegment(summary.dirCounts,'N/A','#2a3040')}
-      </div>
-      <div class="legend" style="margin-top:8px;">
-        <span><i class="dot" style="background:var(--up)"></i>多方 ${summary.dirCounts['多方']}筆</span>
-        <span><i class="dot" style="background:var(--mute)"></i>盤整 ${summary.dirCounts['盤整']}筆</span>
-        <span><i class="dot" style="background:var(--down)"></i>空方 ${summary.dirCounts['空方']}筆</span>
-        <span><i class="dot" style="background:#2a3040"></i>資料不足 ${summary.dirCounts['N/A']}筆</span>
-      </div>
-    </div>
 
     <div class="panel">
       <h3>急跌事件明細</h3>
@@ -1063,7 +1014,7 @@ function renderCrashStats(events, meta){
           <tbody>${body(10, s=>win(s.win5)+win(s.win10)+win(s.win20)+win(s.win60)+pct(s.avg5)+pct(s.avg10)+pct(s.avg20)+pct(s.avg60))}</tbody>
         </table>
       </div>
-      <div class="note">以「底部當天收盤價」為基準，計算其後第N個交易日的漲跌。勝率＝上漲事件占比，高於50%以綠色顯示。</div>
+      <div class="note">以「底部當天收盤價」為基準，計算其後第N個交易日的漲跌。勝率＝上漲事件占比(紅漲綠跌：高於50%紅色、低於50%綠色)。</div>
     </div>
 
     <div class="panel">
@@ -1085,13 +1036,6 @@ function ratioCell(ratio){
   const downShare = clamp(ratio/(ratio+1),0.05,0.95)*100;
   return `<span class="mono">${fmtNum(ratio,2)}</span> <span class="mini-split"><div style="width:${downShare}%;background:var(--down)"></div><div style="width:${100-downShare}%;background:var(--up)"></div></span>`;
 }
-function dirBarSegment(counts, key, color){
-  const total = Object.values(counts).reduce((a,b)=>a+b,0);
-  if (!total) return '';
-  const pct = counts[key]/total*100;
-  if (pct<=0) return '';
-  return `<div style="width:${pct}%;background:${color}" title="${key} ${counts[key]}筆"></div>`;
-}
 
 async function switchTab(key){
   state.active = key;
@@ -1103,7 +1047,6 @@ async function switchTab(key){
 }
 
 window.addEventListener('resize', ()=>{ if(document.getElementById('app') && state.active && state.data[state.active]) drawChart(state.active); });
-
 
 /* ============================== 註冊到 Little Trader ============================== */
 let _indicesBooted = false;

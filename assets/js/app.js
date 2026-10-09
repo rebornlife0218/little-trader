@@ -14,6 +14,7 @@ const LT = (() => {
   ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
   const pages = [];
+  let home = null; // 首頁 {name, mount}，由 modules/home/home.js 設定
   let current = null;
   let routeSeq = 0; // 換頁計數：非同步載入完成時用來確認使用者還在同一頁
 
@@ -23,6 +24,8 @@ const LT = (() => {
     }
     pages.push(page);
   }
+  function setHome(page) { home = page; }
+  function listPages() { return pages.slice(); }
 
   function parseHash() {
     const [section, key] = (location.hash || '').replace(/^#\/?/, '').split('/');
@@ -71,6 +74,7 @@ const LT = (() => {
   }
   function route() {
     let { section, key } = parseHash();
+    if (!section && home) { showHome(); return; }
     const internal = pages.filter(p => !p.href);
     let page = internal.find(p => p.section === section && p.key === key);
     const sec = SECTIONS.find(s => s.key === section);
@@ -95,6 +99,19 @@ const LT = (() => {
       document.title = `${sec.name} · Little Trader`;
       main.innerHTML = `<div class="panel"><div class="empty"><h3 style="margin:0;">${sec.name}</h3><p>此區塊研究內容建置中，敬請期待。</p></div></div>`;
     }
+    document.body.classList.remove('nav-open');
+  }
+
+  function showHome() {
+    if (current && current.unmount) { try { current.unmount(); } catch (e) {} }
+    current = null;
+    const seq = ++routeSeq;
+    const main = document.getElementById('content');
+    main.innerHTML = '';
+    window.scrollTo(0, 0);
+    renderSidebar(null);
+    document.title = 'Little Trader 小交易員的研究室';
+    home.mount(main, { alive: () => seq === routeSeq });
     document.body.classList.remove('nav-open');
   }
 
@@ -130,6 +147,26 @@ const LT = (() => {
     return `<div class="updated">資料來源：${link} · 更新：${meta.updated_at} (台北時間)${meta.schedule ? ' · 排程：' + meta.schedule : ''}</div>`;
   }
 
+  // 暗色 / 淺色模式(記住使用者偏好；預設暗色)
+  function theme() { return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; }
+  function toggleTheme() {
+    const next = theme() === 'light' ? 'dark' : 'light';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('lt.theme', next); } catch (e) {}
+    syncThemeButton();
+    window.dispatchEvent(new Event('resize')); // 圖表依新配色重畫
+  }
+  function syncThemeButton() {
+    const light = theme() === 'light';
+    document.querySelectorAll('.theme-toggle').forEach(btn => {
+      btn.innerHTML = light ? '☾<span>暗色</span>' : '☀<span>淺色</span>';
+      btn.title = light ? '切換為暗色模式' : '切換為淺色模式';
+      btn.setAttribute('aria-label', btn.title);
+    });
+  }
+  // 讀取目前主題的 CSS 色彩變數(供 canvas 圖表使用)
+  function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
   // 桌機版側欄收合(記住使用者偏好)
   function toggleSidebar() {
     const root = document.documentElement;
@@ -150,10 +187,12 @@ const LT = (() => {
     document.getElementById('copyYear').textContent = new Date().getFullYear();
     document.getElementById('navToggle').onclick = () => document.body.classList.toggle('nav-open');
     document.getElementById('sideCollapse').onclick = toggleSidebar;
+    document.querySelectorAll('.theme-toggle').forEach(b => b.onclick = toggleTheme);
     syncCollapseButton();
+    syncThemeButton();
     window.addEventListener('hashchange', route);
     route();
   }
 
-  return { register, start, toggleSection, SECTIONS, dataset, dataUrl, loadJSON, sourceLine };
+  return { register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, dataset, dataUrl, loadJSON, sourceLine };
 })();

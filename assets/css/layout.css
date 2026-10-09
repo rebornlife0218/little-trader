@@ -2,7 +2,7 @@
 body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;}
 .shell{display:flex;min-height:100vh;}
 
-.sidebar{position:sticky;top:0;align-self:flex-start;width:232px;flex:0 0 232px;height:100vh;overflow-y:auto;overflow-x:hidden;
+.sidebar{position:sticky;top:0;align-self:flex-start;width:232px;flex:0 0 232px;height:100vh;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;scrollbar-gutter:stable;
   background:var(--panel);border-right:1px solid var(--border);padding:18px 12px;transition:width .2s, flex-basis .2s, padding .2s;}
 .side-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding-bottom:16px;margin-bottom:14px;border-bottom:1px solid var(--border);}
 .brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);min-width:0;}
@@ -46,7 +46,7 @@ footer.copy{border-top:1px solid var(--border);color:var(--mute);font-size:12px;
     background:var(--panel);border-bottom:1px solid var(--border);padding:8px 16px;}
   .topbar .brand .logo{width:34px;height:34px;flex-basis:34px;}
   .topbar button{padding:7px 12px;}
-  .sidebar, .side-collapsed .sidebar{position:fixed;z-index:30;left:0;top:0;width:250px;padding:18px 12px;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.5);}
+  .sidebar, .side-collapsed .sidebar{position:fixed;z-index:30;left:0;top:0;width:250px;padding:18px 12px;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px var(--shadow);}
   .side-collapsed .side-head{flex-direction:row;}
   .side-collapsed .brand-text, .side-collapsed #sideNav{display:block;}
   .side-collapse{display:none;}
@@ -57,3 +57,11 @@ footer.copy{border-top:1px solid var(--border);color:var(--mute);font-size:12px;
 .side-link.ext{display:flex;justify-content:space-between;align-items:center;}
 .side-link .ext-ico{color:var(--mute);font-size:12px;}
 .side-link.ext:hover .ext-ico{color:var(--amber);}
+
+/* 側欄底部：暗色/淺色切換 */
+.side-foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--border);}
+.theme-toggle{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:8px 10px;border-radius:8px;font-size:15px;color:var(--dim);background:var(--panel2);}
+.theme-toggle span{font-size:12.5px;font-weight:600;}
+.theme-toggle:hover{color:var(--text);}
+.side-collapsed .theme-toggle span{display:none;}
+@media (max-width:860px){ .side-collapsed .theme-toggle span{display:inline;} }

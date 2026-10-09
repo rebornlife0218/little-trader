@@ -10,11 +10,12 @@
 
 ```
 index.html                     網站外框(左側欄 + 內容 + 頁尾)，在此載入各模組
-assets/css/                    共用樣式(components.css 元件、layout.css 版型)
+assets/css/                    共用樣式(components.css 色彩變數/元件，含暗色與淺色主題；layout.css 版型)
 assets/js/app.js               框架：側欄區塊、頁面註冊、路由、資料集載入工具
 assets/img/logo.svg            吉祥物 LOGO「小K」
 
 modules/<模組>/                前端模組(顯示畫面)
+  home/home.js                 首頁(點 LOGO 回到這裡)：各區塊入口與資料更新狀態
   indices/indices.js           指數：跌深反彈量能分析、K棒型態分析
   etf/etf.js                   ETF：ETF折溢價(說明＋參考連結)、即將發行ETF
   stock/stock.js               個股：處置股、隔日沖(建置中)
