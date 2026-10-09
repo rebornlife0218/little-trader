@@ -633,20 +633,6 @@ function drawChart(key){
   const labelEvery = Math.max(1, Math.floor(n/6));
   for (let i=0;i<n;i+=labelEvery){ pctx.fillText(slice[i].date, xAt(i)-24, priceH-4); }
 
-  // 週期性分析：總統選舉(選後第一個交易日)垂直虛線
-  const el = state.mode==='cycle' && state.cycle[key] && state.cycle[key].election;
-  if (el){
-    pctx.save(); pctx.strokeStyle = C.amber; pctx.fillStyle = C.amber; pctx.setLineDash([5,4]); pctx.lineWidth = 1.2;
-    pctx.font = '600 11px Inter, sans-serif';
-    el.events.forEach(ev=>{
-      if (ev.react<s || ev.react>e) return;
-      const x = xAt(ev.react-s);
-      pctx.beginPath(); pctx.moveTo(x,10); pctx.lineTo(x,priceH-20); pctx.stroke();
-      pctx.fillText('選 '+ev.d.slice(0,4)+' '+ev.w, Math.min(x+4, wrapW-padR-90), 22);
-    });
-    pctx.restore();
-  }
-
   // 移動平均線疊圖 (5/10/20/60/120/240MA)
   if (maSet){
     MA_PERIODS.forEach(p=>{
@@ -1153,7 +1139,7 @@ function renderElection(el, key){
           <tr class="allrow"><td colspan="3">上漲機率</td>${sums.map(s=>win(s.win)).join('')}</tr>
         </tbody>
       </table></div>
-      <div class="note">基準日＝投票日當天或之前最後一個交易日的收盤(開票結果出爐前)。「選前20日／5日」＝基準日相對20／5個交易日前的漲跌；「選後」皆以基準日收盤為基準。點選列可在K線圖上定位，圖上的黃色虛線為選後第一個交易日。${E.note?' '+E.note:''}${skipped.length?` ${skipped.map(e=>e.d.slice(0,4)).join('、')} 年的選舉不在資料範圍內。`:''}樣本只有幾次，僅供參考。</div>
+      <div class="note">基準日＝投票日當天或之前最後一個交易日的收盤(開票結果出爐前)。「選前20日／5日」＝基準日相對20／5個交易日前的漲跌；「選後」皆以基準日收盤為基準。點選列可在K線圖上定位到選後第一個交易日。${E.note?' '+E.note:''}${skipped.length?` ${skipped.map(e=>e.d.slice(0,4)).join('、')} 年的選舉不在資料範圍內。`:''}樣本只有幾次，僅供參考。</div>
 
       <h4 class="subhead">選舉週期：距上次選舉第幾年的年報酬</h4>
       <div class="tablewrap"><table class="stattable cycle">
@@ -1383,7 +1369,7 @@ function render(){
 
     <div class="panel">
       <div class="chartbar">
-        <h3 style="margin:0;">${meta.name} · K線圖${mode.key==='crash'?'(標記急跌事件)':mode.key==='cycle'&&electionOf(state.active)?'(標記總統選舉)':''}</h3>
+        <h3 style="margin:0;">${meta.name} · K線圖${mode.key==='crash'?'(標記急跌事件)':''}</h3>
         <div class="zoomrow">
           <button onclick="setZoomPreset('${state.active}','all')">全部</button>
           <button onclick="setZoomPreset('${state.active}',1250)">5年</button>
@@ -1405,7 +1391,6 @@ function render(){
         <span><i class="dot" style="background:var(--amber)"></i>創歷史新高</span>
         <span><i class="dot" style="background:var(--candle-down);opacity:.45"></i>下跌區間</span>
         <span><i class="dot" style="background:var(--candle-up);opacity:.45"></i>反彈區間</span>` : ''}
-        ${mode.key==='cycle' && electionOf(state.active) ? `<span><i class="dot" style="background:var(--amber)"></i>總統選舉(選後首個交易日)</span>` : ''}
         ${MA_PERIODS.map(p=>`<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
         ${meta.hasVolume ? `<span><i class="dot" style="background:var(--ma5)"></i>成交量${VOL_MA}MA</span>` : ''}
         <span style="color:var(--mute)">滾輪縮放 · 拖曳平移 · 點K棒看開高低收量</span>
