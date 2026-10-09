@@ -52,6 +52,7 @@ function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 /* ============================== 移動平均線 ============================== */
 const MA_PERIODS = [5,10,20,60,120,240];
+const VOL_MA = 5; // K線圖成交量均線天數
 function computeMA(closes, period){
   const n = closes.length;
   const ma = new Array(n).fill(NaN);
@@ -490,7 +491,10 @@ function loadIndex(key){
 // 依目前頁面需要才計算(均線 → 多空 → 急跌事件 / K棒型態)，結果快取
 function ensureComputed(key){
   const rows = state.data[key]; if (!rows) return;
-  if (!state.ma[key]) state.ma[key] = computeAllMA(rows.map(d=>d.close));
+  if (!state.ma[key]){
+    state.ma[key] = computeAllMA(rows.map(d=>d.close));
+    state.ma[key].vol5 = computeMA(rows.map(d=>d.volume||0), VOL_MA); // 成交量均線
+  }
   const regimes = getRegimes(key);
   if (state.theme==='crash' && state.mode==='crash' && !state.events[key]) state.events[key] = computeEvents(rows, state.params[key], state.ma[key], regimes);
   if (state.theme==='crash' && state.mode==='myth' && !state.myth[key]) state.myth[key] = computeMyth(rows, state.ma[key], state.mythParams);
@@ -664,7 +668,8 @@ function drawChart(key){
   }
 
   if (vctx){
-    let vmax=0; slice.forEach(d=>vmax=Math.max(vmax,d.volume||0));
+    const vma = maSet && maSet.vol5;
+    let vmax=0; slice.forEach((d,i)=>{ vmax=Math.max(vmax,d.volume||0); if (vma && !Number.isNaN(vma[s+i])) vmax=Math.max(vmax,vma[s+i]); });
     vctx.strokeStyle=C.grid; vctx.beginPath(); vctx.moveTo(padL,volH-14); vctx.lineTo(wrapW-padR,volH-14); vctx.stroke();
     slice.forEach((d,i)=>{
       const x=xAt(i); const h=(vmax>0)? (d.volume/vmax)*(volH-24):0;
@@ -672,6 +677,16 @@ function drawChart(key){
       const bw=Math.max(cw*0.62,1);
       vctx.fillRect(x-bw/2, volH-14-h, bw, h);
     });
+    // 成交量5MA
+    if (vma && vmax>0){
+      vctx.beginPath(); let started=false;
+      for (let i=0;i<n;i++){
+        const v = vma[s+i]; if (Number.isNaN(v)){ started=false; continue; }
+        const x=xAt(i), y=volH-14-(v/vmax)*(volH-24);
+        if (!started){ vctx.moveTo(x,y); started=true; } else vctx.lineTo(x,y);
+      }
+      vctx.strokeStyle=C.ma[5]; vctx.lineWidth=1.3; vctx.stroke();
+    }
   }
 
   // 點選的K棒：垂直虛線 + 收盤價水平線
@@ -771,7 +786,7 @@ function updateOhlcInfo(){
   el.innerHTML = `<b>${d.date}</b>
     <span>開 <em>${f(d.open)}</em></span><span>高 <em>${f(d.high)}</em></span><span>低 <em>${f(d.low)}</em></span>
     <span>收 <em class="${cls}">${f(d.close)}</em></span><span class="${cls}">${fmtPct(chg,2)}</span>
-    <span>${volLabel(key)} <em>${fmtVol(d.volume)}</em></span>${mas}
+    <span>${volLabel(key)} <em>${fmtVol(d.volume)}</em></span>${(()=>{ const v=state.ma[key]&&state.ma[key].vol5[i]; return v>0 ? `<span>${VOL_MA}日均${volLabel(key)==='量'?'量':'值'} <em>${fmtVol(v)}</em></span>` : ''; })()}${mas}
     <span class="mute">← → 移動 · Esc 取消</span>`;
 }
 document.addEventListener('keydown', (ev)=>{
@@ -1392,6 +1407,7 @@ function render(){
         <span><i class="dot" style="background:var(--candle-up);opacity:.45"></i>反彈區間</span>` : ''}
         ${mode.key==='cycle' && electionOf(state.active) ? `<span><i class="dot" style="background:var(--amber)"></i>總統選舉(選後首個交易日)</span>` : ''}
         ${MA_PERIODS.map(p=>`<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
+        ${meta.hasVolume ? `<span><i class="dot" style="background:var(--ma5)"></i>成交量${VOL_MA}MA</span>` : ''}
         <span style="color:var(--mute)">滾輪縮放 · 拖曳平移 · 點K棒看開高低收量</span>
       </div>
     </div>
