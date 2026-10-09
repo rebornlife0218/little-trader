@@ -21,6 +21,7 @@
     --blue:#5B8DEF;
     --candle-up:#E5484D;
     --candle-down:#2ECC71;
+    --ma5:#E8C547;    /* 5MA 黃 */
     --ma10:#5B8DEF;   /* 10MA 藍 */
     --ma20:#B07CF0;   /* 20MA 紫 */
     --ma60:#9AA1AC;   /* 60MA 灰 */
@@ -51,6 +52,7 @@
     --blue:#2F66D0;
     --candle-up:#D92D33;
     --candle-down:#14965A;
+    --ma5:#B8960B;
     --ma10:#2F66D0;
     --ma20:#8E4FD8;
     --ma60:#7A828E;
@@ -280,3 +282,9 @@
   .split > table{flex:0 1 260px;}
   .chap-foot{display:flex;justify-content:space-between;margin-top:22px;padding-top:14px;border-top:1px solid var(--border);}
   .chap-nav{color:var(--amber);text-decoration:none;font-weight:600;font-size:13.5px;}
+
+  /* 常見迷思表格：均線、類型欄位置中對齊 */
+  table.stattable.myth td.line, table.stattable.myth td.kind{text-align:center;font-family:'Inter',sans-serif;font-weight:600;}
+  table.stattable.myth td.line small{display:block;margin-top:2px;color:var(--mute);font-weight:400;font-size:10.5px;font-family:'IBM Plex Mono',monospace;}
+  table.stattable.myth td.line{border-right:1px solid var(--grid);}
+  h4.subhead{margin:20px 0 8px;font-size:13.5px;color:var(--text);}

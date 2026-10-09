@@ -39,7 +39,7 @@ let state = {
   openPattern: null, // 型態總覽中展開的型態
   mode: 'crash',   // 大盤漲跌分析的模式：'crash' 跌深反彈 | 'myth' 常見迷思 | 'm3' | 'm4'
   myth: {},        // key -> 常見迷思統計 (null = 需重算)
-  mythParams: {settleDays:20, confirmDays:10},
+  mythParams: {settleDays:15, confirmDays:1},
   cursor: {},      // key -> K線圖上點選的資料索引
 };
 
@@ -49,7 +49,7 @@ function fmtNum(x,digits=2){ if(x===null||x===undefined||Number.isNaN(x)) return
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 /* ============================== 移動平均線 ============================== */
-const MA_PERIODS = [10,20,60,120,240];
+const MA_PERIODS = [5,10,20,60,120,240];
 function computeMA(closes, period){
   const n = closes.length;
   const ma = new Array(n).fill(NaN);
@@ -527,7 +527,7 @@ function hexA(hex, a){ const h=hex.replace('#',''); const n=parseInt(h.length===
 function chartColors(){
   const v = LT.cssVar;
   return { grid:v('--grid'), text:v('--mute'), up:v('--candle-up'), down:v('--candle-down'), blue:v('--blue'), amber:v('--amber'),
-    ma:{10:v('--ma10'), 20:v('--ma20'), 60:v('--ma60'), 120:v('--ma120'), 240:v('--ma240')}, cursor:v('--text') };
+    ma:{5:v('--ma5'), 10:v('--ma10'), 20:v('--ma20'), 60:v('--ma60'), 120:v('--ma120'), 240:v('--ma240')}, cursor:v('--text') };
 }
 /* ============================== Canvas 圖表 ============================== */
 function drawChart(key){
@@ -626,7 +626,7 @@ function drawChart(key){
   const labelEvery = Math.max(1, Math.floor(n/6));
   for (let i=0;i<n;i+=labelEvery){ pctx.fillText(slice[i].date, xAt(i)-24, priceH-4); }
 
-  // 移動平均線疊圖 (10/20/60/120/240MA)
+  // 移動平均線疊圖 (5/10/20/60/120/240MA)
   if (maSet){
     MA_PERIODS.forEach(p=>{
       const arr = maSet[p];
@@ -791,6 +791,7 @@ function computeMyth(rows, ma, prm){
           let extreme = prevAbove ? Infinity : -Infinity;
           for (let k=i+1;k<=ext20;k++) extreme = prevAbove ? Math.min(extreme, rows[k].low) : Math.max(extreme, rows[k].high);
           const ev = { idx:i, date:rows[i].date, back: i+prm.confirmDays<n ? back : null,
+            candle: rows[i].close>rows[i].open ? 'red' : rows[i].close<rows[i].open ? 'black' : 'flat',
             ext: ext20>i ? extreme/closes[i]-1 : NaN,
             ret5:fwd(i,5), ret10:fwd(i,10), ret20:fwd(i,20), ret60:fwd(i,60) };
           if (prevAbove) down[runAbove>=prm.settleDays ? 'first' : 'later'].push(ev);
@@ -825,7 +826,7 @@ function renderMyth(){
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
   const rate = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td><b>${(v*100).toFixed(0)}%</b></td>`;
   const table = (groups, isDown)=>`
-    <div class="tablewrap"><table class="stattable">
+    <div class="tablewrap"><table class="stattable myth">
       <thead>
         <tr><th rowspan="2">均線</th><th rowspan="2">類型</th><th rowspan="2">次數</th>
           <th rowspan="2">${prm.confirmDays}日內${isDown?'站回均線<br>(有支撐)':'跌回均線<br>(有壓力)'}</th>
@@ -835,18 +836,48 @@ function renderMyth(){
       </thead>
       <tbody>${groups.map(g=>[['first', isDown?'初次跌破':'初次突破'], ['later', isDown?'後續跌破':'後續突破']].map(([t,label],j)=>{
         const s = mythSummary(g[t]);
-        return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2">${g.line.name}<small class="hint-s">${g.line.p}MA</small></td>`:''}
-          <td>${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}
+        return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`:''}
+          <td class="kind">${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}
           ${win(s.win5)}${win(s.win10)}${win(s.win20)}${win(s.win60)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}${pct(s.avg60)}</tr>`;
       }).join('')).join('')}</tbody>
     </table></div>`;
+  // 穿越當天收紅K還是黑K：哪一種比較容易有支撐(跌破)／有壓力(突破)
+  const candleTable = (groups, isDown)=>`
+    <h4 class="subhead">${isDown?'跌破當天收紅K還是黑K，比較容易有撐？':'突破當天收紅K還是黑K，比較容易遇到壓力？'}</h4>
+    <div class="tablewrap"><table class="stattable myth">
+      <thead>
+        <tr><th rowspan="2">均線</th><th rowspan="2">${isDown?'跌破':'突破'}當天</th><th rowspan="2">次數</th>
+          <th rowspan="2">${prm.confirmDays}日內${isDown?'站回均線<br>(有支撐)':'跌回均線<br>(有壓力)'}</th>
+          <th colspan="3">勝率(上漲機率)</th><th colspan="3">平均報酬率</th></tr>
+        <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+5日</th><th>+10日</th><th>+20日</th></tr>
+      </thead>
+      <tbody>${groups.map(g=>{
+        const all = g.first.concat(g.later);
+        return [['red','紅K','var(--candle-up)'],['black','黑K','var(--candle-down)']].map(([c,label,color],j)=>{
+          const s = mythSummary(all.filter(e=>e.candle===c));
+          return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`:''}
+            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${rate(s.backRate)}
+            ${win(s.win5)}${win(s.win10)}${win(s.win20)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}</tr>`;
+        }).join('');
+      }).join('')}</tbody>
+    </table></div>`;
+  const candleInsight = (groups, isDown)=> groups.map(g=>{
+    const all = g.first.concat(g.later);
+    const r = mythSummary(all.filter(e=>e.candle==='red')), b = mythSummary(all.filter(e=>e.candle==='black'));
+    if (Number.isNaN(r.backRate) || Number.isNaN(b.backRate)) return '';
+    const p = v=> (v*100).toFixed(0)+'%';
+    const act = isDown ? '站回均線(有撐)' : '跌回均線(有壓)';
+    const who = Math.abs(r.backRate-b.backRate) < 0.03 ? '紅K與黑K差不多' : (r.backRate > b.backRate ? '收<b class="up">紅K</b>較常' : '收<b class="down">黑K</b>較常') + act;
+    const few = Math.min(r.count, b.count) < 20 ? `<span class="mute">(${r.count<b.count?'紅K':'黑K'}僅 ${Math.min(r.count,b.count)} 次，樣本少、參考性低)</span>` : '';
+    return `<li><b>${g.line.name}</b>：${isDown?'跌破':'突破'}當天收紅K ${p(r.backRate)}(${r.count}次)、收黑K ${p(b.backRate)}(${b.count}次)在${prm.confirmDays}日內${act} → ${who}${few}。</li>`;
+  }).join('');
   const insight = (groups, isDown)=> groups.map(g=>{
     const f = mythSummary(g.first), l = mythSummary(g.later);
     if (!f.count && !l.count) return '';
     const p = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
     const verb = isDown ? '跌破' : '突破', act = isDown ? '站回均線' : '跌回均線';
     const stronger = Number.isNaN(f.backRate)||Number.isNaN(l.backRate) ? '' :
-      (f.backRate > l.backRate ? `初次${verb}較常${act}` : f.backRate < l.backRate ? `後續${verb}較常${act}` : '兩者相近');
+      (Math.abs(f.backRate-l.backRate) < 0.03 ? '兩者相近' : f.backRate > l.backRate ? `初次${verb}較常${act}` : `後續${verb}較常${act}`);
     return `<li><b>${g.line.name}</b>：初次${verb}後 ${p(f.backRate)} 在${prm.confirmDays}日內${act}，後續${verb} ${p(l.backRate)}${stronger?`(${stronger})`:''}；初次${verb}後20日勝率 ${p(f.win20)}、平均報酬 ${Number.isNaN(f.avg20)?'—':fmtPct(f.avg20)}。</li>`;
   }).join('');
   return `
@@ -854,30 +885,34 @@ function renderMyth(){
       <h3>判定參數</h3>
       <div class="paramgrid">
         <div class="paramitem">
-          <label>初次的定義(之前連續站在均線同一側) <b>${prm.settleDays}日</b></label>
+          <label>初次的定義(連續站在均線之上) <b>${prm.settleDays}日</b></label>
           <input type="range" min="5" max="60" step="1" value="${prm.settleDays}"
             onchange="setMythParam('settleDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
         </div>
         <div class="paramitem">
           <label>觀察天數(跌破或突破後) <b>${prm.confirmDays}日</b></label>
-          <input type="range" min="3" max="30" step="1" value="${prm.confirmDays}"
+          <input type="range" min="1" max="5" step="1" value="${prm.confirmDays}"
             onchange="setMythParam('confirmDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
         </div>
       </div>
-      <div class="note">跌破＝前一日收盤在均線之上、當日收盤落到均線之下；突破反之。之前已連續 ${prm.settleDays} 日以上站在均線另一側才算「初次」，剛穿越不久又再穿越的算「後續」(反覆)。有支撐＝跌破後 ${prm.confirmDays} 日內收盤又站回均線(假跌破)；有壓力＝突破後 ${prm.confirmDays} 日內又跌回均線(假突破)。報酬以穿越當天收盤價為基準。</div>
+      <div class="note">跌破＝前一日收盤在均線之上、當日收盤落到均線之下；突破反之。跌破前已連續 ${prm.settleDays} 日以上站在均線之上(突破則為之下)才算「初次」，剛穿越不久又再穿越的算「後續」(反覆)。有支撐＝跌破後 ${prm.confirmDays} 日內收盤又站回均線(假跌破)；有壓力＝突破後 ${prm.confirmDays} 日內又跌回均線(假突破)。報酬以穿越當天收盤價為基準。</div>
     </div>
 
     <div class="panel">
       <h3>跌破均線：有沒有支撐？</h3>
       ${table(res.down, true)}
       <ul class="insight">${insight(res.down, true)}</ul>
+      ${candleTable(res.down, true)}
+      <ul class="insight">${candleInsight(res.down, true)}</ul>
     </div>
 
     <div class="panel">
       <h3>突破均線：有沒有壓力？</h3>
       ${table(res.up, false)}
       <ul class="insight">${insight(res.up, false)}</ul>
-      <div class="note">常見說法如「跌破季線就該出場」「突破年線就會大漲」，可對照上表的勝率與報酬檢驗是否成立。歷史統計不代表未來，樣本數少時僅供參考。</div>
+      ${candleTable(res.up, false)}
+      <ul class="insight">${candleInsight(res.up, false)}</ul>
+      <div class="note">常見說法如「跌破季線就該出場」「突破年線就會大漲」，可對照上表的勝率與報酬檢驗是否成立。紅K／黑K分析合併初次與後續穿越的所有事件，以穿越當天的K棒顏色分組(收盤＞開盤為紅K)。歷史統計不代表未來，樣本數少時僅供參考。</div>
     </div>`;
 }
 
