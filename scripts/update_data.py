@@ -1,5 +1,5 @@
 """
-下載全球 10 大指數 OHLCV (yfinance)，輸出給網頁讀取的 CSV 與更新時間。
+下載全球 10 大指數 OHLCV (yfinance)，每個指數輸出一個 JSON 給網頁讀取，並記錄更新時間。
 由 GitHub Actions 排程執行，也可在本機手動執行：python scripts/update_data.py
 """
 import json
@@ -13,7 +13,6 @@ import yfinance as yf
 
 START_DATE = '1991-01-01'
 OUT_DIR = Path(__file__).resolve().parent.parent / 'data'
-CSV_PATH = OUT_DIR / 'global_indices_ohlcv.csv'
 META_PATH = OUT_DIR / 'meta.json'
 
 tickers = {
@@ -57,38 +56,45 @@ def download(retries=4):
 def main():
     data = download()[target_fields]
     data = data.rename(columns=tickers, level=1)
-    data.columns = [f'{ticker}_{field}' for field, ticker in data.columns]
-
-    df_all = data.reset_index()
-    df_all['Date'] = pd.to_datetime(df_all['Date']).dt.strftime('%Y-%m-%d')
-
-    # 沒抓到資料或休市日以 0 填補(網頁端會把 0 視為無交易日略過)
-    data_cols = [c for c in df_all.columns if c != 'Date']
-    df_all[data_cols] = df_all[data_cols].fillna(0).astype('float64')
-    # 價格取到小數 2 位、成交量取整數，縮小檔案
-    for c in data_cols:
-        df_all[c] = df_all[c].round(0 if c.endswith('_Volume') else 2)
-
-    if len(df_all) < 5000:
-        raise RuntimeError(f'資料筆數異常偏少({len(df_all)})，中止更新')
+    dates = pd.to_datetime(data.index).strftime('%Y-%m-%d')
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    df_all.to_csv(CSV_PATH, index=False)
+    for old in OUT_DIR.glob('*'):  # 清掉舊檔(含過去的整合 CSV)
+        if old.is_file():
+            old.unlink()
+
+    # 每個指數各存一個精簡 JSON(欄位式陣列)，網頁只需載入正在看的指數
+    index_meta = {}
+    for name in tickers.values():
+        df = pd.DataFrame({f: data[f][name].values for f in target_fields}, index=dates)
+        # 休市或缺值的日子(任一價格 <= 0 或缺值)直接剔除
+        ok = (df[['Open', 'High', 'Low', 'Close']] > 0).all(axis=1)
+        df = df[ok]
+        if len(df) < 250:
+            raise RuntimeError(f'{name} 資料筆數異常偏少({len(df)})，中止更新')
+        payload = {
+            'd': list(df.index),
+            'o': df['Open'].round(2).tolist(),
+            'h': df['High'].round(2).tolist(),
+            'l': df['Low'].round(2).tolist(),
+            'c': df['Close'].round(2).tolist(),
+            'v': df['Volume'].fillna(0).round(0).astype('int64').tolist(),
+        }
+        (OUT_DIR / f'{name}.json').write_text(json.dumps(payload, separators=(',', ':')), encoding='utf-8')
+        index_meta[name] = {'rows': len(df), 'first': df.index[0], 'last': df.index[-1],
+                            'has_volume': bool((df['Volume'] > 0).any())}
 
     tw_now = datetime.now(timezone(timedelta(hours=8)))
-    last_dates = {}
-    for name in tickers.values():
-        traded = df_all.loc[df_all[f'{name}_Close'] > 0, 'Date']
-        last_dates[name] = traded.iloc[-1] if len(traded) else None
     META_PATH.write_text(json.dumps({
         'updated_at': tw_now.strftime('%Y-%m-%d %H:%M'),
+        'version': tw_now.strftime('%Y%m%d%H%M'),
         'timezone': 'Asia/Taipei',
-        'rows': len(df_all),
-        'last_trade_date': last_dates,
+        'indices': index_meta,
     }, ensure_ascii=False, indent=2), encoding='utf-8')
 
-    print(f'已儲存 {CSV_PATH} ({len(df_all)} 筆)，更新時間 {tw_now:%Y-%m-%d %H:%M}')
-    print(json.dumps(last_dates, ensure_ascii=False))
+    print(f'已更新 {len(index_meta)} 個指數，更新時間 {tw_now:%Y-%m-%d %H:%M}')
+    for k, m in index_meta.items():
+        print(f"  {k:8s} {m['rows']:5d} 筆  {m['first']} ~ {m['last']}")
 
 
 if __name__ == '__main__':

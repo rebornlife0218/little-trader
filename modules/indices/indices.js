@@ -21,200 +21,27 @@ const DEFAULT_PARAMS = { dropPct:-10, windowDays:5, bottomSearchDays:10, followU
 let state = {
   dataStatus: 'loading', // 'loading' | 'ok' | 'error'
   dataMeta: null,  // data/meta.json
-  active: null,
+  active: 'TAIEX',
   theme: 'crash',  // 'crash' | 'candle'
-  indexList: [],  // [{key,name}] 目前顯示的分頁，動態依資料而定
-  data: {},       // key -> array of {t(ms), date(str), open,high,low,close,volume}
+  regimeDef: 'ma_pos', // 多頭/盤整/空頭的定義，見 REGIME_DEFS
+  indexList: [],  // [{key,name}] 下拉選單
+  data: {},       // key -> array of {date, open,high,low,close,volume}
+  loading: {},    // key -> Promise(下載中)
   meta: {},       // key -> {name, hasOHLC, hasVolume}
-  events: {},     // key -> computed events
   ma: {},         // key -> {5:[],20:[],60:[],240:[]}
-  candlePatterns: {}, // key -> {p1:[],p2:[],p3:[],p4:[],p5_red:[],p5_black:[],p5_up:[],p5_down:[]}
+  regimes: {},    // key -> {defKey, arr:['多頭'|'盤整'|'空頭'|'N/A']}
+  events: {},     // key -> computed events (null = 需重算)
+  candlePatterns: {}, // key -> {patternKey: occurrences[]} (null = 需重算)
   candleParams: {},   // key -> {longBodyPct, longShadowPct, volumeSpikeFactor}
   params: {},     // key -> params per index
   view: {},       // key -> {start,end} index window for chart
+  openPattern: null, // 型態總覽中展開的型態
 };
 
 /* ============================== 小工具 ============================== */
-function fmtDate(ms){ const d=new Date(ms); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 function fmtPct(x,digits=1){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return (x*100>=0?'+':'')+(x*100).toFixed(digits)+'%'; }
 function fmtNum(x,digits=2){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return Number(x).toLocaleString('en-US',{maximumFractionDigits:digits}); }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
-
-/* ============================== CSV 解析 ============================== */
-const COL_ALIASES = {
-  date:['date','日期'],
-  open:['open','開盤','開盤價'],
-  high:['high','最高','最高價'],
-  low:['low','最低','最低價'],
-  close:['close','price','收盤','收盤價','adj close','adjclose'],
-  volume:['volume','vol.','vol','成交量','成交金額'],
-};
-function findCol(headers, key){
-  const aliases = COL_ALIASES[key];
-  const lower = headers.map(h=>h.trim().toLowerCase());
-  for(const a of aliases){ const idx=lower.indexOf(a); if(idx>-1) return idx; }
-  return -1;
-}
-function parseNumberLoose(s){
-  if (s===undefined||s===null) return NaN;
-  s = String(s).trim().replace(/["]/g,'');
-  if (s==='' || s==='-' || s.toLowerCase()==='nan') return NaN;
-  s = s.replace(/,/g,'');
-  let mult=1;
-  if (/[kK]$/.test(s)){ mult=1e3; s=s.slice(0,-1); }
-  else if (/[mM]$/.test(s)){ mult=1e6; s=s.slice(0,-1); }
-  else if (/[bB]$/.test(s)){ mult=1e9; s=s.slice(0,-1); }
-  const v = parseFloat(s);
-  return Number.isNaN(v) ? NaN : v*mult;
-}
-function parseDateLoose(s){
-  s = String(s).trim();
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (m) return Date.UTC(+m[1], +m[2]-1, +m[3]);
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (m) return Date.UTC(+m[3], +m[1]-1, +m[2]);
-  m = s.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})/);
-  if (m){ const months={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    let y=+m[3]; if(y<100) y+=2000; return Date.UTC(y, months[m[2]], +m[1]); }
-  const d = Date.parse(s);
-  return Number.isNaN(d) ? null : d;
-}
-// 單一指數 OHLCV 格式(如 Yahoo Finance / investing.com 匯出)
-function parseSingleCSV(lines, headers){
-  const ci = {
-    date: findCol(headers,'date'), open: findCol(headers,'open'), high: findCol(headers,'high'),
-    low: findCol(headers,'low'), close: findCol(headers,'close'), volume: findCol(headers,'volume'),
-  };
-  if (ci.date===-1 || ci.close===-1) throw new Error('找不到「日期」或「收盤價」欄位，請確認CSV表頭');
-  const rows = [];
-  for (let i=1;i<lines.length;i++){
-    const cols = lines[i].split(',');
-    const t = parseDateLoose(cols[ci.date]);
-    const close = parseNumberLoose(cols[ci.close]);
-    if (t===null || Number.isNaN(close) || close<=0) continue; // 無交易日(開高低收皆0)直接跳過
-    const open = ci.open>-1 ? parseNumberLoose(cols[ci.open]) : close;
-    const high = ci.high>-1 ? parseNumberLoose(cols[ci.high]) : Math.max(open,close);
-    const low = ci.low>-1 ? parseNumberLoose(cols[ci.low]) : Math.min(open,close);
-    const volume = ci.volume>-1 ? parseNumberLoose(cols[ci.volume]) : 0;
-    if (ci.open>-1 && !(open>0)) continue;
-    if (ci.high>-1 && !(high>0)) continue;
-    if (ci.low>-1 && !(low>0)) continue;
-    rows.push({ t, date: fmtDate(t), open: Number.isNaN(open)?close:open, high: Number.isNaN(high)?close:high,
-                low: Number.isNaN(low)?close:low, close, volume: Number.isNaN(volume)?0:volume });
-  }
-  rows.sort((a,b)=>a.t-b.t);
-  const dedup=[]; let lastT=null;
-  for(const r of rows){ if(r.t!==lastT){ dedup.push(r); lastT=r.t; } else { dedup[dedup.length-1]=r; } }
-  if (dedup.length<30) throw new Error('有效資料筆數過少，請確認CSV內容');
-  return dedup;
-}
-// 寬表格式：一欄日期 + 多組「{代號}_Open/High/Low/Close/Volume」欄位(每個指數各一組OHLCV)
-const FIELD_SUFFIX = {open:'open', high:'high', low:'low', close:'close', volume:'volume', 'adj close':'close', adjclose:'close'};
-function parseWideOHLCV(lines, headers){
-  let dateIdx = findCol(headers,'date');
-  if (dateIdx===-1) dateIdx = 0;
-  const suffixRe = /^(.+?)[ _\.\-]+(open|high|low|close|volume|adj\s*close|adjclose)$/i;
-  const groups = {}; // prefix -> {openIdx,highIdx,lowIdx,closeIdx,volumeIdx}
-  headers.forEach((h,i)=>{
-    if (i===dateIdx) return;
-    const name = h.trim();
-    const m = name.match(suffixRe);
-    if (!m) return;
-    const prefix = m[1].trim();
-    const field = FIELD_SUFFIX[m[2].toLowerCase().replace(/\s+/g,' ')];
-    if (!field) return;
-    if (!groups[prefix]) groups[prefix] = {};
-    groups[prefix][field+'Idx'] = i;
-  });
-  const prefixes = Object.keys(groups).filter(p=>groups[p].closeIdx!==undefined);
-  if (prefixes.length===0) return null;
-  const seriesMap = {};
-  prefixes.forEach(p=>seriesMap[p]=[]);
-  for (let i=1;i<lines.length;i++){
-    const parts = lines[i].split(',');
-    const t = parseDateLoose(parts[dateIdx]);
-    if (t===null) continue;
-    const dateStr = fmtDate(t);
-    prefixes.forEach(p=>{
-      const g = groups[p];
-      const close = parseNumberLoose(parts[g.closeIdx]);
-      if (Number.isNaN(close) || close<=0) return; // 該指數當日無交易(開高低收皆0/缺值)則整列跳過，不畫圖也不納入計算
-      const open = g.openIdx!==undefined? parseNumberLoose(parts[g.openIdx]) : NaN;
-      const high = g.highIdx!==undefined? parseNumberLoose(parts[g.highIdx]) : NaN;
-      const low = g.lowIdx!==undefined? parseNumberLoose(parts[g.lowIdx]) : NaN;
-      const volume = g.volumeIdx!==undefined? parseNumberLoose(parts[g.volumeIdx]) : NaN;
-      // 若有提供開/高/低欄位，任一為0或無效同樣視為無交易日，整列跳過
-      if (g.openIdx!==undefined && !(open>0)) return;
-      if (g.highIdx!==undefined && !(high>0)) return;
-      if (g.lowIdx!==undefined && !(low>0)) return;
-      seriesMap[p].push({
-        t, date:dateStr,
-        open: Number.isNaN(open)?close:open,
-        high: Number.isNaN(high)?Math.max(Number.isNaN(open)?close:open, close):high,
-        low: Number.isNaN(low)?Math.min(Number.isNaN(open)?close:open, close):low,
-        close,
-        volume: (Number.isNaN(volume)||volume<0)?0:volume,
-        _hasOpen: g.openIdx!==undefined, _hasHigh: g.highIdx!==undefined, _hasLow: g.lowIdx!==undefined, _hasVol: g.volumeIdx!==undefined,
-      });
-    });
-  }
-  Object.keys(seriesMap).forEach(k=>{
-    seriesMap[k].sort((a,b)=>a.t-b.t);
-    const dedup=[]; let lastT=null;
-    for(const r of seriesMap[k]){ if(r.t!==lastT){ dedup.push(r); lastT=r.t; } else { dedup[dedup.length-1]=r; } }
-    seriesMap[k]=dedup;
-  });
-  return { cols: prefixes, seriesMap, groups };
-}
-// 寬表格式：一欄日期 + 多欄各指數收盤價(無OHLC，僅收盤價)
-function parseWideCSV(lines, headers){
-  let dateIdx = findCol(headers,'date');
-  if (dateIdx===-1) dateIdx = 0;
-  const cols = [];
-  headers.forEach((h,i)=>{
-    const name = h.trim();
-    if (i===dateIdx || name==='' || /^unnamed/i.test(name)) return;
-    cols.push({name, idx:i});
-  });
-  if (cols.length===0) throw new Error('找不到可用的指數欄位');
-  const seriesMap = {}; cols.forEach(c=>seriesMap[c.name]=[]);
-  for (let i=1;i<lines.length;i++){
-    const parts = lines[i].split(',');
-    const t = parseDateLoose(parts[dateIdx]);
-    if (t===null) continue;
-    const dateStr = fmtDate(t);
-    cols.forEach(c=>{
-      const v = parseNumberLoose(parts[c.idx]);
-      if (!Number.isNaN(v) && v>0){
-        seriesMap[c.name].push({t, date:dateStr, open:v, high:v, low:v, close:v, volume:0});
-      }
-    });
-  }
-  Object.keys(seriesMap).forEach(k=>{
-    seriesMap[k].sort((a,b)=>a.t-b.t);
-    const dedup=[]; let lastT=null;
-    for(const r of seriesMap[k]){ if(r.t!==lastT){ dedup.push(r); lastT=r.t; } else { dedup[dedup.length-1]=r; } }
-    seriesMap[k]=dedup;
-  });
-  return { cols: cols.map(c=>c.name), seriesMap };
-}
-// 自動判斷檔案格式：① 多指數「{代號}_Open/High/Low/Close/Volume」寬表(優先) ② 單一指數OHLCV ③ 多指數寬表(僅收盤價)
-function detectAndParseCSV(text){
-  const lines = text.split(/\r\n|\n|\r/).filter(l=>l.trim().length>0);
-  if (lines.length<2) throw new Error('檔案內容過少');
-  const headers = lines[0].split(',');
-  const ohlcv = parseWideOHLCV(lines, headers);
-  if (ohlcv){
-    return { mode:'wide_ohlcv', cols: ohlcv.cols, seriesMap: ohlcv.seriesMap, groups: ohlcv.groups };
-  }
-  const hasOpen = findCol(headers,'open')>-1;
-  const hasHigh = findCol(headers,'high')>-1;
-  if (hasOpen || hasHigh){
-    return { mode:'single', rows: parseSingleCSV(lines, headers) };
-  }
-  const { cols, seriesMap } = parseWideCSV(lines, headers);
-  return { mode:'wide', cols, seriesMap };
-}
 
 /* ============================== 移動平均線 ============================== */
 const MA_PERIODS = [5,20,60,240];
@@ -249,15 +76,64 @@ function computeVolAvgTrailing(vols, period){
   }
   return arr;
 }
-// 型態發生當天的多空氛圍：收盤價相對60日線/240日線的位置(與反彈結構統計的最終方向判定同一套邏輯)
-function regimeAt(i, ma, closes){
-  const ma60v = ma[60][i], ma240v = ma[240][i];
-  if (Number.isNaN(ma60v) || Number.isNaN(ma240v)) return 'N/A';
-  const c = closes[i];
-  if (c > ma240v*1.01 && c > ma60v) return '多頭';
-  if (c < ma240v*0.99 && c < ma60v) return '空頭';
-  return '盤整';
+/* ============================== 多頭/盤整/空頭定義 ==============================
+   使用者可在頁面上方切換；K棒型態的市場環境分組、反彈結構的最終方向都依此判定 */
+const REGIME_DEFS = [
+  {key:'ma_pos', name:'均線位置(60日線＋年線)',
+    desc:'收盤價高於60日線，且高於240日線(年線)1%以上＝多頭；同時低於兩者(低於年線1%以上)＝空頭；其餘＝盤整。'},
+  {key:'ma_align', name:'均線排列(20/60/240日)',
+    desc:'20日線 > 60日線 > 240日線(多頭排列)＝多頭；20日線 < 60日線 < 240日線(空頭排列)＝空頭；均線糾結交錯＝盤整。'},
+  {key:'ma240_slope', name:'年線方向(240日線斜率)',
+    desc:'240日線比20個交易日前上升1%以上＝多頭；下降1%以上＝空頭；其餘(年線走平)＝盤整。'},
+  {key:'ret60', name:'近一季漲跌(60日報酬)',
+    desc:'收盤價比60個交易日前上漲5%以上＝多頭；下跌5%以上＝空頭；其餘＝盤整。'},
+  {key:'range52w', name:'52週高低位置',
+    desc:'收盤價位於過去250個交易日最高價～最低價區間的上方30%＝多頭；下方30%＝空頭；中間＝盤整。'},
+];
+function computeRegimes(data, ma, defKey){
+  const n = data.length, out = new Array(n).fill('N/A');
+  const c = i=>data[i].close;
+  for (let i=0;i<n;i++){
+    let r = 'N/A';
+    if (defKey==='ma_pos'){
+      const m60=ma[60][i], m240=ma[240][i];
+      if (!Number.isNaN(m60) && !Number.isNaN(m240)) r = (c(i)>m240*1.01 && c(i)>m60)?'多頭':(c(i)<m240*0.99 && c(i)<m60)?'空頭':'盤整';
+    } else if (defKey==='ma_align'){
+      const a=ma[20][i], b=ma[60][i], d=ma[240][i];
+      if (![a,b,d].some(Number.isNaN)) r = (a>b && b>d)?'多頭':(a<b && b<d)?'空頭':'盤整';
+    } else if (defKey==='ma240_slope'){
+      const now=ma[240][i], prev=i>=20?ma[240][i-20]:NaN;
+      if (!Number.isNaN(now) && !Number.isNaN(prev)){ const sl=now/prev-1; r = sl>=0.01?'多頭':sl<=-0.01?'空頭':'盤整'; }
+    } else if (defKey==='ret60'){
+      if (i>=60){ const g=c(i)/c(i-60)-1; r = g>=0.05?'多頭':g<=-0.05?'空頭':'盤整'; }
+    } else if (defKey==='range52w'){
+      if (i>=249){
+        let hi=-Infinity, lo=Infinity;
+        for (let k=i-249;k<=i;k++){ if(data[k].high>hi) hi=data[k].high; if(data[k].low<lo) lo=data[k].low; }
+        const pos = hi>lo ? (c(i)-lo)/(hi-lo) : 0.5;
+        r = pos>=0.7?'多頭':pos<=0.3?'空頭':'盤整';
+      }
+    }
+    out[i] = r;
+  }
+  return out;
 }
+function regimeDef(){ return REGIME_DEFS.find(d=>d.key===state.regimeDef)||REGIME_DEFS[0]; }
+function getRegimes(key){
+  const cur = state.regimes[key];
+  if (cur && cur.defKey===state.regimeDef) return cur.arr;
+  const arr = computeRegimes(state.data[key], state.ma[key], state.regimeDef);
+  state.regimes[key] = {defKey:state.regimeDef, arr};
+  return arr;
+}
+function setRegimeDef(defKey){
+  state.regimeDef = defKey;
+  try{ localStorage.setItem('lt.regimeDef', defKey); }catch(e){}
+  // 各指數分析結果都要依新定義重算(用到時才算)
+  Object.keys(state.data).forEach(k=>{ state.events[k]=null; state.candlePatterns[k]=null; });
+  render();
+}
+
 /* K棒型態定義：新增型態只要在這裡加一筆
    group: single 單根 / double 兩根 / triple 三根 / volume 爆量
    bias : 偏多(預期上漲) / 偏空(預期下跌) / 中性(多空猶豫)
@@ -362,7 +238,7 @@ const CANDLE_PATTERNS = [
     rule:'紅K且下影線占振幅達門檻，且爆量。'},
 ];
 
-function detectCandlePatterns(data, ma, params){
+function detectCandlePatterns(data, ma, params, regimes){
   const n = data.length;
   const closes = data.map(d=>d.close);
   const vols = data.map(d=>d.volume||0);
@@ -438,7 +314,7 @@ function detectCandlePatterns(data, ma, params){
       const b20_10 = (i+10<n && !Number.isNaN(ma[20][i+10]))? (closes[i+10]-ma[20][i+10])/ma[20][i+10] : NaN;
       const b60_5 = (i+5<n && !Number.isNaN(ma[60][i+5]))? (closes[i+5]-ma[60][i+5])/ma[60][i+5] : NaN;
       const b60_10 = (i+10<n && !Number.isNaN(ma[60][i+10]))? (closes[i+10]-ma[60][i+10])/ma[60][i+10] : NaN;
-      return { idx:i, date:data[i].date, ret5, ret10, b20_5, b20_10, b60_5, b60_10, regime: regimeAt(i, ma, closes) };
+      return { idx:i, date:data[i].date, ret5, ret10, b20_5, b20_10, b60_5, b60_10, regime: regimes[i] };
     });
   }
   const out = {}; Object.keys(lists).forEach(k=>out[k]=enrich(lists[k]));
@@ -463,7 +339,7 @@ function summarizePatternGroup(occurrences){
 }
 
 // 反彈期間逐一檢查是否站上/遇壓每一條均線(收盤價需連續holdDays天不跌破才算站穩)
-function analyzeReboundStructure(closes, ma, bottomIdx, fEnd, holdDays){
+function analyzeReboundStructure(closes, ma, bottomIdx, fEnd, holdDays, regimes){
   const levels = MA_PERIODS.map(period=>{
     const arr = ma[period];
     let crossIdx=-1, held=null, rejectIdx=null;
@@ -480,13 +356,8 @@ function analyzeReboundStructure(closes, ma, bottomIdx, fEnd, holdDays){
     }
     return {period, crossIdx, held, rejectIdx};
   });
-  let finalDir = 'N/A';
-  const ma60v = ma[60][fEnd], ma240v = ma[240][fEnd], closeV = closes[fEnd];
-  if (!Number.isNaN(ma60v) && !Number.isNaN(ma240v)){
-    if (closeV > ma240v*1.01 && closeV > ma60v) finalDir='多方';
-    else if (closeV < ma240v*0.99 && closeV < ma60v) finalDir='空方';
-    else finalDir='盤整';
-  }
+  const r = regimes[fEnd];
+  const finalDir = r==='多頭'?'多方':r==='空頭'?'空方':r==='盤整'?'盤整':'N/A';
   return { levels, finalDir };
 }
 // 反彈無力點：從底部起，追蹤收盤價創的區間新高，第一次從某個高點回落達PULLBACK_PCT(預設3%)時，
@@ -506,7 +377,7 @@ function findStallPoint(closes, ma, bottomIdx, fEnd){
 }
 
 /* ============================== 崩跌/反彈偵測演算法 ============================== */
-function computeEvents(data, p, ma){
+function computeEvents(data, p, ma, regimes){
   const HOLD_DAYS = 5;
   const n = data.length;
   const dropPct = p.dropPct/100, windowDays = p.windowDays, bottomSearchDays = p.bottomSearchDays, followUpDays = p.followUpDays;
@@ -554,7 +425,7 @@ function computeEvents(data, p, ma){
       // 谷底乖離率：底部收盤價相對於20日線/60日線偏離的幅度，越負代表跌得越深、越可能超跌
       const bias20 = (ma && !Number.isNaN(ma[20][bottomIdx])) ? (closes[bottomIdx]-ma[20][bottomIdx])/ma[20][bottomIdx] : NaN;
       const bias60 = (ma && !Number.isNaN(ma[60][bottomIdx])) ? (closes[bottomIdx]-ma[60][bottomIdx])/ma[60][bottomIdx] : NaN;
-      const structure = ma ? analyzeReboundStructure(closes, ma, bottomIdx, fEnd, HOLD_DAYS) : null;
+      const structure = ma ? analyzeReboundStructure(closes, ma, bottomIdx, fEnd, HOLD_DAYS, regimes) : null;
       const stall = ma ? findStallPoint(closes, ma, bottomIdx, fEnd) : null;
       events.push({ peakIdx, peakVal, bottomIdx, bottomVal,
         dropActual:(bottomVal-peakVal)/peakVal, daysToBottom: bottomIdx-peakIdx,
@@ -606,103 +477,72 @@ function bucketByRatio(events){
   return { threshold:THRESHOLD, lowSummary:computeSummary(low), highSummary:computeSummary(high) };
 }
 
-/* ============================== 儲存 ============================== */
-// 過濾無交易日(開高低收皆0或無效值)的資料列，避免污染圖表與統計
-function sanitizeRows(rows, hasOHLC){
-  return rows.filter(r=>{
-    if (!(r.close>0)) return false;
-    if (hasOHLC){
-      if (!(r.open>0) || !(r.high>0) || !(r.low>0)) return false;
-    }
-    if (r.volume<0) r.volume = 0;
-    return true;
-  });
-}
-/* ============================== 初始化 ============================== */
-async function init(){
-  render();
-  await loadSiteData();
-  render();
-}
-
-/* ============================== 事件處理 ============================== */
-/* 匯入寬表(多指數)解析結果 */
-async function ingestWide(result){
-        const isOHLCV = result.mode==='wide_ohlcv';
-        const newIndexList=[];
-        for (const colName of result.cols){
-          let rows = result.seriesMap[colName];
-          if (rows.length<30) continue;
-          const hasVolume = rows.some(r=>r.volume>0);
-          const hasOHLC = isOHLCV && rows.some(r=>r._hasOpen||r._hasHigh||r._hasLow);
-          // 清掉內部標記欄位
-          rows.forEach(r=>{ delete r._hasOpen; delete r._hasHigh; delete r._hasLow; delete r._hasVol; });
-          rows = sanitizeRows(rows, hasOHLC);
-          if (rows.length<30) continue;
-          const displayName = TICKER_NAMES[colName] || colName;
-          const meta = {name:displayName, hasOHLC, hasVolume};
-          state.data[colName]=rows; state.meta[colName]=meta;
-          state.params[colName] = state.params[colName] || {...DEFAULT_PARAMS};
-          state.candleParams[colName] = state.candleParams[colName] || {...DEFAULT_CANDLE_PARAMS};
-          recompute(colName);
-          newIndexList.push({key:colName, name:displayName});
-        }
-        if (newIndexList.length===0) throw new Error('檔案中沒有找到足夠長度(≥30筆)的指數欄位');
-        const order = k=>{ const i=INDICES.findIndex(c=>c.key===k); return i<0?999:i; };
-        newIndexList.sort((a,b)=>order(a.key)-order(b.key));
-        state.indexList = newIndexList;
-        if (!newIndexList.find(x=>x.key===state.active)) state.active = (newIndexList.find(x=>x.key==='TAIEX')||newIndexList[0]).key;
-}
-/* 自動載入網站上的最新資料(由 GitHub Actions 每個工作日排程更新) */
-const DATA_URL = 'data/global_indices_ohlcv.csv';
+/* ============================== 資料載入 ==============================
+   每個指數一個 JSON(data/<代號>.json)，先載入正在看的指數，其餘於背景預先下載 */
 const META_URL = 'data/meta.json';
-async function loadSiteData(){
+async function init(){
+  try{ const d=localStorage.getItem('lt.regimeDef'); if (REGIME_DEFS.find(x=>x.key===d)) state.regimeDef=d; }catch(e){}
+  render();
   try{
-    const bust = '?v='+Math.floor(Date.now()/600000); // 每10分鐘換一次，避免瀏覽器快取舊資料
-    const [csvRes, metaRes] = await Promise.all([fetch(DATA_URL+bust), fetch(META_URL+bust).catch(()=>null)]);
-    if (!csvRes.ok) throw new Error('HTTP '+csvRes.status);
-    const result = detectAndParseCSV(await csvRes.text());
-    if (result.mode!=='wide_ohlcv' && result.mode!=='wide') throw new Error('資料格式不符');
-    await ingestWide(result);
-    if (metaRes && metaRes.ok){ try{ state.dataMeta = await metaRes.json(); }catch(e){} }
+    const res = await fetch(META_URL, {cache:'no-cache'});
+    if (!res.ok) throw new Error('HTTP '+res.status);
+    state.dataMeta = await res.json();
+    const avail = state.dataMeta.indices || {};
+    state.indexList = INDICES.filter(c=>avail[c.key]).map(c=>({key:c.key, name:c.name}));
+    if (!state.indexList.length) throw new Error('沒有可用的指數資料');
+    if (!avail[state.active]) state.active = state.indexList[0].key;
+    await loadIndex(state.active);
     state.dataStatus = 'ok';
-    return true;
   }catch(err){
-    console.warn('自動載入資料失敗', err);
+    console.warn('載入資料失敗', err);
     state.dataStatus = 'error';
     state.dataError = String(err && err.message || err);
-    return false;
   }
+  render();
+  // 背景預載其他指數(只下載不計算)，切換時幾乎即時
+  const idle = window.requestIdleCallback || (f=>setTimeout(f, 800));
+  idle(()=>state.indexList.forEach(c=>loadIndex(c.key).catch(()=>{})));
+}
+function loadIndex(key){
+  if (state.data[key]) return Promise.resolve();
+  if (state.loading[key]) return state.loading[key];
+  const v = state.dataMeta && state.dataMeta.version ? '?v='+state.dataMeta.version : '';
+  state.loading[key] = fetch(`data/${key}.json${v}`).then(r=>{
+    if (!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(j=>{
+    const rows = new Array(j.d.length);
+    for (let i=0;i<j.d.length;i++) rows[i] = {date:j.d[i], open:j.o[i], high:j.h[i], low:j.l[i], close:j.c[i], volume:j.v[i]||0};
+    state.data[key] = rows;
+    state.meta[key] = {name:TICKER_NAMES[key]||key, hasOHLC:true, hasVolume:rows.some(r=>r.volume>0)};
+    state.params[key] = state.params[key] || {...DEFAULT_PARAMS};
+    state.candleParams[key] = state.candleParams[key] || {...DEFAULT_CANDLE_PARAMS};
+    state.view[key] = {start:0, end:rows.length-1};
+  }).finally(()=>{ delete state.loading[key]; });
+  return state.loading[key];
+}
+// 依目前頁面需要才計算(均線 → 多空 → 急跌事件 / K棒型態)，結果快取
+function ensureComputed(key){
+  const rows = state.data[key]; if (!rows) return;
+  if (!state.ma[key]) state.ma[key] = computeAllMA(rows.map(d=>d.close));
+  const regimes = getRegimes(key);
+  if (state.theme==='crash' && !state.events[key]) state.events[key] = computeEvents(rows, state.params[key], state.ma[key], regimes);
+  if (state.theme==='candle' && !state.candlePatterns[key]) state.candlePatterns[key] = detectCandlePatterns(rows, state.ma[key], state.candleParams[key], regimes);
 }
 
-function recompute(key){
-  const rows = state.data[key];
-  if (!rows) return;
-  const ma = computeAllMA(rows.map(d=>d.close));
-  state.ma[key] = ma;
-  const events = computeEvents(rows, state.params[key], ma);
-  state.events[key] = events;
-  state.view[key] = {start:0, end: rows.length-1};
-  const meta = state.meta[key];
-  state.candlePatterns[key] = (meta && meta.hasOHLC) ? detectCandlePatterns(rows, ma, state.candleParams[key]||DEFAULT_CANDLE_PARAMS) : null;
-}
-function recomputeCandlePatterns(key){
-  const rows = state.data[key], meta = state.meta[key];
-  if (!rows || !meta || !meta.hasOHLC){ state.candlePatterns[key] = null; return; }
-  state.candlePatterns[key] = detectCandlePatterns(rows, state.ma[key], state.candleParams[key]||DEFAULT_CANDLE_PARAMS);
-}
 function setCandleParam(key, field, value){
   state.candleParams[key][field] = value;
-  recomputeCandlePatterns(key);
+  state.candlePatterns[key] = null;
   render();
 }
 function setParam(key, field, value){
   state.params[key][field] = value;
-  recompute(key);
+  state.events[key] = null;
   render();
 }
-function focusEvent(key, ev){
+function focusEvent(key, evIdx){
   const rows = state.data[key];
+  const ev = state.events[key][evIdx];
   const pad = Math.max(20, Math.round((ev.daysToRecover||ev.daysToBottom||30)*1.5));
   const s = clamp(ev.peakIdx-pad,0,rows.length-1);
   const e = clamp((ev.recoverIdx>-1?ev.recoverIdx:ev.bottomIdx)+pad,0,rows.length-1);
@@ -912,79 +752,50 @@ function hitCell(v){
   if (Number.isNaN(v)) return '<span class="tag na">—</span>';
   return `<b class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</b>`;
 }
-function toggleCandleGuide(){ state.candleGuideOpen = state.candleGuideOpen===false; render(); }
-function openPattern(k){
-  const el = document.getElementById('pat-'+k);
-  if (el){ el.open = true; el.scrollIntoView({behavior:'smooth', block:'start'}); }
-}
-
+function togglePattern(k){ state.openPattern = state.openPattern===k ? null : k; render(); }
 function renderCandleTheme(){
   const key = state.active;
-  const meta = state.meta[key] || {};
-  if (!meta.hasOHLC){
-    return `<div class="panel"><div class="note">此指數資料沒有開高低價(僅收盤價)，無法進行K棒型態分析。</div></div>`;
-  }
   const patterns = state.candlePatterns[key];
   if (!patterns) return `<div class="panel"><div class="note">尚未計算型態資料。</div></div>`;
   const cp = state.candleParams[key] || DEFAULT_CANDLE_PARAMS;
-  const guideOpen = state.candleGuideOpen !== false;
+  const hasVol = (state.meta[key]||{}).hasVolume;
 
   let html = `
-    <div class="panel">
-      <div class="guide-head" onclick="toggleCandleGuide()">
-        <h3 style="margin:0;">新手導讀：K棒怎麼看？</h3><span class="mute">${guideOpen?'收合 ▲':'展開 ▼'}</span>
-      </div>
-      ${guideOpen ? `
-      <div class="guide">
-        <div class="guide-fig">
-          ${candleSVG([{o:30,h:92,l:8,c:70},{o:70,h:92,l:8,c:30}], null, 1.6)}
-          <div class="guide-cap"><span style="color:var(--candle-up)">紅K</span>：收盤 &gt; 開盤(上漲)<br><span style="color:var(--candle-down)">黑K(綠)</span>：收盤 &lt; 開盤(下跌)</div>
-        </div>
-        <ul>
-          <li><b>實體</b>：開盤價到收盤價之間的粗柱子，越長代表當天漲跌力道越強(長紅、長黑)。</li>
-          <li><b>上影線</b>：實體上方的細線，代表盤中最高價。上影線長＝曾經漲上去但被賣下來，<b>上方有賣壓</b>。</li>
-          <li><b>下影線</b>：實體下方的細線，代表盤中最低價。下影線長＝曾經跌下去但被買回來，<b>下方有支撐</b>。</li>
-          <li><b>偏多/偏空</b>：型態傳統上暗示之後比較可能上漲(偏多)或下跌(偏空)。同一個形狀出現在不同位置(漲多後 vs 跌深後)，意義可能完全相反。</li>
-          <li><b>應驗率</b>：本站用歷史資料實際驗證──偏多型態看之後10天有沒有漲、偏空型態看之後10天有沒有跌。高於50%(綠色)代表這個型態在該指數上歷史表現較可靠。</li>
-          <li><b>多頭/盤整/空頭</b>：型態出現時的大環境，依收盤價相對60日線、240日線位置判斷。同一型態在不同大環境下表現常常差很多。</li>
-        </ul>
-        <div class="note" style="margin-top:4px;">K棒型態只是機率上的參考，不保證之後的走勢，請搭配趨勢、成交量與自己的風險控管。</div>
-      </div>` : ''}
-    </div>
-
     <div class="panel">
       <h3>型態判定參數</h3>
       <div class="paramgrid">
         <div class="paramitem">
           <label>長紅／長黑門檻(實體／開盤價) <b>${cp.longBodyPct}%</b></label>
           <input type="range" min="0.3" max="5" step="0.1" value="${cp.longBodyPct}"
-            oninput="setCandleParam('${key}','longBodyPct',+this.value)">
+            onchange="setCandleParam('${key}','longBodyPct',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
         <div class="paramitem">
           <label>長影線門檻(佔當天振幅) <b>${cp.longShadowPct}%</b></label>
           <input type="range" min="10" max="80" step="1" value="${cp.longShadowPct}"
-            oninput="setCandleParam('${key}','longShadowPct',+this.value)">
+            onchange="setCandleParam('${key}','longShadowPct',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
         <div class="paramitem">
           <label>爆量倍數(相對前${VOL_SPIKE_LOOKBACK}日均量) <b>${cp.volumeSpikeFactor}x</b></label>
           <input type="range" min="1.1" max="4" step="0.1" value="${cp.volumeSpikeFactor}"
-            oninput="setCandleParam('${key}','volumeSpikeFactor',+this.value)">
+            onchange="setCandleParam('${key}','volumeSpikeFactor',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'x'">
         </div>
       </div>
       <div class="note">長紅/長黑：實體(｜收盤－開盤｜)占開盤價的比例達門檻。小實體：未達門檻的4成。長影線：影線占當天振幅(最高－最低)的比例達門檻。爆量：成交量達前${VOL_SPIKE_LOOKBACK}日均量的設定倍數。「前段下跌/上漲」：收盤比5天前低(高)，且在20日線之下(上)。</div>
     </div>
 
     <div class="panel">
-      <h3>型態總覽(點選列可查看說明與詳細統計)</h3>
+      <h3>型態總覽(點選型態查看詳細統計)</h3>
       <div class="tablewrap">
         <table class="pattable">
-          <thead><tr><th>圖示</th><th>型態</th><th>類型</th><th>出現次數</th><th>10日上漲機率</th><th>平均10日報酬</th><th>10日應驗率</th></tr></thead>
+          <thead><tr><th>圖示</th><th>型態</th><th>類型</th><th>出現次數</th><th>10日上漲機率</th><th>平均10日報酬</th><th>10日應驗率</th><th></th></tr></thead>
           <tbody>
-          ${CANDLE_GROUPS.map(g=>`
-            <tr class="grouprow"><td colspan="7">${g.name}</td></tr>
+          ${CANDLE_GROUPS.filter(g=>hasVol || g.key!=='volume').map(g=>`
+            <tr class="grouprow"><td colspan="8">${g.name}</td></tr>
             ${CANDLE_PATTERNS.filter(p=>p.group===g.key).map(p=>{
-              const s = summarizePatternGroup(patterns[p.key]);
-              return `<tr onclick="openPattern('${p.key}')">
+              const occ = patterns[p.key];
+              const s = summarizePatternGroup(occ);
+              const open = state.openPattern===p.key;
+              return `<tr class="patrow ${open?'open':''}" onclick="togglePattern('${p.key}')">
                 <td class="kcell">${candleSVG(p.shape, p.vol, 0.75)}</td>
                 <td style="font-family:'Inter',sans-serif;font-weight:600;">${p.name}</td>
                 <td>${biasTag(p.bias)}</td>
@@ -992,55 +803,56 @@ function renderCandleTheme(){
                 <td>${fmtPct(s.win10,0).replace('+','')}</td>
                 <td class="${s.avg10>=0?'up':'down'}">${fmtPct(s.avg10)}</td>
                 <td>${hitCell(hitRate(p.bias, s.win10))}</td>
-              </tr>`;
+                <td class="chev">${open?'▴':'▾'}</td>
+              </tr>
+              ${open ? `<tr class="patdetail"><td colspan="8">${renderPatternDetail(p, occ)}</td></tr>` : ''}`;
             }).join('')}`).join('')}
           </tbody>
         </table>
       </div>
-      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例。應驗率：偏多型態＝上漲機率、偏空型態＝下跌機率；十字線為中性不計。</div>
+      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例。應驗率：偏多型態＝上漲機率、偏空型態＝下跌機率(高於50%以綠色顯示)；十字線為中性不計。</div>
     </div>
   `;
-  CANDLE_GROUPS.forEach(g=>{
-    html += `<h2 class="grouptitle">${g.name}</h2>`;
-    CANDLE_PATTERNS.filter(p=>p.group===g.key).forEach(p=>{
-      const occ = patterns[p.key];
-      const byRegime = {'多頭':occ.filter(e=>e.regime==='多頭'), '盤整':occ.filter(e=>e.regime==='盤整'), '空頭':occ.filter(e=>e.regime==='空頭')};
-      const last = occ.length ? occ[occ.length-1].date : null;
-      html += `<details class="panel patcard" id="pat-${p.key}">
-        <summary>
-          ${candleSVG(p.shape, p.vol, 0.8)}
-          <div class="pat-title"><b>${p.name}</b> ${biasTag(p.bias)}<small>共 ${occ.length} 次${last?` · 最近一次 ${last}`:''}</small></div>
-        </summary>
-        <div class="pat-body">
-          <div class="pat-explain">
-            ${candleSVG(p.shape, p.vol, 1.5)}
-            <div>
-              <p class="pat-meaning">${p.meaning}</p>
-              <p class="note" style="margin:6px 0 0;">判定條件：${p.rule}</p>
-            </div>
-          </div>
-          <div class="compare" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
-            ${['多頭','盤整','空頭'].map(r=>candleRegimeCol(r, byRegime[r])).join('')}
-          </div>
-        </div>
-      </details>`;
-    });
-  });
   return html;
 }
-function candleRegimeCol(regimeName, occ){
-  const s = summarizePatternGroup(occ);
-  const color = regimeName==='多頭'?'var(--up)':regimeName==='空頭'?'var(--down)':'var(--mute)';
-  return `<div class="col">
-    <h4><i class="dot" style="background:${color}"></i>${regimeName}(${s.count}次)</h4>
-    <div class="row"><span>+5日勝率</span><b class="${s.win5>=0.5?'up':'down'}">${fmtPct(s.win5,0)}</b></div>
-    <div class="row"><span>+10日勝率</span><b class="${s.win10>=0.5?'up':'down'}">${fmtPct(s.win10,0)}</b></div>
-    <div class="row"><span>平均+5日報酬</span><b class="${s.avg5>=0?'up':'down'}">${fmtPct(s.avg5)}</b></div>
-    <div class="row"><span>平均+10日報酬</span><b class="${s.avg10>=0?'up':'down'}">${fmtPct(s.avg10)}</b></div>
-    <div class="row"><span>+5日乖離率(20MA)</span><b>${fmtPct(s.avgB20_5)}</b></div>
-    <div class="row"><span>+10日乖離率(20MA)</span><b>${fmtPct(s.avgB20_10)}</b></div>
-    <div class="row"><span>+5日乖離率(60MA)</span><b>${fmtPct(s.avgB60_5)}</b></div>
-    <div class="row"><span>+10日乖離率(60MA)</span><b>${fmtPct(s.avgB60_10)}</b></div>
+// 展開的型態：說明 + 依市場環境分組的 +5/+10 日統計表
+function renderPatternDetail(p, occ){
+  const groups = [
+    {name:'全部', list:occ, color:'var(--amber)'},
+    {name:'多頭', list:occ.filter(e=>e.regime==='多頭'), color:'var(--up)'},
+    {name:'盤整', list:occ.filter(e=>e.regime==='盤整'), color:'var(--mute)'},
+    {name:'空頭', list:occ.filter(e=>e.regime==='空頭'), color:'var(--down)'},
+  ];
+  const pctCell = (v, signed=true)=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${signed?fmtPct(v):(v*100).toFixed(0)+'%'}</td>`;
+  const winCell = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
+  const last = occ.length ? occ[occ.length-1].date : null;
+  return `<div class="patdetail-inner">
+    <div class="pat-explain">
+      ${candleSVG(p.shape, p.vol, 1.4)}
+      <div>
+        <p class="pat-meaning"><b>${p.name}</b> ${biasTag(p.bias)}　${p.meaning}</p>
+        <p class="note" style="margin:6px 0 0;">判定條件：${p.rule}${last?`　·　最近一次出現：${last}`:''}</p>
+      </div>
+    </div>
+    <div class="tablewrap">
+      <table class="stattable">
+        <thead>
+          <tr><th rowspan="2">市場環境</th><th rowspan="2">次數</th><th colspan="2">勝率(上漲機率)</th><th colspan="2">平均報酬率</th><th colspan="2">乖離率(20MA)</th><th colspan="2">乖離率(60MA)</th></tr>
+          <tr><th>+5日</th><th>+10日</th><th>+5日</th><th>+10日</th><th>+5日</th><th>+10日</th><th>+5日</th><th>+10日</th></tr>
+        </thead>
+        <tbody>
+          ${groups.map(g=>{ const s=summarizePatternGroup(g.list); return `<tr class="${g.name==='全部'?'allrow':''}">
+            <td><i class="dot" style="background:${g.color}"></i> ${g.name}</td>
+            <td>${s.count}</td>
+            ${winCell(s.win5)}${winCell(s.win10)}
+            ${pctCell(s.avg5)}${pctCell(s.avg10)}
+            ${pctCell(s.avgB20_5)}${pctCell(s.avgB20_10)}
+            ${pctCell(s.avgB60_5)}${pctCell(s.avgB60_10)}
+          </tr>`; }).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="note">市場環境依上方「多空定義」判定型態出現當天的狀態。乖離率＝型態出現後第5/10個交易日收盤價相對當時均線的偏離幅度，正值代表在均線之上。</div>
   </div>`;
 }
 
@@ -1048,23 +860,25 @@ const THEMES = [
   {key:'crash', name:'跌深反彈量能分析'},
   {key:'candle', name:'K棒型態分析'},
 ];
-function switchTheme(theme){ state.theme = theme; render(); }
 function render(){
   const app = document.getElementById('app');
   if (!app) return; // 目前不在指數頁面
-  const rows = state.active ? state.data[state.active] : null;
-  const meta = state.active ? (state.meta[state.active]||{hasOHLC:true,hasVolume:true,name:state.active}) : null;
-  const params = state.active ? state.params[state.active] : null;
-  const events = state.active ? (state.events[state.active]||[]) : [];
   const themeName = (THEMES.find(t=>t.key===state.theme)||THEMES[0]).name;
 
   if (state.dataStatus==='loading'){
     app.innerHTML = `<div class="panel"><div class="empty"><p>正在載入最新指數資料…</p></div></div>`;
     return;
   }
+  if (state.active && state.data[state.active]) ensureComputed(state.active);
+  const rows = state.active ? state.data[state.active] : null;
+  const meta = state.active ? (state.meta[state.active]||{hasOHLC:true,hasVolume:true,name:state.active}) : null;
+  const params = state.active ? state.params[state.active] : null;
+  const events = state.active ? (state.events[state.active]||[]) : [];
   const dm = state.dataMeta;
+  const avail = (dm && dm.indices) || {};
   const updatedLine = dm ? `<div class="updated">資料更新：${dm.updated_at} (台北時間) · 每個工作日 05:30、15:30 自動更新</div>`
     : (state.dataStatus==='error' ? `<div class="updated">無法載入資料(${state.dataError||''})</div>` : '');
+  const rd = regimeDef();
 
   let html = `
     <header class="top">
@@ -1073,17 +887,28 @@ function render(){
         <p>全球主要指數 · 急跌事件與K棒型態研究</p>
         ${updatedLine}
       </div>
-      <div class="pickrow">
-        <label for="indexPick">指數</label>
-        <select id="indexPick" class="indexpick" onchange="switchTab(this.value)">
-          ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${state.data[c.key]?' · '+state.data[c.key].length+'筆':''}</option>`).join('')}
-        </select>
+      <div class="pickers">
+        <div class="pickrow">
+          <label for="indexPick">指數</label>
+          <select id="indexPick" class="indexpick" onchange="switchTab(this.value)">
+            ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${avail[c.key]?' · '+avail[c.key].rows+'筆':''}</option>`).join('')}
+          </select>
+        </div>
+        <div class="pickrow">
+          <label for="regimePick">多空定義</label>
+          <select id="regimePick" class="indexpick" onchange="setRegimeDef(this.value)">
+            ${REGIME_DEFS.map(d=>`<option value="${d.key}" ${d.key===rd.key?'selected':''}>${d.name}</option>`).join('')}
+          </select>
+        </div>
       </div>
     </header>
+    <div class="regime-note"><b>多頭 / 盤整 / 空頭：</b>${rd.desc}</div>
   `;
 
   if (!state.active || !rows){
-    html += `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>目前無法取得指數資料，請稍後重新整理頁面。</p></div></div>`;
+    html += state.loading[state.active]
+      ? `<div class="panel"><div class="empty"><p>正在載入「${TICKER_NAMES[state.active]||state.active}」資料…</p></div></div>`
+      : `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>目前無法取得指數資料，請稍後重新整理頁面。${state.dataError?'('+state.dataError+')':''}</p></div></div>`;
     app.innerHTML = html;
     return;
   }
@@ -1139,22 +964,22 @@ function render(){
         <div class="paramitem">
           <label>急跌幅度門檻 <b>${params.dropPct}%</b></label>
           <input type="range" min="-30" max="-5" step="1" value="${params.dropPct}"
-            oninput="setParam('${state.active}','dropPct',+this.value)">
+            onchange="setParam('${state.active}','dropPct',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
         <div class="paramitem">
           <label>天數窗口(交易日) <b>${params.windowDays}</b></label>
           <input type="range" min="2" max="20" step="1" value="${params.windowDays}"
-            oninput="setParam('${state.active}','windowDays',+this.value)">
+            onchange="setParam('${state.active}','windowDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value">
         </div>
         <div class="paramitem">
           <label>底部搜尋範圍(交易日) <b>${params.bottomSearchDays}</b></label>
           <input type="range" min="10" max="250" step="5" value="${params.bottomSearchDays}"
-            oninput="setParam('${state.active}','bottomSearchDays',+this.value)">
+            onchange="setParam('${state.active}','bottomSearchDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value">
         </div>
         <div class="paramitem">
           <label>後續追蹤天數(交易日) <b>${params.followUpDays}</b></label>
           <input type="range" min="60" max="750" step="10" value="${params.followUpDays}"
-            oninput="setParam('${state.active}','followUpDays',+this.value)">
+            onchange="setParam('${state.active}','followUpDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value">
         </div>
       </div>
       <div class="note">定義：於「天數窗口」內從近期高點下跌達「急跌幅度門檻」即判定為一次急跌事件；起跌點取窗口內收盤最高的一日；底部為起跌後「底部搜尋範圍」內的最低價(無最高低價資料時以收盤價替代)；反彈是否成功分別以「回到起跌點價位」與「創歷史新高」兩種基準各自統計；成交量比值 = 下跌區間(起跌點→底部)總量 ÷ 反彈區間(底部隔日起，取與下跌區間相同天數)總量，僅在資料含成交量欄位時計算。</div>
@@ -1187,7 +1012,7 @@ function render(){
         <div class="stat"><div class="v">${summary.stallSampleCount}/${summary.count}</div><div class="l">有效樣本數(其餘${summary.noStallCount}筆持續強勢未拉回)</div></div>
       </div>
       <div class="note" style="margin-top:10px;">反彈無力乖離率定義：從底部起追蹤收盤價的區間新高，第一次從某個高點回落達 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 以上時，取當時那個高點的乖離率(相對20日線/60日線)。數值越高代表反彈通常要漲到「離均線更遠」才會開始拉回；數值偏低則代表反彈剛脫離均線不遠就容易無力。若追蹤期間內完全沒出現${(STALL_PULLBACK_PCT*100).toFixed(0)}%以上拉回，該筆事件不計入平均值(視為持續強勢)，樣本數會顯示在上方。</div>
-      <div class="note" style="margin-top:14px;margin-bottom:6px;">最終方向分佈：追蹤期間最後一天，收盤價同時高於60日線與240日線(高於240日線1%以上)判為多方；同時低於兩者(低於240日線1%以上)判為空方；其餘(在均線附近拉鋸、或多空訊號不一致)判為盤整：</div>
+      <div class="note" style="margin-top:14px;margin-bottom:6px;">最終方向分佈：追蹤期間最後一天，依上方選擇的多空定義「${regimeDef().name}」判定(多頭＝多方、空頭＝空方)：</div>
       <div class="splitbar" style="height:22px;">
         ${dirBarSegment(summary.dirCounts,'多方','var(--up)')}
         ${dirBarSegment(summary.dirCounts,'盤整','var(--mute)')}
@@ -1231,8 +1056,8 @@ function render(){
             <th>+5日報酬</th><th>+10日報酬</th><th>+20日報酬</th><th>+60日報酬</th><th>回起跌點天數</th><th>創新高天數</th>
           </tr></thead>
           <tbody>
-            ${events.map((ev)=>`
-              <tr onclick="focusEvent('${state.active}', ${JSON.stringify(ev).replace(/"/g,'&quot;')})">
+            ${events.map((ev,ei)=>`
+              <tr onclick="focusEvent('${state.active}', ${ei})">
                 <td>${rows[ev.peakIdx].date}</td>
                 <td>${fmtNum(ev.peakVal, ev.peakVal>1000?0:2)}</td>
                 <td>${rows[ev.bottomIdx].date}</td>
@@ -1278,22 +1103,6 @@ function ratioCell(ratio){
   const downShare = clamp(ratio/(ratio+1),0.05,0.95)*100;
   return `<span class="mono">${fmtNum(ratio,2)}</span> <span class="mini-split"><div style="width:${downShare}%;background:var(--down)"></div><div style="width:${100-downShare}%;background:var(--up)"></div></span>`;
 }
-function renderLevels(structure){
-  if (!structure) return '<span class="tag na">N/A</span>';
-  return structure.levels.map(lv=>{
-    let cls='na', label='未觸及';
-    if (lv.crossIdx>-1){
-      if (lv.held){ cls='yes'; label='站穩'; }
-      else { cls='no'; label='遇壓'; }
-    }
-    return `<span class="tag ${cls}" title="MA${lv.period} ${label}" style="margin-right:3px;">${lv.period}${cls==='yes'?'✓':cls==='no'?'✗':'-'}</span>`;
-  }).join('');
-}
-function finalDirTag(structure){
-  if (!structure || structure.finalDir==='N/A') return '<span class="tag na">N/A</span>';
-  const map = {'多方':'yes','空方':'no','盤整':'na'};
-  return `<span class="tag ${map[structure.finalDir]}">${structure.finalDir}</span>`;
-}
 function dirBarSegment(counts, key, color){
   const total = Object.values(counts).reduce((a,b)=>a+b,0);
   if (!total) return '';
@@ -1302,7 +1111,14 @@ function dirBarSegment(counts, key, color){
   return `<div style="width:${pct}%;background:${color}" title="${key} ${counts[key]}筆"></div>`;
 }
 
-function switchTab(key){ state.active = key; render(); }
+async function switchTab(key){
+  state.active = key;
+  if (!state.data[key]){
+    render(); // 顯示載入中
+    try{ await loadIndex(key); }catch(e){ state.dataError = String(e.message||e); }
+  }
+  render();
+}
 
 window.addEventListener('resize', ()=>{ if(document.getElementById('app') && state.active && state.data[state.active]) drawChart(state.active); });
 
