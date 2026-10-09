@@ -288,3 +288,18 @@
   table.stattable.myth td.line small{display:block;margin-top:2px;color:var(--mute);font-weight:400;font-size:10.5px;font-family:'IBM Plex Mono',monospace;}
   table.stattable.myth td.line{border-right:1px solid var(--grid);}
   h4.subhead{margin:20px 0 8px;font-size:13.5px;color:var(--text);}
+
+  /* 週期性分析：平均漲跌橫條、總統選舉 */
+  table.stattable.cycle td.barcell{min-width:120px;}
+  table.stattable.cycle th.barhead{min-width:120px;}
+  .cbar{position:relative;display:block;height:10px;border-radius:3px;background:var(--panel2);}
+  .cbar::after{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--border-strong);}
+  .cbar i{position:absolute;top:0;bottom:0;border-radius:2px;opacity:.75;}
+  table.stattable.cycle td.kind{font-family:'Inter',sans-serif;}
+  table.stattable.cycle tr.click{cursor:pointer;}
+  table.stattable.cycle td.years{text-align:left;white-space:normal;font-size:11.5px;line-height:1.7;min-width:260px;}
+  table.stattable.cycle td.years span{display:inline-block;margin-right:10px;}
+  table.stattable.cycle td.years .up{color:var(--up);} table.stattable.cycle td.years .down{color:var(--down);}
+  .panel.election{border-color:var(--amber);border-left-width:3px;}
+  .tag.elec{background:var(--amber);color:var(--on-amber);border-color:var(--amber);}
+  .btnrow-l button.active{border-color:var(--amber);color:var(--amber);}
