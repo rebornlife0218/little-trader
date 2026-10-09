@@ -10,7 +10,8 @@
 index.html                 網站外框(左側欄 + 內容 + 頁尾)
 assets/css/components.css  共用元件樣式(面板、按鈕、表格、分頁…)
 assets/css/layout.css      版型(側欄、手機版選單)
-assets/js/app.js           框架：側欄區塊、頁面註冊與路由
+assets/js/app.js           框架：側欄區塊(可收合)、頁面註冊與路由
+assets/img/logo.svg        吉祥物 LOGO「小K」
 modules/indices/           指數區塊：跌深反彈量能分析、K棒型態分析
 scripts/update_data.py     用 yfinance 下載指數資料 → data/
 .github/workflows/         排程：台北時間週一~週五 05:30、15:30 更新資料並部署
@@ -24,7 +25,7 @@ scripts/update_data.py     用 yfinance 下載指數資料 → data/
 
    ```js
    LT.register({
-     section: 'stock',          // 'index' | 'stock' | 'other'
+     section: 'stock',          // 'index' | 'stock' | 'stats' | 'other'
      key: 'my-study',           // 網址：#/stock/my-study
      name: '我的研究',           // 側欄顯示名稱
      mount(el) {                // el 是內容區，把畫面畫進去

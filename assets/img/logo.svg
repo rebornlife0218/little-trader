@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- Little Trader 吉祥物「小K」：一根會笑的紅K棒，舉著上漲箭頭 -->
+  <line x1="21" y1="2.5" x2="21" y2="10" stroke="#E5484D" stroke-width="2.6" stroke-linecap="round"/>
+  <line x1="21" y1="37" x2="21" y2="44.5" stroke="#E5484D" stroke-width="2.6" stroke-linecap="round"/>
+  <rect x="9" y="9" width="24" height="29" rx="7" fill="#E5484D"/>
+  <rect x="11.5" y="11" width="6" height="12" rx="3" fill="#fff" opacity=".22"/>
+  <circle cx="16" cy="20" r="3.6" fill="#fff"/>
+  <circle cx="26" cy="20" r="3.6" fill="#fff"/>
+  <circle cx="17.1" cy="19.1" r="1.8" fill="#1a1d24"/>
+  <circle cx="27.1" cy="19.1" r="1.8" fill="#1a1d24"/>
+  <ellipse cx="12.6" cy="26.4" rx="2.2" ry="1.4" fill="#ffb3b5" opacity=".75"/>
+  <ellipse cx="29.4" cy="26.4" rx="2.2" ry="1.4" fill="#ffb3b5" opacity=".75"/>
+  <path d="M16.2 27.2 Q21 32.2 25.8 27.2" fill="none" stroke="#1a1d24" stroke-width="2" stroke-linecap="round"/>
+  <path d="M33 26 L39 19" stroke="#F0B94D" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M35.2 17.6 L41.2 15.8 L39.6 21.9 Z" fill="#F0B94D" stroke="#F0B94D" stroke-width="1" stroke-linejoin="round"/>
+  <path d="M42.5 6.5 l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z" fill="#F0B94D"/>
+</svg>

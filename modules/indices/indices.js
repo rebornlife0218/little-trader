@@ -1,18 +1,18 @@
 /* 指數 · 跌深反彈量能分析 / K棒型態分析
    資料：data/global_indices_ohlcv.csv(由 GitHub Actions 每個工作日更新) */
 /* ============================== 常數與設定 ============================== */
-// 每個代碼的示範參數與中文名稱；上傳真實資料後，任何 CSV 欄位名稱都能自動變成分頁。
+// 指數代碼與中文名稱(下拉選單依此順序排列)
 const INDICES = [
-  {key:'SP500',   name:'標普500',           demoStart:330,  demoVolBase:3.0e8, demoDrift:0.000517, demoVol:0.0095},
-  {key:'NASDAQ',  name:'那斯達克',           demoStart:450,  demoVolBase:1.8e9, demoDrift:0.000758, demoVol:0.0130},
-  {key:'NK225',   name:'日經225',            demoStart:38000,demoVolBase:9.0e8, demoDrift:0.000007, demoVol:0.0110},
-  {key:'KOSPI50', name:'韓國綜合(KOSPI)',    demoStart:700,  demoVolBase:5.0e8, demoDrift:0.000149, demoVol:0.0140},
-  {key:'TAIEX',   name:'台灣加權',           demoStart:5000, demoVolBase:2.0e9, demoDrift:0.000017, demoVol:0.0125},
-  {key:'SSEC',    name:'上證指數',           demoStart:300,  demoVolBase:8.0e8, demoDrift:0.000200, demoVol:0.0140},
-  {key:'FTSE100', name:'英國富時100',        demoStart:2400, demoVolBase:6.0e8, demoDrift:0.000150, demoVol:0.0090},
-  {key:'HSI',     name:'恒生指數',           demoStart:3000, demoVolBase:1.2e9, demoDrift:0.000250, demoVol:0.0130},
-  {key:'STI',     name:'新加坡海峽時報',      demoStart:1200, demoVolBase:3.0e8, demoDrift:0.000120, demoVol:0.0100},
-  {key:'STOXX50', name:'歐洲STOXX50',        demoStart:1800, demoVolBase:4.0e8, demoDrift:0.000100, demoVol:0.0110},
+  {key:'TAIEX',   name:'台灣加權'},
+  {key:'SP500',   name:'標普500'},
+  {key:'NASDAQ',  name:'那斯達克'},
+  {key:'NK225',   name:'日經225'},
+  {key:'KOSPI50', name:'韓國綜合(KOSPI)'},
+  {key:'HSI',     name:'恒生指數'},
+  {key:'SSEC',    name:'上證指數'},
+  {key:'STI',     name:'新加坡海峽時報'},
+  {key:'STOXX50', name:'歐洲STOXX50'},
+  {key:'FTSE100', name:'英國富時100'},
 ];
 const TICKER_NAMES = {}; INDICES.forEach(c=>TICKER_NAMES[c.key]=c.name);
 
@@ -32,7 +32,6 @@ let state = {
   candleParams: {},   // key -> {longBodyPct, longShadowPct, volumeSpikeFactor}
   params: {},     // key -> params per index
   view: {},       // key -> {start,end} index window for chart
-  isDemo: {},     // key -> bool
 };
 
 /* ============================== 小工具 ============================== */
@@ -40,76 +39,6 @@ function fmtDate(ms){ const d=new Date(ms); return d.getFullYear()+'-'+String(d.
 function fmtPct(x,digits=1){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return (x*100>=0?'+':'')+(x*100).toFixed(digits)+'%'; }
 function fmtNum(x,digits=2){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return Number(x).toLocaleString('en-US',{maximumFractionDigits:digits}); }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
-
-/* ============================== 示範資料產生 ============================== */
-function seededRandom(seed){
-  let s = seed % 2147483647; if (s<=0) s += 2147483646;
-  return function(){ s = s*16807 % 2147483647; return (s-1)/2147483646; };
-}
-function gaussian(rng){
-  let u=0,v=0; while(u===0) u=rng(); while(v===0) v=rng();
-  return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
-}
-// 依指數產生 1990-01-01 至今的模擬每日資料，內建幾段劇本式的崩跌與不同量能反彈型態，僅供介面示範。
-function generateDemoData(cfg, seedOffset){
-  const rng = seededRandom(42+seedOffset);
-  const start = new Date('1990-01-02T00:00:00Z').getTime();
-  const end = Date.now();
-  const DAY = 86400000;
-  let price = cfg.demoStart;
-  const rows = [];
-  const shocks = [
-    {startFrac:0.06, len:10, dailyDrop:-0.038, volDown:3.2, volUp:1.1},
-    {startFrac:0.16, len:8,  dailyDrop:-0.032, volDown:2.0, volUp:2.6},
-    {startFrac:0.27, len:16, dailyDrop:-0.030, volDown:2.8, volUp:1.0},
-    {startFrac:0.40, len:7,  dailyDrop:-0.036, volDown:2.2, volUp:2.3},
-    {startFrac:0.55, len:12, dailyDrop:-0.040, volDown:3.5, volUp:0.9},
-    {startFrac:0.68, len:6,  dailyDrop:-0.034, volDown:1.8, volUp:2.1},
-    {startFrac:0.80, len:9,  dailyDrop:-0.042, volDown:3.0, volUp:1.3},
-    {startFrac:0.90, len:5,  dailyDrop:-0.033, volDown:2.4, volUp:2.8},
-  ];
-  let t = start;
-  let shockCursor = 0;
-  let inShock=null, shockDay=0;
-  while (t < end){
-    const dow = new Date(t).getUTCDay();
-    if (dow===0 || dow===6){ t+=DAY; continue; }
-    const frac = (t-start)/(end-start);
-    if (!inShock){
-      const sh = shocks[shockCursor];
-      if (sh && frac >= sh.startFrac){ inShock = sh; shockDay=0; }
-    }
-    let ret;
-    let volMult = 1;
-    if (inShock && !inShock.rebound){
-      ret = inShock.dailyDrop + gaussian(rng)*cfg.demoVol*0.35;
-      volMult = inShock.volDown * (0.7+rng()*0.6);
-      shockDay++;
-      if (shockDay >= inShock.len){
-        const reboundLen = Math.round(inShock.len*(1.2+rng()*0.8));
-        inShock = {...inShock, rebound:true, reboundLen, reboundDay:0, volUpUse:inShock.volUp};
-      }
-    } else if (inShock && inShock.rebound){
-      const strength = 0.012 + rng()*0.010;
-      ret = strength + gaussian(rng)*cfg.demoVol*0.5;
-      volMult = inShock.volUpUse * (0.7+rng()*0.6);
-      inShock.reboundDay++;
-      if (inShock.reboundDay >= inShock.reboundLen){
-        inShock = null; shockCursor++;
-      }
-    } else {
-      ret = cfg.demoDrift + gaussian(rng)*cfg.demoVol;
-    }
-    price = Math.max(price*(1+ret), price*0.4);
-    const open = price/(1+ret*0.5*(rng()));
-    const high = Math.max(open,price)*(1+rng()*0.006);
-    const low = Math.min(open,price)*(1-rng()*0.006);
-    const volume = cfg.demoVolBase*volMult*(0.75+rng()*0.5);
-    rows.push({t, date:fmtDate(t), open, high, low, close:price, volume});
-    t+=DAY;
-  }
-  return rows;
-}
 
 /* ============================== CSV 解析 ============================== */
 const COL_ALIASES = {
@@ -329,6 +258,110 @@ function regimeAt(i, ma, closes){
   if (c < ma240v*0.99 && c < ma60v) return '空頭';
   return '盤整';
 }
+/* K棒型態定義：新增型態只要在這裡加一筆
+   group: single 單根 / double 兩根 / triple 三根 / volume 爆量
+   bias : 偏多(預期上漲) / 偏空(預期下跌) / 中性(多空猶豫)
+   shape: 示意圖用K棒 {o,h,l,c}(0~100，越大越高)，ctx:true 為前段走勢的淡色K棒；vol 為成交量示意
+   meaning: 給新手的白話說明；rule: 本站的判定條件 */
+const CANDLE_GROUPS = [
+  {key:'single', name:'單根K棒'},
+  {key:'double', name:'兩根K棒組合'},
+  {key:'triple', name:'三根K棒組合'},
+  {key:'volume', name:'爆量K棒'},
+];
+const DOWN2 = [{o:86,h:88,l:72,c:74,ctx:true},{o:74,h:76,l:60,c:62,ctx:true}];
+const UP2 = [{o:14,h:28,l:12,c:26,ctx:true},{o:26,h:40,l:24,c:38,ctx:true}];
+const CANDLE_PATTERNS = [
+  // ---------- 單根 ----------
+  {key:'hammer', group:'single', name:'錘子線', bias:'偏多',
+    shape:[...DOWN2,{o:44,h:49,l:10,c:49}],
+    meaning:'跌了一段後出現。盤中一度大跌，收盤前卻被買回來，留下一根長長的下影線，像一把槌子。代表低檔有人進場承接，跌勢可能止住。',
+    rule:'前5日下跌且收盤在20日線下；下影線 ≥ 實體2倍，上影線很短。'},
+  {key:'hanging', group:'single', name:'吊人線', bias:'偏空',
+    shape:[...UP2,{o:60,h:61,l:22,c:55}],
+    meaning:'漲了一段後出現，長得跟錘子線一樣。高檔時盤中曾被大量賣出，雖然收盤拉回，但代表賣壓開始出現，要小心漲勢轉弱。',
+    rule:'前5日上漲且收盤在20日線上；下影線 ≥ 實體2倍，上影線很短。'},
+  {key:'invHammer', group:'single', name:'倒狀錘子', bias:'偏多',
+    shape:[...DOWN2,{o:46,h:84,l:44,c:51}],
+    meaning:'跌了一段後出現，上影線很長。買方曾試著往上攻，雖然被壓回，但代表開始有人敢買，是可能止跌的早期訊號，需隔天確認。',
+    rule:'前5日下跌且收盤在20日線下；上影線 ≥ 實體2倍，下影線很短。'},
+  {key:'shootingStar', group:'single', name:'流星線', bias:'偏空',
+    shape:[...UP2,{o:54,h:90,l:52,c:49}],
+    meaning:'漲多後衝高又被打下來，留下長上影線，像劃過天空的流星。代表上方賣壓很重，追高的人被套，漲勢可能到頂。',
+    rule:'前5日上漲且收盤在20日線上；上影線 ≥ 實體2倍，下影線很短。'},
+  {key:'doji', group:'single', name:'十字線', bias:'中性',
+    shape:[{o:30,h:46,l:26,c:44,ctx:true},{o:50,h:76,l:24,c:50}],
+    meaning:'開盤價和收盤價幾乎一樣，多空打成平手，市場在猶豫。單獨出現意義不大，但在大漲或大跌之後出現，常是行情要轉折的警訊。',
+    rule:'實體 ≤ 當天振幅的10%。'},
+  // ---------- 兩根 ----------
+  {key:'p1', group:'double', name:'多頭吞噬(長紅吞長黑)', bias:'偏多',
+    shape:[{o:72,h:74,l:38,c:40},{o:36,h:80,l:34,c:78}],
+    meaning:'昨天一根長黑K，今天一根更長的紅K把它整根「吃掉」。代表買方一口氣扭轉局面，是常見的看漲反轉訊號。',
+    rule:'昨日長黑、今日長紅，且今日實體完全包住昨日實體。'},
+  {key:'p2', group:'double', name:'空頭吞噬(長黑吞長紅)', bias:'偏空',
+    shape:[{o:30,h:64,l:28,c:62},{o:66,h:68,l:22,c:24}],
+    meaning:'昨天一根長紅K，今天一根更長的黑K把它整根吃掉。代表賣方強勢反攻，是常見的看跌反轉訊號。',
+    rule:'昨日長紅、今日長黑，且今日實體完全包住昨日實體。'},
+  {key:'p3', group:'double', name:'長紅吞噬長上影黑K', bias:'偏多',
+    shape:[{o:55,h:86,l:46,c:48},{o:44,h:66,l:42,c:64}],
+    meaning:'昨天衝高被壓回(長上影黑K)，看似賣壓很重；今天卻用一根長紅K把昨天吃掉，代表賣壓已被消化，買方更有力。',
+    rule:'昨日黑K且上影線占振幅達門檻；今日長紅吞噬昨日實體。'},
+  {key:'p4', group:'double', name:'長黑吞噬長下影紅K', bias:'偏空',
+    shape:[{o:48,h:57,l:16,c:55},{o:58,h:60,l:36,c:38}],
+    meaning:'昨天雖然低檔有撐(長下影紅K)，今天卻一根長黑K把它吃掉，代表支撐失效，賣方占上風。',
+    rule:'昨日紅K且下影線占振幅達門檻；今日長黑吞噬昨日實體。'},
+  {key:'piercing', group:'double', name:'貫穿線', bias:'偏多',
+    shape:[{o:84,h:86,l:70,c:72,ctx:true},{o:72,h:74,l:42,c:44},{o:36,h:64,l:34,c:62}],
+    meaning:'下跌中先出現長黑K，隔天開低後一路往上拉，收盤收復昨天黑K的一半以上，像一把刀刺穿下跌趨勢。代表買方開始反擊。',
+    rule:'前段下跌；昨日長黑；今日紅K開盤低於昨收，收盤超過昨日實體中點但未超過昨開。'},
+  {key:'darkCloud', group:'double', name:'烏雲罩頂', bias:'偏空',
+    shape:[{o:16,h:30,l:14,c:28,ctx:true},{o:28,h:58,l:26,c:56},{o:64,h:66,l:36,c:38}],
+    meaning:'上漲中先出現長紅K，隔天開高後一路下殺，收盤跌掉昨天紅K的一半以上，像烏雲蓋住晴天。代表賣方開始反擊。',
+    rule:'前段上漲；昨日長紅；今日黑K開盤高於昨收，收盤跌破昨日實體中點但未跌破昨開。'},
+  {key:'bullHarami', group:'double', name:'多頭母子', bias:'偏多',
+    shape:[{o:90,h:92,l:78,c:80,ctx:true},{o:80,h:82,l:28,c:30},{o:46,h:58,l:44,c:56}],
+    meaning:'下跌中一根大黑K(媽媽)之後，出現一根被包在裡面的小K棒(孩子)。代表賣壓突然縮小，跌勢可能暫停，但力道不如吞噬型態。',
+    rule:'前段下跌；昨日長黑；今日小實體完全落在昨日實體範圍內。'},
+  {key:'bearHarami', group:'double', name:'空頭母子', bias:'偏空',
+    shape:[{o:10,h:22,l:8,c:20,ctx:true},{o:20,h:72,l:18,c:70},{o:54,h:56,l:42,c:44}],
+    meaning:'上漲中一根大紅K之後，出現一根被包在裡面的小K棒。代表買氣突然降溫，漲勢可能暫停。',
+    rule:'前段上漲；昨日長紅；今日小實體完全落在昨日實體範圍內。'},
+  // ---------- 三根 ----------
+  {key:'morningStar', group:'triple', name:'晨星', bias:'偏多',
+    shape:[{o:84,h:86,l:46,c:48},{o:38,h:42,l:30,c:35},{o:40,h:76,l:38,c:74}],
+    meaning:'長黑K → 小K棒(猶豫) → 長紅K。像黑夜後升起的晨星，代表空方力竭、多方接手，是經典的底部反轉型態。',
+    rule:'前段下跌；第1根長黑；第2根小實體且位於第1根實體下半部以下；第3根紅K收盤超過第1根實體中點。'},
+  {key:'eveningStar', group:'triple', name:'夜星', bias:'偏空',
+    shape:[{o:16,h:56,l:14,c:54},{o:62,h:70,l:60,c:65},{o:60,h:62,l:24,c:26}],
+    meaning:'長紅K → 小K棒(猶豫) → 長黑K。像天黑前出現的夜星，代表多方力竭、空方接手，是經典的頭部反轉型態。',
+    rule:'前段上漲；第1根長紅；第2根小實體且位於第1根實體上半部以上；第3根黑K收盤跌破第1根實體中點。'},
+  {key:'threeSoldiers', group:'triple', name:'紅三兵', bias:'偏多',
+    shape:[{o:14,h:36,l:12,c:34},{o:30,h:56,l:28,c:54},{o:50,h:78,l:48,c:76}],
+    meaning:'連續三根紅K，一天比一天收得高，像三個士兵穩步前進。代表買方持續進場，常出現在上漲初期。',
+    rule:'連3根紅K，收盤一根比一根高，每根開盤在前一根實體內，實體達長紅門檻一半以上，上影線短。'},
+  {key:'threeCrows', group:'triple', name:'黑三鴉', bias:'偏空',
+    shape:[{o:86,h:88,l:64,c:66},{o:70,h:72,l:44,c:46},{o:50,h:52,l:22,c:24}],
+    meaning:'連續三根黑K，一天比一天收得低，像三隻烏鴉停在樹上。代表賣方持續出貨，常出現在下跌初期。',
+    rule:'連3根黑K，收盤一根比一根低，每根開盤在前一根實體內，實體達長黑門檻一半以上，下影線短。'},
+  // ---------- 爆量 ----------
+  {key:'p5_red', group:'volume', name:'長紅爆量', bias:'偏多',
+    shape:[{o:40,h:46,l:36,c:44,ctx:true},{o:44,h:48,l:40,c:42,ctx:true},{o:42,h:82,l:40,c:80}], vol:[30,26,95],
+    meaning:'大漲的紅K配上暴增的成交量，代表大量資金積極買進，上漲比較有說服力。但若在漲多的高檔出現，也可能是主力趁機出貨。',
+    rule:'長紅K，且成交量 ≥ 前5日均量 × 爆量倍數。'},
+  {key:'p5_black', group:'volume', name:'長黑爆量', bias:'偏空',
+    shape:[{o:56,h:60,l:52,c:58,ctx:true},{o:58,h:62,l:54,c:56,ctx:true},{o:58,h:60,l:18,c:20}], vol:[30,26,95],
+    meaning:'大跌的黑K配上暴增的成交量，代表很多人搶著賣出、恐慌性賣壓湧現。有時是趨勢轉空，有時則是恐慌殺到底的訊號。',
+    rule:'長黑K，且成交量 ≥ 前5日均量 × 爆量倍數。'},
+  {key:'p5_up', group:'volume', name:'長上影黑K爆量', bias:'偏空',
+    shape:[{o:30,h:40,l:28,c:38,ctx:true},{o:38,h:48,l:36,c:46,ctx:true},{o:50,h:90,l:44,c:46}], vol:[30,26,95],
+    meaning:'大量成交但衝高被打回，收成黑K。代表上方有大量賣單等著，買方追價失敗，是高檔常見的出貨訊號。',
+    rule:'黑K且上影線占振幅達門檻，且爆量。'},
+  {key:'p5_down', group:'volume', name:'長下影紅K爆量', bias:'偏多',
+    shape:[{o:70,h:72,l:60,c:62,ctx:true},{o:62,h:64,l:52,c:54,ctx:true},{o:50,h:56,l:12,c:54}], vol:[30,26,95],
+    meaning:'大量成交且盤中殺低後被強力買回，收成紅K。代表低檔有大量買盤承接，常是止跌的訊號。',
+    rule:'紅K且下影線占振幅達門檻，且爆量。'},
+];
+
 function detectCandlePatterns(data, ma, params){
   const n = data.length;
   const closes = data.map(d=>d.close);
@@ -337,27 +370,65 @@ function detectCandlePatterns(data, ma, params){
   const longShadowPct = (params.longShadowPct||DEFAULT_CANDLE_PARAMS.longShadowPct)/100;
   const volSpikeFactor = params.volumeSpikeFactor||DEFAULT_CANDLE_PARAMS.volumeSpikeFactor;
   const volAvg = computeVolAvgTrailing(vols, VOL_SPIKE_LOOKBACK);
-  const isLongBody = (d)=> d.open>0 && Math.abs(d.close-d.open)/d.open >= longBodyPct;
-  const isLongUpperShadow = (d)=>{ const r=d.high-d.low; return r>0 && (d.high-Math.max(d.open,d.close))/r >= longShadowPct; };
-  const isLongLowerShadow = (d)=>{ const r=d.high-d.low; return r>0 && (Math.min(d.open,d.close)-d.low)/r >= longShadowPct; };
-  const isVolSpike = (i)=>{ const avg=volAvg[i]; return avg>0 && vols[i] >= avg*volSpikeFactor; };
-  const idxLists = {p1:[], p2:[], p3:[], p4:[], p5_red:[], p5_black:[], p5_up:[], p5_down:[]};
+  const ma20 = ma[20];
+  // 基本量測
+  const body = d=>Math.abs(d.close-d.open);
+  const range = d=>d.high-d.low;
+  const upper = d=>d.high-Math.max(d.open,d.close);
+  const lower = d=>Math.min(d.open,d.close)-d.low;
+  const red = d=>d.close>d.open, black = d=>d.close<d.open;
+  const bodyPct = d=>d.open>0? body(d)/d.open : 0;
+  const isLong = d=>bodyPct(d)>=longBodyPct;
+  const isSmall = d=>bodyPct(d)<=longBodyPct*0.4;
+  const mid = d=>(d.open+d.close)/2;
+  const bodyTop = d=>Math.max(d.open,d.close), bodyBot = d=>Math.min(d.open,d.close);
+  const isLongUpperShadow = d=>{ const r=range(d); return r>0 && upper(d)/r>=longShadowPct; };
+  const isLongLowerShadow = d=>{ const r=range(d); return r>0 && lower(d)/r>=longShadowPct; };
+  const isVolSpike = i=>{ const a=volAvg[i]; return a>0 && vols[i]>=a*volSpikeFactor; };
+  // 前段趨勢：第 j 天收盤較5日前低(高)，且位於20日線之下(上)
+  const downBefore = j=> j>=5 && closes[j]<closes[j-5] && !Number.isNaN(ma20[j]) && closes[j]<ma20[j];
+  const upBefore   = j=> j>=5 && closes[j]>closes[j-5] && !Number.isNaN(ma20[j]) && closes[j]>ma20[j];
+  // 錘子類：一側影線 ≥ 實體2倍、另一側影線 ≤ 實體(或振幅10%)
+  const hammerShape = d=>{ const r=range(d), b=body(d); return r>0 && b>0 && lower(d)>=2*b && upper(d)<=Math.max(b, r*0.1) && b/r<=0.35; };
+  const invHammerShape = d=>{ const r=range(d), b=body(d); return r>0 && b>0 && upper(d)>=2*b && lower(d)<=Math.max(b, r*0.1) && b/r<=0.35; };
+
+  const lists = {}; CANDLE_PATTERNS.forEach(p=>lists[p.key]=[]);
+  const add = (k,i)=>lists[k].push(i);
   for (let i=1;i<n;i++){
-    const y = data[i-1], t = data[i];
-    const yRed = y.close>y.open, yBlack = y.close<y.open;
-    const tRed = t.close>t.open, tBlack = t.close<t.open;
-    const tLongBody = isLongBody(t), yLongBody = isLongBody(y);
-    const bullishEngulf = t.open<=y.close && t.close>=y.open;
-    const bearishEngulf = t.open>=y.close && t.close<=y.open;
-    if (yBlack && yLongBody && tRed && tLongBody && bullishEngulf) idxLists.p1.push(i);
-    if (yRed && yLongBody && tBlack && tLongBody && bearishEngulf) idxLists.p2.push(i);
-    if (yBlack && isLongUpperShadow(y) && tRed && tLongBody && bullishEngulf) idxLists.p3.push(i);
-    if (yRed && isLongLowerShadow(y) && tBlack && tLongBody && bearishEngulf) idxLists.p4.push(i);
-    // 型態⑤：單一K棒(不需跟昨天比較) + 當天爆量
-    if (tRed && tLongBody && isVolSpike(i)) idxLists.p5_red.push(i);
-    if (tBlack && tLongBody && isVolSpike(i)) idxLists.p5_black.push(i);
-    if (tBlack && isLongUpperShadow(t) && isVolSpike(i)) idxLists.p5_up.push(i);
-    if (tRed && isLongLowerShadow(t) && isVolSpike(i)) idxLists.p5_down.push(i);
+    const t=data[i], y=data[i-1];
+    // 單根
+    if (hammerShape(t)){ if (downBefore(i-1)) add('hammer',i); else if (upBefore(i-1)) add('hanging',i); }
+    if (invHammerShape(t)){ if (downBefore(i-1)) add('invHammer',i); else if (upBefore(i-1)) add('shootingStar',i); }
+    if (range(t)>0 && body(t)/range(t)<=0.1) add('doji',i);
+    // 兩根
+    const bullEngulf = t.open<=y.close && t.close>=y.open;
+    const bearEngulf = t.open>=y.close && t.close<=y.open;
+    if (black(y)&&isLong(y)&&red(t)&&isLong(t)&&bullEngulf) add('p1',i);
+    if (red(y)&&isLong(y)&&black(t)&&isLong(t)&&bearEngulf) add('p2',i);
+    if (black(y)&&isLongUpperShadow(y)&&red(t)&&isLong(t)&&bullEngulf) add('p3',i);
+    if (red(y)&&isLongLowerShadow(y)&&black(t)&&isLong(t)&&bearEngulf) add('p4',i);
+    if (downBefore(i-1)&&black(y)&&isLong(y)&&red(t)&&t.open<y.close&&t.close>mid(y)&&t.close<y.open) add('piercing',i);
+    if (upBefore(i-1)&&red(y)&&isLong(y)&&black(t)&&t.open>y.close&&t.close<mid(y)&&t.close>y.open) add('darkCloud',i);
+    if (downBefore(i-1)&&black(y)&&isLong(y)&&isSmall(t)&&bodyTop(t)<y.open&&bodyBot(t)>y.close) add('bullHarami',i);
+    if (upBefore(i-1)&&red(y)&&isLong(y)&&isSmall(t)&&bodyTop(t)<y.close&&bodyBot(t)>y.open) add('bearHarami',i);
+    // 三根
+    if (i>=2){
+      const a=data[i-2], b=y, c=t;
+      if (downBefore(i-2)&&black(a)&&isLong(a)&&isSmall(b)&&bodyTop(b)<mid(a)&&red(c)&&c.close>mid(a)) add('morningStar',i);
+      if (upBefore(i-2)&&red(a)&&isLong(a)&&isSmall(b)&&bodyBot(b)>mid(a)&&black(c)&&c.close<mid(a)) add('eveningStar',i);
+      const half = d=>bodyPct(d)>=longBodyPct*0.5;
+      if ([a,b,c].every(d=>red(d)&&half(d)&&upper(d)<=body(d)*0.5) && b.close>a.close && c.close>b.close
+          && b.open>=a.open && b.open<=a.close && c.open>=b.open && c.open<=b.close) add('threeSoldiers',i);
+      if ([a,b,c].every(d=>black(d)&&half(d)&&lower(d)<=body(d)*0.5) && b.close<a.close && c.close<b.close
+          && b.open<=a.open && b.open>=a.close && c.open<=b.open && c.open>=b.close) add('threeCrows',i);
+    }
+    // 爆量
+    if (isVolSpike(i)){
+      if (red(t)&&isLong(t)) add('p5_red',i);
+      if (black(t)&&isLong(t)) add('p5_black',i);
+      if (black(t)&&isLongUpperShadow(t)) add('p5_up',i);
+      if (red(t)&&isLongLowerShadow(t)) add('p5_down',i);
+    }
   }
   function enrich(idxList){
     return idxList.map(i=>{
@@ -370,8 +441,8 @@ function detectCandlePatterns(data, ma, params){
       return { idx:i, date:data[i].date, ret5, ret10, b20_5, b20_10, b60_5, b60_10, regime: regimeAt(i, ma, closes) };
     });
   }
-  return { p1:enrich(idxLists.p1), p2:enrich(idxLists.p2), p3:enrich(idxLists.p3), p4:enrich(idxLists.p4),
-    p5_red:enrich(idxLists.p5_red), p5_black:enrich(idxLists.p5_black), p5_up:enrich(idxLists.p5_up), p5_down:enrich(idxLists.p5_down) };
+  const out = {}; Object.keys(lists).forEach(k=>out[k]=enrich(lists[k]));
+  return out;
 }
 function summarizePatternGroup(occurrences){
   const avgField = (field)=>{
@@ -547,70 +618,16 @@ function sanitizeRows(rows, hasOHLC){
     return true;
   });
 }
-async function loadAllStored(){
-  const out=[];
-  try{
-    const listResult = await window.storage.list('dataset:');
-    if (!listResult || !listResult.keys) return out;
-    for (const k of listResult.keys){
-      try{
-        const r = await window.storage.get(k, false);
-        if (r && r.value){
-          const parsed = JSON.parse(r.value);
-          const meta = parsed.meta || {name:k.replace('dataset:',''), hasOHLC:true, hasVolume:true};
-          const rows = sanitizeRows(parsed.rows||[], meta.hasOHLC);
-          out.push({ key: k.replace('dataset:',''), meta, rows });
-        }
-      }catch(e){}
-    }
-  }catch(e){}
-  return out;
-}
-async function saveStored(key, meta, rows){
-  try{ await window.storage.set('dataset:'+key, JSON.stringify({meta, rows}), false); }
-  catch(e){ console.error('storage set failed', e); }
-}
-async function deleteStored(key){
-  try{ await window.storage.delete('dataset:'+key, false); }catch(e){}
-}
-
 /* ============================== 初始化 ============================== */
 async function init(){
   render();
-  if (await loadSiteData()){ render(); return; }
-  const stored = await loadAllStored();
-  if (stored.length>0){
-    state.indexList = stored.map(s=>({key:s.key, name:(s.meta&&s.meta.name)||s.key}));
-    stored.forEach(s=>{
-      state.data[s.key]=s.rows;
-      state.meta[s.key]=s.meta||{name:s.key,hasOHLC:true,hasVolume:true};
-      state.isDemo[s.key]=false;
-      state.params[s.key]={...DEFAULT_PARAMS};
-      recompute(s.key);
-    });
-    state.active = state.indexList[0].key;
-  } else {
-    state.indexList = INDICES.map(c=>({key:c.key, name:c.name}));
-    INDICES.forEach(c=>{ state.params[c.key]={...DEFAULT_PARAMS}; state.candleParams[c.key]={...DEFAULT_CANDLE_PARAMS}; });
-    state.active = INDICES[0].key;
-  }
+  await loadSiteData();
   render();
 }
 
 /* ============================== 事件處理 ============================== */
-async function loadDemo(key){
-  const cfg = INDICES.find(i=>i.key===key);
-  if (!cfg) return;
-  state.data[key] = generateDemoData(cfg, INDICES.indexOf(cfg));
-  state.meta[key] = {name:cfg.name, hasOHLC:true, hasVolume:true};
-  state.isDemo[key] = true;
-  state.params[key] = state.params[key] || {...DEFAULT_PARAMS};
-  state.candleParams[key] = state.candleParams[key] || {...DEFAULT_CANDLE_PARAMS};
-  recompute(key);
-  render();
-}
-/* 匯入寬表(多指數)解析結果；persist=true 時寫入瀏覽器儲存(僅使用者自行上傳時) */
-async function ingestWide(result, persist){
+/* 匯入寬表(多指數)解析結果 */
+async function ingestWide(result){
         const isOHLCV = result.mode==='wide_ohlcv';
         const newIndexList=[];
         for (const colName of result.cols){
@@ -618,20 +635,21 @@ async function ingestWide(result, persist){
           if (rows.length<30) continue;
           const hasVolume = rows.some(r=>r.volume>0);
           const hasOHLC = isOHLCV && rows.some(r=>r._hasOpen||r._hasHigh||r._hasLow);
-          // 清掉內部標記欄位，避免存進 storage 浪費空間
+          // 清掉內部標記欄位
           rows.forEach(r=>{ delete r._hasOpen; delete r._hasHigh; delete r._hasLow; delete r._hasVol; });
           rows = sanitizeRows(rows, hasOHLC);
           if (rows.length<30) continue;
           const displayName = TICKER_NAMES[colName] || colName;
           const meta = {name:displayName, hasOHLC, hasVolume};
-          state.data[colName]=rows; state.meta[colName]=meta; state.isDemo[colName]=false;
+          state.data[colName]=rows; state.meta[colName]=meta;
           state.params[colName] = state.params[colName] || {...DEFAULT_PARAMS};
           state.candleParams[colName] = state.candleParams[colName] || {...DEFAULT_CANDLE_PARAMS};
           recompute(colName);
-          if (persist) await saveStored(colName, meta, rows);
           newIndexList.push({key:colName, name:displayName});
         }
         if (newIndexList.length===0) throw new Error('檔案中沒有找到足夠長度(≥30筆)的指數欄位');
+        const order = k=>{ const i=INDICES.findIndex(c=>c.key===k); return i<0?999:i; };
+        newIndexList.sort((a,b)=>order(a.key)-order(b.key));
         state.indexList = newIndexList;
         if (!newIndexList.find(x=>x.key===state.active)) state.active = (newIndexList.find(x=>x.key==='TAIEX')||newIndexList[0]).key;
 }
@@ -645,7 +663,7 @@ async function loadSiteData(){
     if (!csvRes.ok) throw new Error('HTTP '+csvRes.status);
     const result = detectAndParseCSV(await csvRes.text());
     if (result.mode!=='wide_ohlcv' && result.mode!=='wide') throw new Error('資料格式不符');
-    await ingestWide(result, false);
+    await ingestWide(result);
     if (metaRes && metaRes.ok){ try{ state.dataMeta = await metaRes.json(); }catch(e){} }
     state.dataStatus = 'ok';
     return true;
@@ -657,58 +675,6 @@ async function loadSiteData(){
   }
 }
 
-function triggerUpload(){
-  const input = document.createElement('input');
-  input.type='file'; input.accept='.csv,text/csv';
-  input.onchange = async (e)=>{
-    const file = e.target.files[0]; if(!file) return;
-    if (/\.feather$/i.test(file.name)){
-      alert('瀏覽器無法直接讀取 .feather 二進位檔。請先在 Python 執行:\n\ndf.to_csv("indices.csv", index=False)\n\n再上傳轉出的 CSV 檔；或直接把 .feather 檔傳給 Claude 幫你轉換。');
-      return;
-    }
-    try{
-      const text = await file.text();
-      const result = detectAndParseCSV(text);
-      if (result.mode==='wide_ohlcv' || result.mode==='wide'){
-        await ingestWide(result, true);
-      } else {
-        let rows = result.rows;
-        let key = prompt('這份CSV要對應哪個指數？請輸入代號，例如 SP500、NASDAQ、NK225、KOSPI50、TAIEX、SSEC、FTSE100、HSI、STI、STOXX50，或自訂名稱：','');
-        if (!key) return;
-        key = key.trim();
-        rows = sanitizeRows(rows, true);
-        const hasVolume = rows.some(r=>r.volume>0);
-        const displayName = TICKER_NAMES[key] || key;
-        const meta = {name:displayName, hasOHLC:true, hasVolume};
-        state.data[key]=rows; state.meta[key]=meta; state.isDemo[key]=false;
-        state.params[key] = state.params[key] || {...DEFAULT_PARAMS};
-  state.candleParams[key] = state.candleParams[key] || {...DEFAULT_CANDLE_PARAMS};
-        recompute(key);
-        await saveStored(key, meta, rows);
-        if (!state.indexList.find(x=>x.key===key)) state.indexList.push({key,name:displayName});
-        state.active = key;
-      }
-      render();
-    }catch(err){
-      alert('檔案解析失敗: '+err.message);
-    }
-  };
-  input.click();
-}
-async function clearData(key){
-  delete state.data[key]; delete state.events[key]; delete state.isDemo[key]; delete state.meta[key];
-  await deleteStored(key);
-  const isOriginal = INDICES.find(i=>i.key===key);
-  if (!isOriginal){
-    state.indexList = state.indexList.filter(x=>x.key!==key);
-    if (state.active===key) state.active = state.indexList.length? state.indexList[0].key : null;
-  }
-  if (!state.active && state.indexList.length===0){
-    state.indexList = INDICES.map(c=>({key:c.key,name:c.name}));
-    state.active = INDICES[0].key;
-  }
-  render();
-}
 function recompute(key){
   const rows = state.data[key];
   if (!rows) return;
@@ -913,26 +879,79 @@ function drawChart(key){
 }
 
 /* ============================== 主渲染 ============================== */
+/* K棒示意圖(SVG)：紅漲綠跌，淡色為前段走勢 */
+function candleSVG(shape, vol, scale=1){
+  const cw=12, gap=7, padX=6, priceH=60, volH=vol?16:0, H=priceH+(vol?volH+4:0)+4;
+  const W = padX*2 + shape.length*cw + (shape.length-1)*gap;
+  const y = v=>4 + (100-v)/100*priceH;
+  let g='';
+  shape.forEach((k,i)=>{
+    const x = padX + i*(cw+gap), cx = x+cw/2;
+    const col = k.c>k.o ? 'var(--candle-up)' : k.c<k.o ? 'var(--candle-down)' : 'var(--dim)';
+    const op = k.ctx ? 0.35 : 1;
+    const top = y(Math.max(k.o,k.c)), bot = y(Math.min(k.o,k.c));
+    g += `<g opacity="${op}"><line x1="${cx}" x2="${cx}" y1="${y(k.h)}" y2="${y(k.l)}" stroke="${col}" stroke-width="1.6"/>`
+       + `<rect x="${x}" y="${top}" width="${cw}" height="${Math.max(bot-top,1.6)}" rx="1.5" fill="${col}"/></g>`;
+    if (vol){
+      const vh = vol[i]/100*volH;
+      g += `<rect x="${x+1}" y="${H-2-vh}" width="${cw-2}" height="${vh}" rx="1" fill="${col}" opacity="${k.ctx?0.3:0.75}"/>`;
+    }
+  });
+  return `<svg class="kshape" width="${W*scale}" height="${H*scale}" viewBox="0 0 ${W} ${H}" aria-hidden="true">${g}</svg>`;
+}
+function biasTag(bias){
+  const cls = bias==='偏多'?'yes':bias==='偏空'?'no':'na';
+  return `<span class="tag ${cls}">${bias}</span>`;
+}
+// 訊號應驗率：偏多型態看之後上漲比例，偏空型態看之後下跌比例
+function hitRate(bias, win){
+  if (Number.isNaN(win) || bias==='中性') return NaN;
+  return bias==='偏多'? win : 1-win;
+}
+function hitCell(v){
+  if (Number.isNaN(v)) return '<span class="tag na">—</span>';
+  return `<b class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</b>`;
+}
+function toggleCandleGuide(){ state.candleGuideOpen = state.candleGuideOpen===false; render(); }
+function openPattern(k){
+  const el = document.getElementById('pat-'+k);
+  if (el){ el.open = true; el.scrollIntoView({behavior:'smooth', block:'start'}); }
+}
+
 function renderCandleTheme(){
   const key = state.active;
   const meta = state.meta[key] || {};
   if (!meta.hasOHLC){
-    return `<div class="panel"><div class="note">此資料集沒有開高低價(僅收盤價)，無法進行K棒型態分析。請上傳含開高低收價的資料(單一指數OHLCV格式，或寬表 代號_Open/High/Low/Close/Volume 格式)。</div></div>`;
+    return `<div class="panel"><div class="note">此指數資料沒有開高低價(僅收盤價)，無法進行K棒型態分析。</div></div>`;
   }
   const patterns = state.candlePatterns[key];
   if (!patterns) return `<div class="panel"><div class="note">尚未計算型態資料。</div></div>`;
   const cp = state.candleParams[key] || DEFAULT_CANDLE_PARAMS;
-  const defs = [
-    {key:'p1', name:'① 長紅吞噬長黑', desc:'昨日為長黑K，今日長紅K實體完全吞噬昨日實體──偏多反轉訊號。'},
-    {key:'p2', name:'② 長黑吞噬長紅', desc:'昨日為長紅K，今日長黑K實體完全吞噬昨日實體──偏空反轉訊號。'},
-    {key:'p3', name:'③ 長紅吞噬昨天長上影線黑K', desc:'昨日為帶長上影線的黑K(高點遭賣壓壓回)，今日長紅K實體吞噬昨日實體──較強力的偏多反轉訊號。'},
-    {key:'p4', name:'④ 長黑吞噬昨天長下影線紅K', desc:'昨日為帶長下影線的紅K(低點雖有撐但仍偏弱)，今日長黑K實體吞噬昨日實體──偏空反轉訊號。'},
-    {key:'p5_red', name:'⑤-1 長紅爆量', desc:'當天K棒為長紅K，且成交量達前5日均量的設定倍數以上。'},
-    {key:'p5_black', name:'⑤-2 長黑爆量', desc:'當天K棒為長黑K，且成交量達前5日均量的設定倍數以上。'},
-    {key:'p5_up', name:'⑤-3 長上影線黑K爆量', desc:'當天K棒為帶長上影線的黑K，且成交量達前5日均量的設定倍數以上。'},
-    {key:'p5_down', name:'⑤-4 長下影線紅K爆量', desc:'當天K棒為帶長下影線的紅K，且成交量達前5日均量的設定倍數以上。'},
-  ];
+  const guideOpen = state.candleGuideOpen !== false;
+
   let html = `
+    <div class="panel">
+      <div class="guide-head" onclick="toggleCandleGuide()">
+        <h3 style="margin:0;">新手導讀：K棒怎麼看？</h3><span class="mute">${guideOpen?'收合 ▲':'展開 ▼'}</span>
+      </div>
+      ${guideOpen ? `
+      <div class="guide">
+        <div class="guide-fig">
+          ${candleSVG([{o:30,h:92,l:8,c:70},{o:70,h:92,l:8,c:30}], null, 1.6)}
+          <div class="guide-cap"><span style="color:var(--candle-up)">紅K</span>：收盤 &gt; 開盤(上漲)<br><span style="color:var(--candle-down)">黑K(綠)</span>：收盤 &lt; 開盤(下跌)</div>
+        </div>
+        <ul>
+          <li><b>實體</b>：開盤價到收盤價之間的粗柱子，越長代表當天漲跌力道越強(長紅、長黑)。</li>
+          <li><b>上影線</b>：實體上方的細線，代表盤中最高價。上影線長＝曾經漲上去但被賣下來，<b>上方有賣壓</b>。</li>
+          <li><b>下影線</b>：實體下方的細線，代表盤中最低價。下影線長＝曾經跌下去但被買回來，<b>下方有支撐</b>。</li>
+          <li><b>偏多/偏空</b>：型態傳統上暗示之後比較可能上漲(偏多)或下跌(偏空)。同一個形狀出現在不同位置(漲多後 vs 跌深後)，意義可能完全相反。</li>
+          <li><b>應驗率</b>：本站用歷史資料實際驗證──偏多型態看之後10天有沒有漲、偏空型態看之後10天有沒有跌。高於50%(綠色)代表這個型態在該指數上歷史表現較可靠。</li>
+          <li><b>多頭/盤整/空頭</b>：型態出現時的大環境，依收盤價相對60日線、240日線位置判斷。同一型態在不同大環境下表現常常差很多。</li>
+        </ul>
+        <div class="note" style="margin-top:4px;">K棒型態只是機率上的參考，不保證之後的走勢，請搭配趨勢、成交量與自己的風險控管。</div>
+      </div>` : ''}
+    </div>
+
     <div class="panel">
       <h3>型態判定參數</h3>
       <div class="paramgrid">
@@ -952,19 +971,60 @@ function renderCandleTheme(){
             oninput="setCandleParam('${key}','volumeSpikeFactor',+this.value)">
         </div>
       </div>
-      <div class="note">長紅/長黑：K棒實體(｜收盤－開盤｜)占開盤價的比例達門檻即算「長」。長影線：上影線或下影線占當天高低價差(振幅)的比例達門檻即算「長」。爆量：當天成交量達前${VOL_SPIKE_LOOKBACK}個交易日(不含當天)平均量的設定倍數以上。多頭/盤整/空頭依型態發生當天收盤價相對60日線與240日線的位置判定(與反彈結構統計的最終方向判定同一套邏輯)。以下統計為型態發生後 +5、+10 個交易日的收盤價表現，以及當時價格相對均線的乖離率。</div>
+      <div class="note">長紅/長黑：實體(｜收盤－開盤｜)占開盤價的比例達門檻。小實體：未達門檻的4成。長影線：影線占當天振幅(最高－最低)的比例達門檻。爆量：成交量達前${VOL_SPIKE_LOOKBACK}日均量的設定倍數。「前段下跌/上漲」：收盤比5天前低(高)，且在20日線之下(上)。</div>
+    </div>
+
+    <div class="panel">
+      <h3>型態總覽(點選列可查看說明與詳細統計)</h3>
+      <div class="tablewrap">
+        <table class="pattable">
+          <thead><tr><th>圖示</th><th>型態</th><th>類型</th><th>出現次數</th><th>10日上漲機率</th><th>平均10日報酬</th><th>10日應驗率</th></tr></thead>
+          <tbody>
+          ${CANDLE_GROUPS.map(g=>`
+            <tr class="grouprow"><td colspan="7">${g.name}</td></tr>
+            ${CANDLE_PATTERNS.filter(p=>p.group===g.key).map(p=>{
+              const s = summarizePatternGroup(patterns[p.key]);
+              return `<tr onclick="openPattern('${p.key}')">
+                <td class="kcell">${candleSVG(p.shape, p.vol, 0.75)}</td>
+                <td style="font-family:'Inter',sans-serif;font-weight:600;">${p.name}</td>
+                <td>${biasTag(p.bias)}</td>
+                <td>${s.count}</td>
+                <td>${fmtPct(s.win10,0).replace('+','')}</td>
+                <td class="${s.avg10>=0?'up':'down'}">${fmtPct(s.avg10)}</td>
+                <td>${hitCell(hitRate(p.bias, s.win10))}</td>
+              </tr>`;
+            }).join('')}`).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例。應驗率：偏多型態＝上漲機率、偏空型態＝下跌機率；十字線為中性不計。</div>
     </div>
   `;
-  defs.forEach(d=>{
-    const occ = patterns[d.key];
-    const byRegime = {'多頭':occ.filter(e=>e.regime==='多頭'), '盤整':occ.filter(e=>e.regime==='盤整'), '空頭':occ.filter(e=>e.regime==='空頭')};
-    html += `<div class="panel">
-      <h3>${d.name}(共 ${occ.length} 次)</h3>
-      <div class="note" style="margin-top:0;margin-bottom:12px;">${d.desc}</div>
-      <div class="compare" style="grid-template-columns:repeat(3,1fr);">
-        ${['多頭','盤整','空頭'].map(r=>candleRegimeCol(r, byRegime[r])).join('')}
-      </div>
-    </div>`;
+  CANDLE_GROUPS.forEach(g=>{
+    html += `<h2 class="grouptitle">${g.name}</h2>`;
+    CANDLE_PATTERNS.filter(p=>p.group===g.key).forEach(p=>{
+      const occ = patterns[p.key];
+      const byRegime = {'多頭':occ.filter(e=>e.regime==='多頭'), '盤整':occ.filter(e=>e.regime==='盤整'), '空頭':occ.filter(e=>e.regime==='空頭')};
+      const last = occ.length ? occ[occ.length-1].date : null;
+      html += `<details class="panel patcard" id="pat-${p.key}">
+        <summary>
+          ${candleSVG(p.shape, p.vol, 0.8)}
+          <div class="pat-title"><b>${p.name}</b> ${biasTag(p.bias)}<small>共 ${occ.length} 次${last?` · 最近一次 ${last}`:''}</small></div>
+        </summary>
+        <div class="pat-body">
+          <div class="pat-explain">
+            ${candleSVG(p.shape, p.vol, 1.5)}
+            <div>
+              <p class="pat-meaning">${p.meaning}</p>
+              <p class="note" style="margin:6px 0 0;">判定條件：${p.rule}</p>
+            </div>
+          </div>
+          <div class="compare" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
+            ${['多頭','盤整','空頭'].map(r=>candleRegimeCol(r, byRegime[r])).join('')}
+          </div>
+        </div>
+      </details>`;
+    });
   });
   return html;
 }
@@ -1004,7 +1064,7 @@ function render(){
   }
   const dm = state.dataMeta;
   const updatedLine = dm ? `<div class="updated">資料更新：${dm.updated_at} (台北時間) · 每個工作日 05:30、15:30 自動更新</div>`
-    : (state.dataStatus==='error' ? `<div class="updated">無法自動載入網站資料(${state.dataError||''})，請手動上傳 CSV</div>` : '');
+    : (state.dataStatus==='error' ? `<div class="updated">無法載入資料(${state.dataError||''})</div>` : '');
 
   let html = `
     <header class="top">
@@ -1012,37 +1072,18 @@ function render(){
         <h1>${themeName}</h1>
         <p>全球主要指數 · 急跌事件與K棒型態研究</p>
         ${updatedLine}
-        <div class="hint">支援三種CSV格式：① 寬表 OHLCV(一欄日期＋每指數五欄 <code>代號_Open/High/Low/Close/Volume</code>，如 <code>SP500_Open, SP500_High...</code>，自動依代號建立分頁) ② 單一指數OHLCV(單檔含開高低收量) ③ 寬表收盤價(一欄日期＋多欄各指數收盤價)。若資料是 .feather，請先在 Python 執行 <code>df.to_csv("indices.csv", index=False)</code> 轉存再上傳。</div>
       </div>
-      <div class="btnrow">
-        <button class="ghost" onclick="triggerUpload()">上傳自訂資料(CSV)</button>
+      <div class="pickrow">
+        <label for="indexPick">指數</label>
+        <select id="indexPick" class="indexpick" onchange="switchTab(this.value)">
+          ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${state.data[c.key]?' · '+state.data[c.key].length+'筆':''}</option>`).join('')}
+        </select>
       </div>
     </header>
-    <div class="tabs">
-      ${state.indexList.map(c=>{
-        const m = state.meta[c.key];
-        const label = state.data[c.key] ? (state.isDemo[c.key]?'示範資料 · '+state.data[c.key].length+'筆':(m&&!m.hasVolume?'已載入(無量) · ':'已載入 · ')+state.data[c.key].length+'筆') : '未載入';
-        return `<div class="tab ${c.key===state.active?'active':''}" onclick="switchTab('${c.key}')">
-          ${c.name}
-          <small>${label}</small>
-        </div>`;
-      }).join('')}
-    </div>
   `;
 
   if (!state.active || !rows){
-    const isOriginal = INDICES.find(i=>i.key===state.active);
-    html += `
-      <div class="panel">
-        <div class="empty">
-          <h3 style="margin:0;">尚未載入「${(state.indexList.find(c=>c.key===state.active)||{}).name||''}」資料</h3>
-          <p>點右上「上傳資料檔」選擇 CSV：可以是單一指數的開高低收量檔案，也可以是一欄日期＋多欄各指數收盤價的整合檔(上傳一次即可同時建立所有指數分頁)。或先使用示範資料熟悉介面操作方式——示範資料為模擬產生，並非真實歷史數據。</p>
-          <div class="btnrow">
-            <button class="primary" onclick="triggerUpload()">上傳資料檔</button>
-            ${isOriginal? `<button onclick="loadDemo('${state.active}')">使用示範資料</button>` : ''}
-          </div>
-        </div>
-      </div>`;
+    html += `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>目前無法取得指數資料，請稍後重新整理頁面。</p></div></div>`;
     app.innerHTML = html;
     return;
   }
@@ -1057,8 +1098,7 @@ function render(){
   const buckets = meta.hasVolume ? bucketByRatio(events) : null;
 
   html += `
-    ${state.isDemo[state.active] ? `<div class="banner demo">目前顯示的是模擬示範資料，用來展示介面與統計邏輯，並非真實歷史指數。請上傳真實 CSV 以取得可信的回測結果。</div>` : ''}
-    ${(!state.isDemo[state.active] && !meta.hasVolume) ? `<div class="banner info">此資料集沒有成交量欄位，量能比值分析已停用；下方仍會正常呈現急跌事件、底部、反彈報酬與勝率統計。${!meta.hasOHLC?' 資料僅含收盤價，圖表以收盤價折線呈現(無法繪製K線)。':''}</div>` : ''}
+        ${(!meta.hasVolume) ? `<div class="banner info">此資料集沒有成交量欄位，量能比值分析已停用；下方仍會正常呈現急跌事件、底部、反彈報酬與勝率統計。${!meta.hasOHLC?' 資料僅含收盤價，圖表以收盤價折線呈現(無法繪製K線)。':''}</div>` : ''}
 
     <div class="panel">
       <div class="chartbar">
@@ -1071,8 +1111,6 @@ function render(){
             <button onclick="setZoomPreset('${state.active}',250)">1年</button>
             <button onclick="setZoomPreset('${state.active}',60)">3個月</button>
           </div>
-          <button class="ghost" onclick="triggerUpload()">重新上傳</button>
-          <button class="danger ghost" onclick="clearData('${state.active}')">清除資料</button>
         </div>
       </div>
       <div class="chartwrap">
@@ -1164,7 +1202,7 @@ function render(){
       </div>
     </div>
 
-    ${!meta.hasVolume ? `<div class="panel"><div class="note">此資料集無成交量欄位，量能結構分組比較已停用。若你有另外的成交量資料來源，可準備成單一指數 OHLCV 格式的 CSV 重新上傳該指數，即可啟用此區塊。</div></div>`
+    ${!meta.hasVolume ? `<div class="panel"><div class="note">此指數資料無成交量，量能結構分組比較已停用。</div></div>`
       : buckets ? `
     <div class="panel">
       <h3>量能結構分組比較(以下跌/反彈成交量比值 = ${fmtNum(buckets.threshold,0)} 為分界)</h3>

@@ -4,20 +4,28 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Little Trader</title>
-<meta name="description" content="Little Trader：指數、個股與市場研究" />
+<meta name="description" content="Little Trader 小交易員：指數、個股、統計學與市場研究" />
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/components.css">
 <link rel="stylesheet" href="assets/css/layout.css">
+<script>try{ if(localStorage.getItem('lt.sideCollapsed')==='1') document.documentElement.classList.add('side-collapsed'); }catch(e){}</script>
 </head>
 <body>
 <div class="topbar">
-  <a class="brand" href="#/"><div class="logo">LT</div><div class="name">Little <span>Trader</span></div></a>
+  <a class="brand" href="#/"><img class="logo" src="assets/img/logo.svg" alt=""><div class="name">Little <span>Trader</span></div></a>
   <button id="navToggle" aria-label="選單">☰ 選單</button>
 </div>
 <div class="shell">
   <aside class="sidebar">
-    <a class="brand" href="#/"><div class="logo">LT</div><div class="name">Little <span>Trader</span></div></a>
+    <div class="side-head">
+      <a class="brand" href="#/" title="Little Trader 小交易員">
+        <img class="logo" src="assets/img/logo.svg" alt="Little Trader">
+        <div class="brand-text"><div class="name">Little <span>Trader</span></div><div class="tagline">小交易員的研究室</div></div>
+      </a>
+      <button id="sideCollapse" class="side-collapse" title="收起側欄" aria-label="收起側欄">«</button>
+    </div>
     <nav id="sideNav"></nav>
   </aside>
   <div class="main">

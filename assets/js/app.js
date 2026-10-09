@@ -8,6 +8,7 @@ const LT = (() => {
   const SECTIONS = [
     { key: 'index', name: '指數' },
     { key: 'stock', name: '個股' },
+    { key: 'stats', name: '統計學' },
     { key: 'other', name: '其他' },
   ];
   const pages = []; // {section, key, name, mount(container), unmount?()}
@@ -60,9 +61,27 @@ const LT = (() => {
     document.body.classList.remove('nav-open');
   }
 
+  // 桌機版側欄收合(記住使用者偏好)
+  function toggleSidebar() {
+    const root = document.documentElement;
+    const collapsed = root.classList.toggle('side-collapsed');
+    try { localStorage.setItem('lt.sideCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+    syncCollapseButton();
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 230); // 讓圖表依新寬度重畫
+  }
+  function syncCollapseButton() {
+    const btn = document.getElementById('sideCollapse');
+    const collapsed = document.documentElement.classList.contains('side-collapsed');
+    btn.textContent = collapsed ? '»' : '«';
+    btn.title = collapsed ? '展開側欄' : '收起側欄';
+    btn.setAttribute('aria-label', btn.title);
+  }
+
   function start() {
     document.getElementById('copyYear').textContent = new Date().getFullYear();
     document.getElementById('navToggle').onclick = () => document.body.classList.toggle('nav-open');
+    document.getElementById('sideCollapse').onclick = toggleSidebar;
+    syncCollapseButton();
     window.addEventListener('hashchange', route);
     route();
   }
