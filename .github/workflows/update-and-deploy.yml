@@ -1,4 +1,4 @@
-name: 更新資料並部署網站
+name: Little Trader 更新資料並部署
 
 on:
   schedule:
@@ -40,9 +40,8 @@ jobs:
 
       - name: 整理網站檔案
         run: |
-          mkdir -p _site/data
-          cp index.html _site/
-          cp data/global_indices_ohlcv.csv data/meta.json _site/data/
+          mkdir -p _site
+          cp -r index.html assets modules data _site/
 
       - uses: actions/configure-pages@v5
 
