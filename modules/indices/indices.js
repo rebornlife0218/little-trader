@@ -64,7 +64,7 @@ function computeAllMA(closes){
 }
 
 /* ============================== K棒型態分析 ============================== */
-const DEFAULT_CANDLE_PARAMS = { longBodyPct:1.5, longShadowPct:50, volumeSpikeFactor:1.5 };
+const DEFAULT_CANDLE_PARAMS = { longBodyPct:1, longShadowPct:50, volumeSpikeFactor:1.5 };
 const VOL_SPIKE_LOOKBACK = 5; // 爆量比較基準：前N日均量(不含當天)
 function computeVolAvgTrailing(vols, period){
   const n = vols.length;
@@ -433,7 +433,7 @@ function computeEvents(data, p, ma, regimes){
         recoverIdx, daysToRecover: recoverIdx>-1? recoverIdx-bottomIdx: null,
         newHighIdx, daysToNewHigh: newHighIdx>-1? newHighIdx-bottomIdx: null,
         downVol, upVol, ratio, ret5, ret10, ret20, ret60, reDecline,
-        bias20, bias60, structure, stall });
+        bias20, bias60, structure, stall, bottomRegime: regimes[bottomIdx] });
       lastBottom = bottomIdx;
       idx = Math.max(bottomIdx+1, idx+1); // 確保索引恆向前推進，避免異常資料造成無窮迴圈
     } else { idx += 1; }
@@ -469,15 +469,6 @@ function computeSummary(events){
     newHighProb, reDeclineProb, avgBias20, avgBias60, dirCounts,
     avgStallBias20, avgStallBias60, stallSampleCount:withStall.length, noStallCount};
 }
-function bucketByRatio(events){
-  const withRatio = events.filter(e=>!Number.isNaN(e.ratio));
-  if (withRatio.length<2) return null;
-  const THRESHOLD = 1; // 下跌量/反彈量 = 1為分界：>=1代表反彈量縮，<1代表反彈量增(反彈量比下跌量還大)
-  const low = withRatio.filter(e=>e.ratio<THRESHOLD);
-  const high = withRatio.filter(e=>e.ratio>=THRESHOLD);
-  return { threshold:THRESHOLD, lowSummary:computeSummary(low), highSummary:computeSummary(high) };
-}
-
 /* ============================== 資料載入 ==============================
    每個指數一個 JSON(data/indices/<代號>.json)，先載入正在看的指數，其餘於背景預先下載 */
 async function init(){
@@ -917,7 +908,6 @@ function render(){
   }
 
   const summary = computeSummary(events);
-  const buckets = meta.hasVolume ? bucketByRatio(events) : null;
 
   html += `
         ${(!meta.hasVolume) ? `<div class="banner info">此資料集沒有成交量欄位，量能比值分析已停用；下方仍會正常呈現急跌事件、底部、反彈報酬與勝率統計。${!meta.hasOHLC?' 資料僅含收盤價，圖表以收盤價折線呈現(無法繪製K線)。':''}</div>` : ''}
@@ -982,34 +972,11 @@ function render(){
       <div class="note">定義：於「天數窗口」內從近期高點下跌達「急跌幅度門檻」即判定為一次急跌事件；起跌點取窗口內收盤最高的一日；底部為起跌後「底部搜尋範圍」內的最低價(無最高低價資料時以收盤價替代)；反彈是否成功分別以「回到起跌點價位」與「創歷史新高」兩種基準各自統計；成交量比值 = 下跌區間(起跌點→底部)總量 ÷ 反彈區間(底部隔日起，取與下跌區間相同天數)總量，僅在資料含成交量欄位時計算。</div>
     </div>
 
-    <div class="panel">
-      <h3>整體統計(共 ${summary.count} 筆急跌事件)</h3>
-      <div class="statgrid">
-        <div class="stat"><div class="v">${summary.count}</div><div class="l">事件數</div></div>
-        <div class="stat"><div class="v ${summary.win5>=0.5?'up':'down'}">${fmtPct(summary.win5,0)}</div><div class="l">反彈後+5日勝率</div></div>
-        <div class="stat"><div class="v ${summary.win10>=0.5?'up':'down'}">${fmtPct(summary.win10,0)}</div><div class="l">反彈後+10日勝率</div></div>
-        <div class="stat"><div class="v ${summary.avg5>=0?'up':'down'}">${fmtPct(summary.avg5)}</div><div class="l">平均+5日報酬</div></div>
-        <div class="stat"><div class="v ${summary.avg10>=0?'up':'down'}">${fmtPct(summary.avg10)}</div><div class="l">平均+10日報酬</div></div>
-        <div class="stat"><div class="v ${summary.win20>=0.5?'up':'down'}">${fmtPct(summary.win20,0)}</div><div class="l">反彈後+20日勝率</div></div>
-        <div class="stat"><div class="v ${summary.win60>=0.5?'up':'down'}">${fmtPct(summary.win60,0)}</div><div class="l">反彈後+60日勝率</div></div>
-        <div class="stat"><div class="v ${summary.avg20>=0?'up':'down'}">${fmtPct(summary.avg20)}</div><div class="l">平均+20日報酬</div></div>
-        <div class="stat"><div class="v ${summary.avg60>=0?'up':'down'}">${fmtPct(summary.avg60)}</div><div class="l">平均+60日報酬</div></div>
-        <div class="stat"><div class="v">${fmtPct(summary.newHighProb,0)}</div><div class="l">後續創歷史新高機率</div></div>
-        <div class="stat"><div class="v">${fmtPct(summary.reDeclineProb,0)}</div><div class="l">回起跌點後續跌機率</div></div>
-      </div>
-    </div>
+    ${renderCrashStats(events, meta)}
 
     <div class="panel">
-      <h3>反彈結構統計(乖離率與反彈無力訊號)</h3>
-      <div class="statgrid">
-        <div class="stat"><div class="v ${summary.avgBias20<=0?'down':'up'}">${fmtPct(summary.avgBias20)}</div><div class="l">平均谷底乖離率(20MA)</div></div>
-        <div class="stat"><div class="v ${summary.avgBias60<=0?'down':'up'}">${fmtPct(summary.avgBias60)}</div><div class="l">平均谷底乖離率(60MA)</div></div>
-        <div class="stat"><div class="v">${fmtPct(summary.avgStallBias20)}</div><div class="l">反彈無力乖離率(20MA)</div></div>
-        <div class="stat"><div class="v">${fmtPct(summary.avgStallBias60)}</div><div class="l">反彈無力乖離率(60MA)</div></div>
-        <div class="stat"><div class="v">${summary.stallSampleCount}/${summary.count}</div><div class="l">有效樣本數(其餘${summary.noStallCount}筆持續強勢未拉回)</div></div>
-      </div>
-      <div class="note" style="margin-top:10px;">反彈無力乖離率定義：從底部起追蹤收盤價的區間新高，第一次從某個高點回落達 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 以上時，取當時那個高點的乖離率(相對20日線/60日線)。數值越高代表反彈通常要漲到「離均線更遠」才會開始拉回；數值偏低則代表反彈剛脫離均線不遠就容易無力。若追蹤期間內完全沒出現${(STALL_PULLBACK_PCT*100).toFixed(0)}%以上拉回，該筆事件不計入平均值(視為持續強勢)，樣本數會顯示在上方。</div>
-      <div class="note" style="margin-top:14px;margin-bottom:6px;">最終方向分佈：追蹤期間最後一天，依上方選擇的多空定義「${regimeDef().name}」判定(多頭＝多方、空頭＝空方)：</div>
+      <h3>反彈結束時的方向</h3>
+      <div class="note" style="margin-top:0;margin-bottom:6px;">追蹤期間最後一天，依上方多空定義「${regimeDef().name}」判定(多頭＝多方、空頭＝空方)：</div>
       <div class="splitbar" style="height:22px;">
         ${dirBarSegment(summary.dirCounts,'多方','var(--up)')}
         ${dirBarSegment(summary.dirCounts,'盤整','var(--mute)')}
@@ -1023,23 +990,6 @@ function render(){
         <span><i class="dot" style="background:#2a3040"></i>資料不足 ${summary.dirCounts['N/A']}筆</span>
       </div>
     </div>
-
-    ${!meta.hasVolume ? `<div class="panel"><div class="note">此指數資料無成交量，量能結構分組比較已停用。</div></div>`
-      : buckets ? `
-    <div class="panel">
-      <h3>量能結構分組比較(以下跌/反彈成交量比值 = ${fmtNum(buckets.threshold,0)} 為分界)</h3>
-      <div class="compare">
-        <div class="col">
-          <h4><i class="dot" style="background:var(--down)"></i> 量縮反彈組 — 反彈量 &lt; 下跌量 (比值≥${fmtNum(buckets.threshold,0)}，共${buckets.highSummary.count}筆)</h4>
-          ${compareRows(buckets.highSummary)}
-        </div>
-        <div class="col">
-          <h4><i class="dot" style="background:var(--up)"></i> 量增反彈組 — 反彈量 ≥ 下跌量 (比值&lt;${fmtNum(buckets.threshold,0)}，共${buckets.lowSummary.count}筆)</h4>
-          ${compareRows(buckets.lowSummary)}
-        </div>
-      </div>
-      <div class="note">若「量增反彈組」在勝率、報酬與創新高機率上明顯優於「量縮反彈組」，即支持假說：反彈期間量能是否放大，與後續反彈力道及續創新高的機率相關；反之則代表此指數樣本中量能比值對後市判斷的參考性較弱。事件樣本數少時，統計結果僅供參考，避免過度解讀。</div>
-    </div>` : `<div class="panel"><div class="note">目前可計算量能比值的事件數不足以分組比較(需至少2筆有效量比的事件)。</div></div>`}
 
     <div class="panel">
       <h3>急跌事件明細</h3>
@@ -1081,19 +1031,54 @@ function render(){
   requestAnimationFrame(()=>drawChart(state.active));
 }
 
-function compareRows(s){
+// 跌深反彈統計表：與K棒型態分析相同的表格呈現
+function renderCrashStats(events, meta){
+  const withRatio = events.filter(e=>!Number.isNaN(e.ratio));
+  const groups = [{name:'全部事件', list:events, color:'var(--amber)', cls:'allrow'}];
+  if (meta.hasVolume && withRatio.length>=2){
+    groups.push({head:'依反彈量能'});
+    groups.push({name:'量增反彈', hint:'反彈量 ≥ 下跌量', list:withRatio.filter(e=>e.ratio<1), color:'var(--up)'});
+    groups.push({name:'量縮反彈', hint:'反彈量 < 下跌量', list:withRatio.filter(e=>e.ratio>=1), color:'var(--down)'});
+  }
+  groups.push({head:'依底部當天市場環境'});
+  [['多頭','var(--up)'],['盤整','var(--mute)'],['空頭','var(--down)']].forEach(([r,c])=>
+    groups.push({name:r, list:events.filter(e=>e.bottomRegime===r), color:c}));
+  const rows = groups.map(g=>g.head ? null : {...g, s:computeSummary(g.list)});
+  const pct = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v)}</td>`;
+  const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
+  const prob = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td>${(v*100).toFixed(0)}%</td>`;
+  const label = g=>`<td><i class="dot" style="background:${g.color}"></i> ${g.name}${g.hint?`<small class="hint-s">${g.hint}</small>`:''}</td><td>${g.s.count}</td>`;
+  const body = (cols, render)=> groups.map((g,i)=> g.head
+    ? `<tr class="grouphead"><td colspan="${cols}">${g.head}</td></tr>`
+    : `<tr class="${g.cls||''}">${label(rows[i])}${render(rows[i].s)}</tr>`).join('');
   return `
-    <div class="row"><span>+5日勝率</span><b class="${s.win5>=0.5?'up':'down'}">${fmtPct(s.win5,0)}</b></div>
-    <div class="row"><span>+10日勝率</span><b class="${s.win10>=0.5?'up':'down'}">${fmtPct(s.win10,0)}</b></div>
-    <div class="row"><span>+20日勝率</span><b class="${s.win20>=0.5?'up':'down'}">${fmtPct(s.win20,0)}</b></div>
-    <div class="row"><span>+60日勝率</span><b class="${s.win60>=0.5?'up':'down'}">${fmtPct(s.win60,0)}</b></div>
-    <div class="row"><span>平均+5日報酬</span><b class="${s.avg5>=0?'up':'down'}">${fmtPct(s.avg5)}</b></div>
-    <div class="row"><span>平均+10日報酬</span><b class="${s.avg10>=0?'up':'down'}">${fmtPct(s.avg10)}</b></div>
-    <div class="row"><span>平均+20日報酬</span><b class="${s.avg20>=0?'up':'down'}">${fmtPct(s.avg20)}</b></div>
-    <div class="row"><span>平均+60日報酬</span><b class="${s.avg60>=0?'up':'down'}">${fmtPct(s.avg60)}</b></div>
-    <div class="row"><span>後續創新高機率</span><b>${fmtPct(s.newHighProb,0)}</b></div>
-    <div class="row"><span>回起跌點後續跌機率</span><b>${fmtPct(s.reDeclineProb,0)}</b></div>
-  `;
+    <div class="panel">
+      <h3>勝率與報酬率(共 ${events.length} 筆急跌事件)</h3>
+      <div class="tablewrap">
+        <table class="stattable">
+          <thead>
+            <tr><th rowspan="2">分組</th><th rowspan="2">次數</th><th colspan="4">勝率(上漲機率)</th><th colspan="4">平均報酬率</th></tr>
+            <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th></tr>
+          </thead>
+          <tbody>${body(10, s=>win(s.win5)+win(s.win10)+win(s.win20)+win(s.win60)+pct(s.avg5)+pct(s.avg10)+pct(s.avg20)+pct(s.avg60))}</tbody>
+        </table>
+      </div>
+      <div class="note">以「底部當天收盤價」為基準，計算其後第N個交易日的漲跌。勝率＝上漲事件占比，高於50%以綠色顯示。</div>
+    </div>
+
+    <div class="panel">
+      <h3>乖離率與後續發展</h3>
+      <div class="tablewrap">
+        <table class="stattable">
+          <thead>
+            <tr><th rowspan="2">分組</th><th rowspan="2">次數</th><th colspan="2">谷底乖離率</th><th colspan="2">反彈無力乖離率</th><th rowspan="2">後續創<br>歷史新高</th><th rowspan="2">回到起跌點後<br>又跌回去</th></tr>
+            <tr><th>20MA</th><th>60MA</th><th>20MA</th><th>60MA</th></tr>
+          </thead>
+          <tbody>${body(8, s=>pct(s.avgBias20)+pct(s.avgBias60)+pct(s.avgStallBias20)+pct(s.avgStallBias60)+prob(s.newHighProb)+prob(s.reDeclineProb))}</tbody>
+        </table>
+      </div>
+      <div class="note">谷底乖離率＝底部收盤價相對均線的偏離，越負代表跌得越深。反彈無力乖離率＝反彈過程中第一次從高點拉回 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 時，那個高點相對均線的偏離；數值越高代表通常要漲離均線越遠才會拉回(持續強勢未拉回的事件不計入)。量能分組：下跌期間總量 ÷ 反彈期間(取相同天數)總量。樣本數少時僅供參考。</div>
+    </div>`;
 }
 function ratioCell(ratio){
   if (Number.isNaN(ratio)) return '<span class="tag na">N/A</span>';

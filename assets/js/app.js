@@ -12,7 +12,8 @@ const LT = (() => {
     { key: 'stats', name: '統計學' },
     { key: 'other', name: '其他' },
   ];
-  const pages = []; // {section, key, name, mount(container), unmount?()} 或外部連結 {section, key, name, href}
+  // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
+  const pages = [];
   let current = null;
   let routeSeq = 0; // 換頁計數：非同步載入完成時用來確認使用者還在同一頁
 
@@ -28,19 +29,46 @@ const LT = (() => {
     return { section, key };
   }
 
+  // 側欄各區塊可展開/收合；目前所在的區塊一定展開，其餘記住使用者的選擇
+  let openSections = new Set();
+  try { openSections = new Set(JSON.parse(localStorage.getItem('lt.openSections') || '[]')); } catch (e) {}
+  function saveOpenSections() {
+    try { localStorage.setItem('lt.openSections', JSON.stringify([...openSections])); } catch (e) {}
+  }
+  function toggleSection(key) {
+    if (openSections.has(key)) openSections.delete(key); else openSections.add(key);
+    saveOpenSections();
+    renderSidebar(current || { section: parseHash().section });
+  }
+
   function renderSidebar(active) {
     const nav = document.getElementById('sideNav');
     nav.innerHTML = SECTIONS.map(sec => {
       const list = pages.filter(p => p.section === sec.key);
+      const isActive = p => active && active.section === sec.key && active.key === p.key;
       const items = list.length
         ? list.map(p => p.href
             ? `<a href="${p.href}" target="_blank" rel="noopener" class="side-link ext" title="在新分頁開啟外部網站">${p.name}<span class="ext-ico">↗</span></a>`
-            : `<a href="#/${sec.key}/${p.key}" class="side-link ${active && active.section === sec.key && active.key === p.key ? 'active' : ''}">${p.name}</a>`).join('')
+            : `<a href="#/${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`).join('')
         : `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
-      return `<div class="side-group"><div class="side-title">${sec.name}</div>${items}</div>`;
+      const here = active && active.section === sec.key;
+      const open = here || openSections.has(sec.key);
+      return `<div class="side-group ${open ? 'open' : ''} ${here ? 'here' : ''}">
+        <button class="side-title" onclick="LT.toggleSection('${sec.key}')" aria-expanded="${open}">
+          <span>${sec.name}</span><span class="side-count">${list.length || ''}</span><span class="side-chev">▸</span>
+        </button>
+        <div class="side-items">${items}</div>
+      </div>`;
     }).join('');
   }
-
+  // 建置中頁面
+  function mountPlaceholder(page, el) {
+    el.innerHTML = `<div class="panel"><div class="empty">
+      <h3 style="margin:0;">${page.name}</h3>
+      ${page.desc ? `<p>${page.desc}</p>` : ''}
+      <p class="mute">此研究內容建置中，敬請期待。</p>
+    </div></div>`;
+  }
   function route() {
     let { section, key } = parseHash();
     const internal = pages.filter(p => !p.href);
@@ -54,10 +82,12 @@ const LT = (() => {
     window.scrollTo(0, 0);
     if (page) {
       current = page;
+      if (!openSections.has(page.section)) { openSections.add(page.section); saveOpenSections(); }
       renderSidebar(page);
       document.title = `${page.name} · Little Trader`;
       const seq = ++routeSeq;
-      page.mount(main, { alive: () => seq === routeSeq });
+      if (page.mount) page.mount(main, { alive: () => seq === routeSeq });
+      else mountPlaceholder(page, main);
     } else {
       current = null;
       routeSeq++;
@@ -125,5 +155,5 @@ const LT = (() => {
     route();
   }
 
-  return { register, start, SECTIONS, dataset, dataUrl, loadJSON, sourceLine };
+  return { register, start, toggleSection, SECTIONS, dataset, dataUrl, loadJSON, sourceLine };
 })();

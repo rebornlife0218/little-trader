@@ -141,3 +141,18 @@
   table.etftable td{font-family:'Inter',sans-serif;font-size:13px;}
   table.etftable td.fund{font-weight:600;white-space:normal;min-width:240px;}
   table.etftable tbody tr{cursor:default;}
+
+  /* 統計表分組列 */
+  table.stattable tr.grouphead td{background:var(--panel2);color:var(--amber);font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:.5px;text-align:left;}
+  table.stattable .hint-s{display:block;color:var(--mute);font-weight:400;font-size:10.5px;margin-left:16px;}
+
+  /* 說明頁 */
+  .doc{font-size:13.5px;line-height:1.9;}
+  .doc h3{margin-top:4px;}
+  .doc p{margin:0 0 10px;}
+  .doc ul{margin:0 0 10px;padding-left:20px;}
+  .doc .formula{font-family:'IBM Plex Mono',monospace;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:6px 0 12px;color:var(--amber);}
+  .linkcard{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;color:var(--text);text-decoration:none;margin-bottom:10px;}
+  .linkcard:hover{border-color:var(--amber);}
+  .linkcard small{display:block;color:var(--mute);font-size:11.5px;margin-top:3px;word-break:break-all;}
+  .linkcard .go{color:var(--amber);font-weight:600;white-space:nowrap;}

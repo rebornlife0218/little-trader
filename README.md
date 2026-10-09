@@ -16,7 +16,9 @@ assets/img/logo.svg            吉祥物 LOGO「小K」
 
 modules/<模組>/                前端模組(顯示畫面)
   indices/indices.js           指數：跌深反彈量能分析、K棒型態分析
-  etf/etf.js                   ETF：ETF折溢價(外部連結)、即將發行ETF
+  etf/etf.js                   ETF：ETF折溢價(說明＋參考連結)、即將發行ETF
+  stock/stock.js               個股：處置股、隔日沖(建置中)
+  stats/stats.js               統計學：初級統計學、計量(建置中)
 
 scripts/<資料集>/update.py     資料集更新程式 → 輸出到 data/<資料集>/
   indices/                     Yahoo Finance 全球 10 大指數
@@ -41,12 +43,13 @@ scripts/publish_data.sh        把某個資料集發佈到 data 分支
 
 ## 新增研究內容
 
-### 只是頁面(或外部連結)
+### 只是頁面(或外部連結、建置中頁面)
 
 在 `modules/<區塊>/` 新增 JS，於 `index.html` 的「研究模組」處加上 `<script>`：
 
 ```js
-LT.register({ section: 'etf', key: 'premium', name: 'ETF折溢價', href: 'https://...' }); // 外部連結
+LT.register({ section: 'etf', key: 'x', name: '外部網站', href: 'https://...' });       // 側欄直接開新分頁
+LT.register({ section: 'stock', key: 'disposition', name: '處置股', desc: '一句話說明' }); // 建置中頁面(沒有 mount)
 
 LT.register({
   section: 'stock',            // 'index' | 'etf' | 'stock' | 'stats' | 'other'(定義在 app.js 的 SECTIONS)
