@@ -21,10 +21,11 @@
     --blue:#5B8DEF;
     --candle-up:#E5484D;
     --candle-down:#2ECC71;
-    --ma5:#F0B94D;
-    --ma20:#5B8DEF;
-    --ma60:#C08CF0;
-    --ma240:#C9CED8;
+    --ma10:#5B8DEF;   /* 10MA 藍 */
+    --ma20:#B07CF0;   /* 20MA 紫 */
+    --ma60:#9AA1AC;   /* 60MA 灰 */
+    --ma120:#F06FB0;  /* 120MA 粉紅 */
+    --ma240:#F5923B;  /* 240MA 橘 */
     --scroll:#2c3341;
     --scroll-hover:#424b5c;
     --shadow:rgba(0,0,0,.5);
@@ -50,10 +51,11 @@
     --blue:#2F66D0;
     --candle-up:#D92D33;
     --candle-down:#14965A;
-    --ma5:#D48E10;
-    --ma20:#2F66D0;
-    --ma60:#8E4FD8;
-    --ma240:#5E6673;
+    --ma10:#2F66D0;
+    --ma20:#8E4FD8;
+    --ma60:#7A828E;
+    --ma120:#D9468F;
+    --ma240:#E07B10;
     --scroll:#CBD1D9;
     --scroll-hover:#AAB2BD;
     --shadow:rgba(20,25,35,.18);
@@ -231,3 +233,50 @@
   .home-data:last-child{border-bottom:none;}
   .home-data b{min-width:90px;color:var(--text);font-size:13px;}
   @media (max-width:640px){ .hero{flex-direction:column;text-align:center;} }
+
+  /* 大盤漲跌分析：模式分頁 */
+  .mode-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:16px;}
+  .mode-tab{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 14px;text-align:left;border-radius:10px;background:var(--panel);}
+  .mode-tab b{font-family:'Space Grotesk',sans-serif;font-size:14.5px;}
+  .mode-tab small{color:var(--mute);font-weight:400;font-size:11.5px;}
+  .mode-tab.active{border-color:var(--amber);box-shadow:inset 0 -2px 0 var(--amber);background:var(--panel2);}
+
+  /* K線圖：點選K棒的開高低收量 */
+  .ohlc-info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;min-height:32px;padding:6px 10px;margin-bottom:8px;
+    background:var(--panel2);border:1px solid var(--border);border-radius:8px;font-size:12.5px;font-family:'IBM Plex Mono',monospace;color:var(--dim);}
+  .ohlc-info b{color:var(--text);}
+  .ohlc-info em{font-style:normal;color:var(--text);font-weight:600;}
+  .ohlc-info em.up, .ohlc-info .up{color:var(--up);} .ohlc-info em.down, .ohlc-info .down{color:var(--down);}
+  #priceCanvas{touch-action:pan-y;outline:none;}
+
+  /* 自動解讀 */
+  ul.insight{margin:12px 0 0;padding-left:20px;font-size:13px;line-height:1.85;}
+  ul.insight b{color:var(--amber);}
+
+  /* 初級統計學 */
+  .chap-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;}
+  .chap-list a{display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--dim);text-decoration:none;font-size:12.5px;}
+  .chap-list a span{font-family:'IBM Plex Mono',monospace;color:var(--mute);font-size:11px;}
+  .chap-list a:hover{color:var(--text);border-color:var(--border-strong);}
+  .chap-list a.active{color:var(--text);border-color:var(--amber);background:var(--panel2);}
+  .chap-list a.active span{color:var(--amber);}
+  .chapter h2{margin:0;font-size:21px;}
+  .chap-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;padding-bottom:12px;margin-bottom:14px;border-bottom:1px solid var(--border);}
+  .chap-st a{color:var(--amber);font-size:12.5px;text-decoration:none;}
+  .goals{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 16px;margin-bottom:16px;}
+  .goals b{color:var(--amber);font-size:12.5px;}
+  .goals ul{margin:4px 0 0;}
+  .doc h3{margin:20px 0 8px;font-size:15px;color:var(--text);text-transform:none;letter-spacing:.2px;}
+  .doc ol{margin:0 0 10px;padding-left:22px;}
+  .doc table.stattable{margin:6px 0 12px;}
+  .callout{border-left:3px solid var(--amber);background:var(--amber-soft);padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:13px;line-height:1.85;}
+  .demo-box, .live-box{margin-top:18px;padding:14px 16px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;}
+  .demo-box h3, .live-box h3{margin-top:0;}
+  .btnrow-l{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:13px;}
+  .btnrow-l button{padding:6px 12px;font-size:12.5px;}
+  .chart-svg{display:block;width:100%;height:auto;margin-top:8px;}
+  .split{display:flex;flex-wrap:wrap;gap:16px;align-items:center;}
+  .split > svg{flex:1 1 300px;}
+  .split > table{flex:0 1 260px;}
+  .chap-foot{display:flex;justify-content:space-between;margin-top:22px;padding-top:14px;border-top:1px solid var(--border);}
+  .chap-nav{color:var(--amber);text-decoration:none;font-weight:600;font-size:13.5px;}

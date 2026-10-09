@@ -37,6 +37,10 @@ let state = {
   params: {},     // key -> params per index
   view: {},       // key -> {start,end} index window for chart
   openPattern: null, // 型態總覽中展開的型態
+  mode: 'crash',   // 大盤漲跌分析的模式：'crash' 跌深反彈 | 'myth' 常見迷思 | 'm3' | 'm4'
+  myth: {},        // key -> 常見迷思統計 (null = 需重算)
+  mythParams: {settleDays:20, confirmDays:10},
+  cursor: {},      // key -> K線圖上點選的資料索引
 };
 
 /* ============================== 小工具 ============================== */
@@ -45,7 +49,7 @@ function fmtNum(x,digits=2){ if(x===null||x===undefined||Number.isNaN(x)) return
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
 
 /* ============================== 移動平均線 ============================== */
-const MA_PERIODS = [5,20,60,240];
+const MA_PERIODS = [10,20,60,120,240];
 function computeMA(closes, period){
   const n = closes.length;
   const ma = new Array(n).fill(NaN);
@@ -486,7 +490,8 @@ function ensureComputed(key){
   const rows = state.data[key]; if (!rows) return;
   if (!state.ma[key]) state.ma[key] = computeAllMA(rows.map(d=>d.close));
   const regimes = getRegimes(key);
-  if (state.theme==='crash' && !state.events[key]) state.events[key] = computeEvents(rows, state.params[key], state.ma[key], regimes);
+  if (state.theme==='crash' && state.mode==='crash' && !state.events[key]) state.events[key] = computeEvents(rows, state.params[key], state.ma[key], regimes);
+  if (state.theme==='crash' && state.mode==='myth' && !state.myth[key]) state.myth[key] = computeMyth(rows, state.ma[key], state.mythParams);
   if (state.theme==='candle' && !state.candlePatterns[key]) state.candlePatterns[key] = detectCandlePatterns(rows, state.ma[key], state.candleParams[key], regimes);
 }
 
@@ -522,13 +527,13 @@ function hexA(hex, a){ const h=hex.replace('#',''); const n=parseInt(h.length===
 function chartColors(){
   const v = LT.cssVar;
   return { grid:v('--grid'), text:v('--mute'), up:v('--candle-up'), down:v('--candle-down'), blue:v('--blue'), amber:v('--amber'),
-    ma:{5:v('--ma5'), 20:v('--ma20'), 60:v('--ma60'), 240:v('--ma240')} };
+    ma:{10:v('--ma10'), 20:v('--ma20'), 60:v('--ma60'), 120:v('--ma120'), 240:v('--ma240')}, cursor:v('--text') };
 }
 /* ============================== Canvas 圖表 ============================== */
 function drawChart(key){
   const rows = state.data[key]; if(!rows) return;
   const meta = state.meta[key] || {hasOHLC:true, hasVolume:true};
-  const events = state.events[key]||[];
+  const events = state.mode==='crash' ? (state.events[key]||[]) : [];
   const view = state.view[key] || {start:0,end:rows.length-1};
   const priceCanvas = document.getElementById('priceCanvas');
   if (!priceCanvas) return;
@@ -621,7 +626,7 @@ function drawChart(key){
   const labelEvery = Math.max(1, Math.floor(n/6));
   for (let i=0;i<n;i+=labelEvery){ pctx.fillText(slice[i].date, xAt(i)-24, priceH-4); }
 
-  // 移動平均線疊圖 (MA5/MA20/MA60/MA240)
+  // 移動平均線疊圖 (10/20/60/120/240MA)
   if (maSet){
     MA_PERIODS.forEach(p=>{
       const arr = maSet[p];
@@ -634,7 +639,7 @@ function drawChart(key){
         if (!started){ pctx.moveTo(x,y); started=true; } else { pctx.lineTo(x,y); }
       }
       pctx.strokeStyle = C.ma[p];
-      pctx.lineWidth = p===240? 1.8 : (p===60? 1.4 : 1.1);
+      pctx.lineWidth = p===240? 1.8 : p===120? 1.6 : p===60? 1.4 : 1.1;
       pctx.globalAlpha = 0.9;
       pctx.stroke();
       pctx.globalAlpha = 1;
@@ -652,17 +657,35 @@ function drawChart(key){
     });
   }
 
+  // 點選的K棒：垂直虛線 + 收盤價水平線
+  const cur = state.cursor[key];
+  if (cur!=null && cur>=s && cur<=e){
+    const x = xAt(cur-s), yc = yAt(rows[cur].close);
+    pctx.save();
+    pctx.strokeStyle = C.cursor; pctx.globalAlpha = 0.55; pctx.setLineDash([4,3]); pctx.lineWidth = 1;
+    pctx.beginPath(); pctx.moveTo(x,10); pctx.lineTo(x,priceH-20); pctx.moveTo(padL,yc); pctx.lineTo(wrapW-padR,yc); pctx.stroke();
+    pctx.setLineDash([]); pctx.globalAlpha = 1;
+    pctx.strokeStyle = C.amber; pctx.lineWidth = 1.5;
+    const bw = Math.max(cw*0.9,6), yh = yAt(rows[cur].high), yl = yAt(rows[cur].low);
+    pctx.strokeRect(x-bw/2-1, yh-3, bw+2, (yl-yh)+6);
+    pctx.restore();
+    if (vctx){ vctx.save(); vctx.strokeStyle=C.cursor; vctx.globalAlpha=0.5; vctx.setLineDash([4,3]); vctx.beginPath(); vctx.moveTo(x,0); vctx.lineTo(x,volH-14); vctx.stroke(); vctx.restore(); }
+  }
+
+  // 互動：滾輪縮放、拖曳平移、點選K棒(指標事件，換頁重繪時不會殘留監聽器)
+  priceCanvas._geo = {s, e, padL, plotW, cw};
   if (!priceCanvas._wired){
     priceCanvas._wired = true;
-    let dragging=false, dragStartX=0, dragStartView=null;
+    priceCanvas.tabIndex = 0;
+    let drag = null;
     priceCanvas.addEventListener('wheel',(ev)=>{
       ev.preventDefault();
-      const v = state.view[state.active]; if(!v) return;
+      const g = priceCanvas._geo, v = state.view[state.active]; if(!v) return;
       const curRows = state.data[state.active]; const range = v.end-v.start;
       const factor = ev.deltaY>0? 1.15 : 0.87;
       const newRange = clamp(Math.round(range*factor), 20, curRows.length-1);
       const rect = priceCanvas.getBoundingClientRect();
-      const relX = clamp((ev.clientX-rect.left-padL)/plotW,0,1);
+      const relX = clamp((ev.clientX-rect.left-g.padL)/g.plotW,0,1);
       const centerIdx = v.start + relX*range;
       let ns = Math.round(centerIdx - relX*newRange);
       let ne = ns+newRange;
@@ -670,19 +693,192 @@ function drawChart(key){
       state.view[state.active]={start:ns,end:ne};
       drawChart(state.active);
     }, {passive:false});
-    priceCanvas.addEventListener('mousedown',(ev)=>{ dragging=true; dragStartX=ev.clientX; dragStartView={...state.view[state.active]}; });
-    window.addEventListener('mouseup',()=>dragging=false);
-    window.addEventListener('mousemove',(ev)=>{
-      if(!dragging) return;
-      const v = dragStartView; if(!v) return;
-      const curRows = state.data[state.active]; const range=v.end-v.start;
-      const dx = ev.clientX-dragStartX;
-      const shift = Math.round(-dx/cw);
-      let ns=clamp(v.start+shift,0,curRows.length-1-range); let ne=ns+range;
-      state.view[state.active]={start:ns,end:ne};
+    priceCanvas.addEventListener('pointerdown',(ev)=>{
+      drag = {x:ev.clientX, view:{...state.view[state.active]}, moved:false};
+      priceCanvas.setPointerCapture(ev.pointerId);
+    });
+    priceCanvas.addEventListener('pointermove',(ev)=>{
+      if (!drag) return;
+      const dx = ev.clientX-drag.x;
+      if (Math.abs(dx)>4) drag.moved = true;
+      if (!drag.moved) return;
+      const g = priceCanvas._geo, v = drag.view, curRows = state.data[state.active], range = v.end-v.start;
+      const shift = Math.round(-dx/g.cw);
+      const ns = clamp(v.start+shift,0,curRows.length-1-range);
+      state.view[state.active] = {start:ns, end:ns+range};
       drawChart(state.active);
     });
+    priceCanvas.addEventListener('pointerup',(ev)=>{
+      if (drag && !drag.moved){
+        const g = priceCanvas._geo, rect = priceCanvas.getBoundingClientRect();
+        const i = Math.floor((ev.clientX-rect.left-g.padL)/g.cw);
+        if (i>=0 && i<=g.e-g.s){ setCursor(g.s+i, false); priceCanvas.focus({preventScroll:true}); }
+      }
+      drag = null;
+    });
+    priceCanvas.addEventListener('pointercancel',()=>{ drag = null; });
   }
+}
+
+// 點選K棒後顯示開高低收量；鍵盤 ← → 移動(移出畫面時自動平移)，Esc 取消
+function setCursor(idx, ensureVisible){
+  const key = state.active, rows = state.data[key]; if (!rows) return;
+  idx = clamp(idx, 0, rows.length-1);
+  state.cursor[key] = idx;
+  if (ensureVisible){
+    const v = state.view[key], range = v.end-v.start;
+    if (idx < v.start) state.view[key] = {start:idx, end:idx+range};
+    else if (idx > v.end) state.view[key] = {start:idx-range, end:idx};
+  }
+  drawChart(key);
+  updateOhlcInfo();
+}
+function fmtVol(v){
+  if (!v) return '—';
+  if (v>=1e8) return (v/1e8).toFixed(2)+'億';
+  if (v>=1e4) return (v/1e4).toFixed(0)+'萬';
+  return fmtNum(v,0);
+}
+function updateOhlcInfo(){
+  const el = document.getElementById('ohlcInfo'); if (!el) return;
+  const key = state.active, rows = state.data[key], i = state.cursor[key];
+  if (i==null || !rows || !rows[i]){
+    el.innerHTML = '<span class="mute">點選K棒可查看當日開高低收量，之後可用鍵盤 ← → 左右移動</span>';
+    return;
+  }
+  const d = rows[i], chg = i>0 ? d.close/rows[i-1].close-1 : NaN;
+  const cls = chg>=0 ? 'up' : 'down', f = v=>fmtNum(v, v>1000?0:2);
+  const mas = MA_PERIODS.map(p=>{ const v=state.ma[key]&&state.ma[key][p][i]; return Number.isNaN(v)||v==null ? '' : `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA <em>${f(v)}</em></span>`; }).join('');
+  el.innerHTML = `<b>${d.date}</b>
+    <span>開 <em>${f(d.open)}</em></span><span>高 <em>${f(d.high)}</em></span><span>低 <em>${f(d.low)}</em></span>
+    <span>收 <em class="${cls}">${f(d.close)}</em></span><span class="${cls}">${fmtPct(chg,2)}</span>
+    <span>量 <em>${fmtVol(d.volume)}</em></span>${mas}
+    <span class="mute">← → 移動 · Esc 取消</span>`;
+}
+document.addEventListener('keydown', (ev)=>{
+  if (!document.getElementById('priceCanvas')) return;
+  const key = state.active; if (state.cursor[key]==null) return;
+  const tag = (ev.target && ev.target.tagName || '').toLowerCase();
+  if (tag==='input' || tag==='select' || tag==='textarea') return;
+  if (ev.key==='ArrowLeft'){ ev.preventDefault(); setCursor(state.cursor[key]-1, true); }
+  else if (ev.key==='ArrowRight'){ ev.preventDefault(); setCursor(state.cursor[key]+1, true); }
+  else if (ev.key==='Escape'){ state.cursor[key] = null; drawChart(key); updateOhlcInfo(); }
+});
+
+/* ============================== 常見迷思：均線的支撐與壓力 ==============================
+   跌破：前一日收盤在均線上、當日收盤在均線下；突破反之。
+   初次跌破(突破)：之前已連續 settleDays 日以上站在均線上(下)；否則為後續(反覆)跌破(突破)。
+   有支撐：跌破後 confirmDays 日內收盤又站回均線(假跌破)；有壓力：突破後 confirmDays 日內又跌回均線(假突破)。 */
+const MYTH_LINES = [{p:20, name:'月線'}, {p:60, name:'季線'}, {p:120, name:'半年線'}, {p:240, name:'年線'}];
+function computeMyth(rows, ma, prm){
+  const n = rows.length, closes = rows.map(r=>r.close);
+  const fwd = (i,k)=> i+k<n ? closes[i+k]/closes[i]-1 : NaN;
+  const out = {down:[], up:[]};
+  MYTH_LINES.forEach(L=>{
+    const arr = ma[L.p];
+    const down = {first:[], later:[]}, up = {first:[], later:[]};
+    let runAbove = 0, runBelow = 0;
+    for (let i=0;i<n;i++){
+      const m = arr[i];
+      if (Number.isNaN(m)){ runAbove = runBelow = 0; continue; }
+      const above = closes[i] >= m;
+      if (i>0 && !Number.isNaN(arr[i-1])){
+        const prevAbove = closes[i-1] >= arr[i-1];
+        if (prevAbove !== above){
+          const end = Math.min(i+prm.confirmDays, n-1), ext20 = Math.min(i+20, n-1);
+          let back = false;
+          for (let k=i+1;k<=end;k++){ if ((closes[k]>=arr[k]) === prevAbove){ back = true; break; } }
+          let extreme = prevAbove ? Infinity : -Infinity;
+          for (let k=i+1;k<=ext20;k++) extreme = prevAbove ? Math.min(extreme, rows[k].low) : Math.max(extreme, rows[k].high);
+          const ev = { idx:i, date:rows[i].date, back: i+prm.confirmDays<n ? back : null,
+            ext: ext20>i ? extreme/closes[i]-1 : NaN,
+            ret5:fwd(i,5), ret10:fwd(i,10), ret20:fwd(i,20), ret60:fwd(i,60) };
+          if (prevAbove) down[runAbove>=prm.settleDays ? 'first' : 'later'].push(ev);
+          else up[runBelow>=prm.settleDays ? 'first' : 'later'].push(ev);
+        }
+      }
+      if (above){ runAbove++; runBelow = 0; } else { runBelow++; runAbove = 0; }
+    }
+    out.down.push({line:L, first:down.first, later:down.later});
+    out.up.push({line:L, first:up.first, later:up.later});
+  });
+  return out;
+}
+function mythSummary(list){
+  const avg = f=>{ const v=list.map(e=>e[f]).filter(x=>!Number.isNaN(x)); return v.length? v.reduce((a,b)=>a+b,0)/v.length : NaN; };
+  const win = f=>{ const v=list.map(e=>e[f]).filter(x=>!Number.isNaN(x)); return v.length? v.filter(x=>x>0).length/v.length : NaN; };
+  const done = list.filter(e=>e.back!==null);
+  return { count:list.length, backRate: done.length? done.filter(e=>e.back).length/done.length : NaN, ext:avg('ext'),
+    win5:win('ret5'), win10:win('ret10'), win20:win('ret20'), win60:win('ret60'),
+    avg5:avg('ret5'), avg10:avg('ret10'), avg20:avg('ret20'), avg60:avg('ret60'),
+    last: list.length ? list[list.length-1].date : null };
+}
+function setMythParam(field, value){
+  state.mythParams[field] = value;
+  Object.keys(state.myth).forEach(k=>state.myth[k] = null);
+  render();
+}
+function renderMyth(){
+  const res = state.myth[state.active]; if (!res) return '';
+  const prm = state.mythParams;
+  const pct = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v)}</td>`;
+  const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
+  const rate = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td><b>${(v*100).toFixed(0)}%</b></td>`;
+  const table = (groups, isDown)=>`
+    <div class="tablewrap"><table class="stattable">
+      <thead>
+        <tr><th rowspan="2">均線</th><th rowspan="2">類型</th><th rowspan="2">次數</th>
+          <th rowspan="2">${prm.confirmDays}日內${isDown?'站回均線<br>(有支撐)':'跌回均線<br>(有壓力)'}</th>
+          <th rowspan="2">20日內平均<br>${isDown?'最大續跌':'最大續漲'}</th>
+          <th colspan="4">勝率(上漲機率)</th><th colspan="4">平均報酬率</th></tr>
+        <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th></tr>
+      </thead>
+      <tbody>${groups.map(g=>[['first', isDown?'初次跌破':'初次突破'], ['later', isDown?'後續跌破':'後續突破']].map(([t,label],j)=>{
+        const s = mythSummary(g[t]);
+        return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2">${g.line.name}<small class="hint-s">${g.line.p}MA</small></td>`:''}
+          <td>${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}
+          ${win(s.win5)}${win(s.win10)}${win(s.win20)}${win(s.win60)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}${pct(s.avg60)}</tr>`;
+      }).join('')).join('')}</tbody>
+    </table></div>`;
+  const insight = (groups, isDown)=> groups.map(g=>{
+    const f = mythSummary(g.first), l = mythSummary(g.later);
+    if (!f.count && !l.count) return '';
+    const p = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
+    const verb = isDown ? '跌破' : '突破', act = isDown ? '站回均線' : '跌回均線';
+    const stronger = Number.isNaN(f.backRate)||Number.isNaN(l.backRate) ? '' :
+      (f.backRate > l.backRate ? `初次${verb}較常${act}` : f.backRate < l.backRate ? `後續${verb}較常${act}` : '兩者相近');
+    return `<li><b>${g.line.name}</b>：初次${verb}後 ${p(f.backRate)} 在${prm.confirmDays}日內${act}，後續${verb} ${p(l.backRate)}${stronger?`(${stronger})`:''}；初次${verb}後20日勝率 ${p(f.win20)}、平均報酬 ${Number.isNaN(f.avg20)?'—':fmtPct(f.avg20)}。</li>`;
+  }).join('');
+  return `
+    <div class="panel">
+      <h3>判定參數</h3>
+      <div class="paramgrid">
+        <div class="paramitem">
+          <label>初次的定義(之前連續站在均線同一側) <b>${prm.settleDays}日</b></label>
+          <input type="range" min="5" max="60" step="1" value="${prm.settleDays}"
+            onchange="setMythParam('settleDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
+        </div>
+        <div class="paramitem">
+          <label>觀察天數(跌破或突破後) <b>${prm.confirmDays}日</b></label>
+          <input type="range" min="3" max="30" step="1" value="${prm.confirmDays}"
+            onchange="setMythParam('confirmDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
+        </div>
+      </div>
+      <div class="note">跌破＝前一日收盤在均線之上、當日收盤落到均線之下；突破反之。之前已連續 ${prm.settleDays} 日以上站在均線另一側才算「初次」，剛穿越不久又再穿越的算「後續」(反覆)。有支撐＝跌破後 ${prm.confirmDays} 日內收盤又站回均線(假跌破)；有壓力＝突破後 ${prm.confirmDays} 日內又跌回均線(假突破)。報酬以穿越當天收盤價為基準。</div>
+    </div>
+
+    <div class="panel">
+      <h3>跌破均線：有沒有支撐？</h3>
+      ${table(res.down, true)}
+      <ul class="insight">${insight(res.down, true)}</ul>
+    </div>
+
+    <div class="panel">
+      <h3>突破均線：有沒有壓力？</h3>
+      ${table(res.up, false)}
+      <ul class="insight">${insight(res.up, false)}</ul>
+      <div class="note">常見說法如「跌破季線就該出場」「突破年線就會大漲」，可對照上表的勝率與報酬檢驗是否成立。歷史統計不代表未來，樣本數少時僅供參考。</div>
+    </div>`;
 }
 
 /* ============================== 主渲染 ============================== */
@@ -767,7 +963,7 @@ function renderCandleTheme(){
           </tbody>
         </table>
       </div>
-      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例(紅漲綠跌：高於50%紅色、低於50%綠色)。</div>
+      <div class="note">10日上漲機率＝型態出現後第10個交易日收盤高於當天收盤的比例。</div>
     </div>
   `;
   return html;
@@ -814,9 +1010,16 @@ function renderPatternDetail(p, occ){
 }
 
 const THEMES = [
-  {key:'crash', name:'跌深反彈量能分析'},
+  {key:'crash', name:'大盤漲跌分析'},
   {key:'candle', name:'K棒型態分析'},
 ];
+const MODES = [
+  {key:'crash', name:'跌深反彈', desc:'急跌事件的底部、反彈報酬與量能結構'},
+  {key:'myth', name:'常見迷思', desc:'跌破均線有沒有支撐、突破均線有沒有壓力'},
+  {key:'m3', name:'模式三', desc:'建置中'},
+  {key:'m4', name:'模式四', desc:'建置中'},
+];
+function switchMode(m){ state.mode = m; render(); }
 function render(){
   const app = document.getElementById('app');
   if (!app) return; // 目前不在指數頁面
@@ -841,7 +1044,7 @@ function render(){
     <header class="top">
       <div>
         <h1>${themeName}</h1>
-        <p>全球主要指數 · 急跌事件與K棒型態研究</p>
+        <p>${state.theme==='crash' ? '全球主要指數 · 跌深反彈與均線支撐壓力研究' : '全球主要指數 · K棒型態統計研究'}</p>
         ${updatedLine}
       </div>
       <div class="pickers">
@@ -876,43 +1079,45 @@ function render(){
     return;
   }
 
-  const summary = computeSummary(events);
-
+  const mode = MODES.find(m=>m.key===state.mode) || MODES[0];
   html += `
-        ${(!meta.hasVolume) ? `<div class="banner info">此資料集沒有成交量欄位，量能比值分析已停用；下方仍會正常呈現急跌事件、底部、反彈報酬與勝率統計。${!meta.hasOHLC?' 資料僅含收盤價，圖表以收盤價折線呈現(無法繪製K線)。':''}</div>` : ''}
+    <div class="mode-tabs">
+      ${MODES.map(m=>`<button class="mode-tab ${m.key===mode.key?'active':''}" onclick="switchMode('${m.key}')"><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}
+    </div>
+    ${(!meta.hasVolume && mode.key==='crash') ? `<div class="banner info">此資料集沒有成交量欄位，量能比值分析已停用。</div>` : ''}
 
     <div class="panel">
       <div class="chartbar">
-        <h3 style="margin:0;">${meta.name} · ${meta.hasOHLC?'K線圖':'收盤價走勢圖'}(標記急跌事件)</h3>
-        <div class="filerow">
-          <div class="zoomrow">
-            <button onclick="setZoomPreset('${state.active}','all')">全部</button>
-            <button onclick="setZoomPreset('${state.active}',1250)">5年</button>
-            <button onclick="setZoomPreset('${state.active}',500)">2年</button>
-            <button onclick="setZoomPreset('${state.active}',250)">1年</button>
-            <button onclick="setZoomPreset('${state.active}',60)">3個月</button>
-          </div>
+        <h3 style="margin:0;">${meta.name} · K線圖${mode.key==='crash'?'(標記急跌事件)':''}</h3>
+        <div class="zoomrow">
+          <button onclick="setZoomPreset('${state.active}','all')">全部</button>
+          <button onclick="setZoomPreset('${state.active}',1250)">5年</button>
+          <button onclick="setZoomPreset('${state.active}',500)">2年</button>
+          <button onclick="setZoomPreset('${state.active}',250)">1年</button>
+          <button onclick="setZoomPreset('${state.active}',60)">3個月</button>
         </div>
       </div>
+      <div id="ohlcInfo" class="ohlc-info"></div>
       <div class="chartwrap">
         <canvas id="priceCanvas"></canvas>
         ${meta.hasVolume ? `<canvas id="volCanvas"></canvas>` : ''}
       </div>
       <div class="legend">
+        ${mode.key==='crash' ? `
         <span><i class="dot" style="background:var(--candle-down)"></i>起跌點(峰)</span>
         <span><i class="dot" style="background:var(--blue)"></i>底部</span>
         <span><i class="dot" style="background:var(--candle-up)"></i>回到起跌點</span>
         <span><i class="dot" style="background:var(--amber)"></i>創歷史新高</span>
         <span><i class="dot" style="background:var(--candle-down);opacity:.45"></i>下跌區間</span>
-        <span><i class="dot" style="background:var(--candle-up);opacity:.45"></i>反彈區間</span>
-        <span><i class="dot" style="background:var(--ma5)"></i>MA5</span>
-        <span><i class="dot" style="background:var(--ma20)"></i>MA20</span>
-        <span><i class="dot" style="background:var(--ma60)"></i>MA60</span>
-        <span><i class="dot" style="background:var(--ma240)"></i>MA240</span>
-        <span style="color:var(--mute)">滾輪縮放 · 拖曳平移 · 點下方表格列可跳轉</span>
+        <span><i class="dot" style="background:var(--candle-up);opacity:.45"></i>反彈區間</span>` : ''}
+        ${MA_PERIODS.map(p=>`<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
+        <span style="color:var(--mute)">滾輪縮放 · 拖曳平移 · 點K棒看開高低收量</span>
       </div>
     </div>
+  `;
 
+  if (mode.key==='crash'){
+    html += `
     <div class="panel">
       <h3>偵測參數</h3>
       <div class="paramgrid">
@@ -977,8 +1182,14 @@ function render(){
       </div>
     </div>
   `;
+  } else if (mode.key==='myth'){
+    html += renderMyth();
+  } else {
+    html += `<div class="panel"><div class="empty"><h3 style="margin:0;">${mode.name}</h3><p>此分析模式建置中，敬請期待。</p></div></div>`;
+  }
 
   app.innerHTML = html;
+  updateOhlcInfo();
   requestAnimationFrame(()=>drawChart(state.active));
 }
 
@@ -1004,31 +1215,20 @@ function renderCrashStats(events, meta){
     : `<tr class="${g.cls||''}">${label(rows[i])}${render(rows[i].s)}</tr>`).join('');
   return `
     <div class="panel">
-      <h3>勝率與報酬率(共 ${events.length} 筆急跌事件)</h3>
+      <h3>統計結果(共 ${events.length} 筆急跌事件)</h3>
       <div class="tablewrap">
         <table class="stattable">
           <thead>
-            <tr><th rowspan="2">分組</th><th rowspan="2">次數</th><th colspan="4">勝率(上漲機率)</th><th colspan="4">平均報酬率</th></tr>
-            <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th></tr>
+            <tr><th rowspan="2">分組</th><th rowspan="2">次數</th><th colspan="4">勝率(上漲機率)</th><th colspan="4">平均報酬率</th>
+              <th colspan="2">谷底乖離率</th><th colspan="2">反彈無力乖離率</th><th rowspan="2">後續創<br>歷史新高</th><th rowspan="2">回到起跌點後<br>又跌回去</th></tr>
+            <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th>
+              <th>20MA</th><th>60MA</th><th>20MA</th><th>60MA</th></tr>
           </thead>
-          <tbody>${body(10, s=>win(s.win5)+win(s.win10)+win(s.win20)+win(s.win60)+pct(s.avg5)+pct(s.avg10)+pct(s.avg20)+pct(s.avg60))}</tbody>
+          <tbody>${body(16, s=>win(s.win5)+win(s.win10)+win(s.win20)+win(s.win60)+pct(s.avg5)+pct(s.avg10)+pct(s.avg20)+pct(s.avg60)
+            +pct(s.avgBias20)+pct(s.avgBias60)+pct(s.avgStallBias20)+pct(s.avgStallBias60)+prob(s.newHighProb)+prob(s.reDeclineProb))}</tbody>
         </table>
       </div>
-      <div class="note">以「底部當天收盤價」為基準，計算其後第N個交易日的漲跌。勝率＝上漲事件占比(紅漲綠跌：高於50%紅色、低於50%綠色)。</div>
-    </div>
-
-    <div class="panel">
-      <h3>乖離率與後續發展</h3>
-      <div class="tablewrap">
-        <table class="stattable">
-          <thead>
-            <tr><th rowspan="2">分組</th><th rowspan="2">次數</th><th colspan="2">谷底乖離率</th><th colspan="2">反彈無力乖離率</th><th rowspan="2">後續創<br>歷史新高</th><th rowspan="2">回到起跌點後<br>又跌回去</th></tr>
-            <tr><th>20MA</th><th>60MA</th><th>20MA</th><th>60MA</th></tr>
-          </thead>
-          <tbody>${body(8, s=>pct(s.avgBias20)+pct(s.avgBias60)+pct(s.avgStallBias20)+pct(s.avgStallBias60)+prob(s.newHighProb)+prob(s.reDeclineProb))}</tbody>
-        </table>
-      </div>
-      <div class="note">谷底乖離率＝底部收盤價相對均線的偏離，越負代表跌得越深。反彈無力乖離率＝反彈過程中第一次從高點拉回 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 時，那個高點相對均線的偏離；數值越高代表通常要漲離均線越遠才會拉回(持續強勢未拉回的事件不計入)。量能分組：下跌期間總量 ÷ 反彈期間(取相同天數)總量。樣本數少時僅供參考。</div>
+      <div class="note">勝率與報酬以「底部當天收盤價」為基準，計算其後第N個交易日的漲跌。谷底乖離率＝底部收盤價相對均線的偏離，越負代表跌得越深。反彈無力乖離率＝反彈過程中第一次從高點拉回 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 時，那個高點相對均線的偏離(持續強勢未拉回的事件不計入)。量能分組：下跌期間總量 ÷ 反彈期間(取相同天數)總量。樣本數少時僅供參考。</div>
     </div>`;
 }
 function ratioCell(ratio){
@@ -1055,5 +1255,5 @@ function mountIndices(container, theme){
   state.theme = theme;
   if (!_indicesBooted){ _indicesBooted = true; init(); } else { render(); }
 }
-LT.register({ section:'index', key:'crash', name:'跌深反彈量能分析', mount: el=>mountIndices(el,'crash') });
+LT.register({ section:'index', key:'crash', name:'大盤漲跌分析', mount: el=>mountIndices(el,'crash') });
 LT.register({ section:'index', key:'candle', name:'K棒型態分析', mount: el=>mountIndices(el,'candle') });
