@@ -1,0 +1,55 @@
+name: 更新資料並部署網站
+
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '30 7 * * 1-5'    # 台北 週一~週五 15:30
+    - cron: '30 21 * * 0-4'   # 台北 週一~週五 05:30 (= UTC 前一日 21:30)
+  push:
+    branches: [main]
+  workflow_dispatch:        # 可在 GitHub 網頁手動觸發
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: 安裝套件
+        run: pip install -r requirements.txt
+
+      - name: 下載最新指數資料 (yfinance)
+        run: python scripts/update_data.py
+
+      - name: 整理網站檔案
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp data/global_indices_ohlcv.csv data/meta.json _site/data/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
