@@ -54,7 +54,6 @@
     return data.d.map((d, i) => ({ date: d, close: data.c[i] }));
   }
   const formula = s => `<div class="formula">${s}</div>`;
-  const tip = s => `<div class="callout">${s}</div>`;
   // 文氏圖：kind = inter 交集 / union 聯集 / comp 補集 / diff 差集 / disjoint 互斥，著色部分為該事件
   function venn(kind, caption) {
     const id = 'venn-' + kind, apart = kind === 'disjoint';
@@ -102,9 +101,18 @@
     const r = await fetch(MD_DIR + name + '.md', { cache: 'no-cache' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     // 先把程式碼收起來(R 的 birthwt$bwt 不是公式)，再把公式換成佔位符，避免被 Markdown 改寫
-    const code = [], math = [];
+    const code = [], math = [], vennRows = [];
+    const inlineTex = s => s.replace(/\$([^$]+)\$/g, (_, t) => katex.renderToString(t, { throwOnError: false }));
     let src = (await r.text()).replace(/<!--[\s\S]*?-->/g, '')
       .replace(/```[\s\S]*?```|`[^`\n]+`/g, m => `%%CODE${code.push(m) - 1}%%`)
+      // 文氏圖：[[venn 種類|標題|說明]]，種類 = inter / union / comp / diff / disjoint；連續多行排成一列
+      .replace(/(?:^\[\[venn .+\]\][ \t]*(?:\r?\n|$))+/gm, block => {
+        const figs = block.trim().split(/\r?\n/).map(line => {
+          const [kind, title, note] = line.trim().slice(7, -2).split('|');
+          return venn(kind.trim(), inlineTex(title.trim()) + (note ? `<br><small>${inlineTex(note.trim())}</small>` : ''));
+        });
+        return `\n%%VENN${vennRows.push(`<div class="venn-row">${figs.join('')}</div>`) - 1}%%\n\n`;
+      })
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, t) => `\n\n%%MATH${math.push([t, true]) - 1}%%\n\n`)
       .replace(/\\\$/g, '%%DOLLAR%%')
       .replace(/\$([^$\n]+?)\$/g, (_, t) => `%%MATH${math.push([t, false]) - 1}%%`)
@@ -113,6 +121,7 @@
     const html = marked.parse(src)
       .replace(/<p>%%MATH(\d+)%%<\/p>/g, (_, i) => tex(math[i]))
       .replace(/%%MATH(\d+)%%/g, (_, i) => tex(math[i]))
+      .replace(/<p>%%VENN(\d+)%%<\/p>/g, (_, i) => vennRows[i])
       .replace(/%%DOLLAR%%/g, '$');
     const box = document.createElement('div');
     box.innerHTML = html;
@@ -140,402 +149,46 @@
   }
 
   /* ---------- 章節(架構參考大碩補習班張翔老師的統計學課程，編排略有調整) ---------- */
-  const L = 'style="text-align:left"';
+  // 各章內容在 content/stats/basic/chNN.md(Markdown＋LaTeX 公式，編輯方式見 content/README.md)
   const CHAPTERS = [
     {
-      // 內容在 content/stats/basic/ch01.md(Markdown＋LaTeX 公式，編輯方式見 content/README.md)
       title: '概論及敘述統計學', md: 'ch01', live: 'describe',
     },
     {
-      title: '機率', st: ['basic-probability', 'Basic Probability'], demo: ['dice', 'coin'],
-      body: () => `
-        <h3>基本名詞</h3>
-        <ul>
-          <li><b>隨機試驗</b>：結果事先無法確定的過程，例如擲骰子、明天大盤漲或跌。</li>
-          <li><b>樣本空間 S</b>：所有可能結果的集合，擲一顆骰子 S = {1, 2, 3, 4, 5, 6}。</li>
-          <li><b>事件</b>：S 的子集合，例如「擲出偶數」A = {2, 4, 6}。只含一個結果的叫簡單事件，∅ 為不可能事件，S 為必然事件。</li>
-        </ul>
-        <h3>事件的運算：交集、聯集、補集</h3>
-        <div class="venn-row">
-          ${venn('inter', '交集 A ∩ B<br><small>A 與 B 同時發生</small>')}
-          ${venn('union', '聯集 A ∪ B<br><small>A 或 B 至少一個發生</small>')}
-          ${venn('comp', '補集 Aᶜ<br><small>A 不發生</small>')}
-          ${venn('diff', '差集 A − B = A ∩ Bᶜ<br><small>A 發生但 B 不發生</small>')}
-          ${venn('disjoint', '互斥 A ∩ B = ∅<br><small>A、B 不可能同時發生</small>')}
-        </div>
-        <p>擲骰子例：A = {2, 4, 6}(偶數)、B = {4, 5, 6}(大於 3)，則 A ∩ B = {4, 6}、A ∪ B = {2, 4, 5, 6}、Aᶜ = {1, 3, 5}、A − B = {2}。</p>
-        ${formula('交換律、結合律　　分配律 A ∩ (B ∪ C) = (A ∩ B) ∪ (A ∩ C)　　笛摩根定律 (A ∪ B)ᶜ = Aᶜ ∩ Bᶜ，(A ∩ B)ᶜ = Aᶜ ∪ Bᶜ')}
-        <p>若 A₁, …, Aₙ 兩兩互斥且 A₁ ∪ ⋯ ∪ Aₙ = S(周延)，稱為 S 的一個<b>分割</b>：每次試驗恰好有一個 Aᵢ 發生。貝氏定理就建立在分割上。</p>
-        <h3>Kolmogorov 公設化機率</h3>
-        <p>機率有三種常見的解釋：<b>古典機率</b>(結果同樣可能時 P(A) = n(A) ÷ n(S))、<b>相對次數</b>(長期重複試驗的發生比例，見下方模擬)、<b>主觀機率</b>(個人的信心程度)。但每一種都有適用不到的情況，例如古典機率要求「同樣可能」、相對次數無法真的無限重複。</p>
-        <p>1933 年蘇聯數學家 <b>Kolmogorov</b> 不去爭論機率「是什麼」，而是規定機率「必須滿足什麼」：只要一個函數 P 對樣本空間 S 中的每個事件 A 給出一個實數，並滿足以下三個<b>公設</b>，就稱為機率。</p>
-        <table class="stattable"><thead><tr><th>公設</th><th>內容</th><th>意義</th></tr></thead><tbody>
-          <tr><td>公設一　非負性</td><td ${L}>對任意事件 A，P(A) ≥ 0</td><td ${L}>機率不會是負的</td></tr>
-          <tr><td>公設二　規範性</td><td ${L}>P(S) = 1</td><td ${L}>一定有某個結果發生</td></tr>
-          <tr><td>公設三　可數可加性</td><td ${L}>A₁, A₂, … 兩兩互斥時，P(A₁ ∪ A₂ ∪ ⋯) = P(A₁) + P(A₂) + ⋯</td><td ${L}>互斥事件的機率可以直接相加</td></tr>
-        </tbody></table>
-        <p>古典、相對次數、主觀機率都滿足這三個公設，所以由公設推導出的所有定理對它們都成立。<b>由公設推導的性質</b>：</p>
-        <ul>
-          <li><b>P(∅) = 0</b>：S = S ∪ ∅ ∪ ∅ ∪ ⋯ 兩兩互斥，由公設三得 P(∅) = 0。</li>
-          <li><b>餘事件 P(Aᶜ) = 1 − P(A)</b>：A 與 Aᶜ 互斥且 A ∪ Aᶜ = S，由公設二、三得 P(A) + P(Aᶜ) = 1。</li>
-          <li><b>0 ≤ P(A) ≤ 1</b>：由公設一與上一條。</li>
-          <li><b>單調性</b>：A ⊂ B ⇒ P(A) ≤ P(B)，因為 B = A ∪ (B − A) 互斥，P(B − A) ≥ 0。</li>
-          <li><b>加法定理 P(A ∪ B) = P(A) + P(B) − P(A ∩ B)</b>：把 A ∪ B 拆成互斥的 A 與 B − A，而 P(B − A) = P(B) − P(A ∩ B)。看上方聯集的圖，A ∩ B 被 A、B 各算了一次，所以要減掉一次。</li>
-        </ul>
-        ${formula('三個事件：P(A ∪ B ∪ C) = P(A) + P(B) + P(C) − P(A ∩ B) − P(A ∩ C) − P(B ∩ C) + P(A ∩ B ∩ C)')}
-        <h3>計數方法</h3>
-        ${formula('乘法原理 n₁ × n₂ × ⋯　　排列 P(n, r) = n! ÷ (n − r)!　　組合 C(n, r) = n! ÷ [r!(n − r)!]')}
-        <p>例：從 10 檔股票挑 3 檔組成投資組合(不管順序)，共 C(10, 3) = 120 種。</p>
-        <h3>條件機率與獨立</h3>
-        ${formula('條件機率 P(A | B) = P(A ∩ B) ÷ P(B)，P(B) &gt; 0　　乘法法則 P(A ∩ B) = P(B)·P(A | B)')}
-        <p>「已知 B 發生」等於把樣本空間從 S 縮小成 B，再看 A 占 B 的多少(交集的圖中，著色部分占 B 的比例)。</p>
-        <p><b>獨立</b>：P(A ∩ B) = P(A)·P(B)，等價於 P(A | B) = P(A)，知道 B 發生不會改變 A 的機率。注意「互斥」與「獨立」不同：機率皆為正的兩事件若互斥，一定不獨立(一個發生，另一個就不可能發生)。</p>
-        ${tip('<b>市場實例</b>：「出現某K棒型態後上漲的機率」是條件機率 P(上漲 | 型態)，要和 P(上漲) 比較才知道型態有沒有資訊。<b>賭徒謬誤</b>：每天漲跌若獨立，連跌 5 天也不代表明天一定反彈；大數法則是靠次數多「稀釋」偏差，而不是「補回來」。')}
-        <h3>Monty Hall 問題(三門問題)</h3>
-        <p>美國電視遊戲節目《Let's Make a Deal》：三扇門後面有一輛汽車和兩隻山羊。你先選一扇門(假設 1 號門)，<b>知道答案的主持人 Monty Hall</b> 一定會從剩下的兩扇門中，打開一扇後面是山羊的門(假設打開 3 號門)，然後問你：要不要換到 2 號門？</p>
-        <p>直覺會說「剩兩扇門，各 1/2，換不換都一樣」，但答案是<b>換門贏的機率是 2/3</b>。列出汽車所在位置的三種等可能情況：</p>
-        <table class="stattable"><thead><tr><th>汽車在</th><th>機率</th><th>主持人開</th><th>不換(留 1 號)</th><th>換門</th></tr></thead><tbody>
-          <tr><td>1 號門</td><td>1/3</td><td>2 號或 3 號</td><td>贏</td><td>輸</td></tr>
-          <tr><td>2 號門</td><td>1/3</td><td>只能開 3 號</td><td>輸</td><td>贏</td></tr>
-          <tr><td>3 號門</td><td>1/3</td><td>只能開 2 號</td><td>輸</td><td>贏</td></tr>
-          <tr><td colspan="3">贏的機率</td><td><b>1/3</b></td><td><b>2/3</b></td></tr>
-        </tbody></table>
-        <p><b>關鍵在於主持人不是隨機開門</b>：他知道汽車在哪，而且一定開山羊門。你一開始選對的機率只有 1/3，這個機率不會因為主持人開門而改變；剩下的 2/3 原本分散在 2、3 號門，3 號門被排除後就全部集中到 2 號門。想像成 100 扇門：你選 1 扇，主持人打開其餘 98 扇山羊門，只留下 1 扇，你一定會想換。</p>
-        <p>「主持人打開 3 號門」就是一個<b>新的訊息</b>，下一節用貝氏定理正式計算它如何改變各扇門的機率。</p>
-        <h3>貝氏定理</h3>
-        <p>設 A₁, A₂, …, Aₙ 是樣本空間 S 的一個分割(互斥且周延)，B 為任一事件，P(B) &gt; 0。</p>
-        ${formula('全機率定理：P(B) = P(A₁)P(B | A₁) + P(A₂)P(B | A₂) + ⋯ + P(Aₙ)P(B | Aₙ)')}
-        ${formula('貝氏定理：P(Aᵢ | B) = P(Aᵢ)·P(B | Aᵢ) ÷ [ P(A₁)P(B | A₁) + ⋯ + P(Aₙ)P(B | Aₙ) ]')}
-        <table class="stattable"><thead><tr><th>名稱</th><th>符號</th><th>意義</th></tr></thead><tbody>
-          <tr><td>事前機率(先驗)</td><td>P(Aᵢ)</td><td ${L}>還沒得到新訊息之前，對 Aᵢ 的評估</td></tr>
-          <tr><td>概似</td><td>P(B | Aᵢ)</td><td ${L}>如果 Aᵢ 是真的，觀察到 B 的機率</td></tr>
-          <tr><td>事後機率(後驗)</td><td>P(Aᵢ | B)</td><td ${L}>得知 B 已發生之後，對 Aᵢ 重新評估的機率</td></tr>
-        </tbody></table>
-        <div class="callout"><b>貝氏定理的意義</b><br>有新的訊息進來，即認知到事件B已經發生新的事實，此時事件A1~An不宜再用事前機率評估，既然事件B已發生，就要重新估算，在給定事件B已發生的條件下，事件A1~An發生的條件機率。</div>
-        <p>換句話說，貝氏定理是一套<b>用新證據修正舊看法</b>的規則：事後機率 ∝ 事前機率 × 概似。原本就比較可能的 Aᵢ(事前機率大)，或是最能解釋 B 為什麼發生的 Aᵢ(概似大)，事後機率就會變大。今天的事後機率，又可以當成下一次有新訊息時的事前機率，不斷更新。</p>
-        <p><b>例一 · Monty Hall</b>：Aᵢ = 汽車在 i 號門，事前機率各 1/3；B = 主持人打開 3 號門(你選 1 號)。</p>
-        ${formula('概似：P(B | A₁) = 1/2(1 號有車時，2、3 號他隨便開一扇)　P(B | A₂) = 1(只能開 3 號)　P(B | A₃) = 0(不會開汽車門)')}
-        ${formula('P(B) = (1/3)(1/2) + (1/3)(1) + (1/3)(0) = 1/2　→　P(A₁ | B) = (1/6) ÷ (1/2) = 1/3，P(A₂ | B) = (1/3) ÷ (1/2) = 2/3')}
-        <p>新訊息讓 2 號門的機率從事前的 1/3 修正為事後的 2/3，所以要換門。</p>
-        <p><b>例二 · 醫學檢驗</b>：疾病盛行率 1%(事前機率)，有病時 99% 驗出陽性、沒病時 1% 誤判陽性(概似)。某人驗出陽性(新訊息 B)，真的有病的機率：</p>
-        ${formula('P(陽性) = 0.01 × 0.99 + 0.99 × 0.01 = 0.0198　→　P(有病 | 陽性) = 0.0099 ÷ 0.0198 = 50%')}
-        <p>有病的機率從 1% 修正為 50%，但仍只有一半，因為沒病的人太多，1% 的誤判就產生和真陽性一樣多的假陽性。<b>事前機率(基礎比率)非常重要</b>，只看檢驗準確率 99% 會嚴重高估。若再驗一次仍是陽性，就把 50% 當成新的事前機率再更新一次，有病的機率會升到 99%。</p>`,
+      title: '機率', md: 'ch02', st: ['basic-probability', 'Basic Probability'], demo: ['dice', 'coin'],
     },
     {
-      title: '隨機變數', st: ['probability-distributions', 'Probability Distributions'],
-      body: () => `
-        <h3>隨機變數</h3>
-        <p>把樣本空間中的每個結果對應到一個實數的函數，記為 X。</p>
-        <table class="stattable"><thead><tr><th></th><th>離散</th><th>連續</th></tr></thead><tbody>
-          <tr><td>描述</td><td ${L}>機率質量函數 f(x) = P(X = x)</td><td ${L}>機率密度函數 f(x)，P(a ≤ X ≤ b) = ∫ₐᵇ f(x)dx</td></tr>
-          <tr><td>條件</td><td ${L}>f(x) ≥ 0，Σ f(x) = 1</td><td ${L}>f(x) ≥ 0，∫ f(x)dx = 1</td></tr>
-          <tr><td>單點機率</td><td ${L}>可以大於 0</td><td ${L}>P(X = a) = 0，所以 ≤ 與 &lt; 沒有差別</td></tr>
-        </tbody></table>
-        ${formula('累積分配函數 F(x) = P(X ≤ x)：遞增、右連續、F(−∞) = 0、F(∞) = 1；連續時 f(x) = F′(x)')}
-        <h3>期望值</h3>
-        ${formula('E[X] = Σ x·f(x)　或　∫ x·f(x)dx　　E[g(X)] = Σ g(x)·f(x)　或　∫ g(x)·f(x)dx')}
-        ${formula('E[aX + b] = a·E[X] + b')}
-        <h3>變異數</h3>
-        ${formula('Var(X) = E[(X − μ)²] = E[X²] − (E[X])²　　Var(aX + b) = a²·Var(X)')}
-        <p>例：擲一顆公平骰子，E[X] = 3.5、E[X²] = 91/6，Var(X) = 91/6 − 3.5² = 35/12 ≈ 2.92。期望值是「長期平均」，不代表單次會擲出 3.5。</p>
-        <h3>動差與動差生成函數</h3>
-        ${formula('k 階原動差 E[Xᵏ]　　k 階主動差 E[(X − μ)ᵏ]　　M(t) = E[eᵗˣ]，E[Xᵏ] = M⁽ᵏ⁾(0)')}
-        <ul>
-          <li>二階主動差是變異數；三階、四階主動差標準化後就是偏態係數與峰態係數。</li>
-          <li>MGF 唯一決定分配：兩個隨機變數的 MGF 相同，分配就相同。常用來證明獨立隨機變數相加後的分配。</li>
-        </ul>
-        <h3>柴比雪夫不等式</h3>
-        ${formula('P(|X − μ| ≥ kσ) ≤ 1 ÷ k²　(不論 X 是什麼分配)')}
-        ${tip('<b>金融用語</b>：一筆交易的「期望報酬」= 勝率 × 平均賺 − 敗率 × 平均賠。勝率高不代表期望值為正，賺小賠大的策略勝率 80% 也可能長期虧錢。')}`,
+      title: '隨機變數', md: 'ch03', st: ['probability-distributions', 'Probability Distributions'],
     },
     {
-      title: '多元隨機變數', st: null, live: 'cov',
-      body: () => `
-        <h3>聯合分配</h3>
-        ${formula('離散 f(x, y) = P(X = x, Y = y)　　連續 P((X, Y) ∈ A) = ∬_A f(x, y) dx dy')}
-        ${formula('邊際分配 f_X(x) = Σ_y f(x, y)　或　∫ f(x, y) dy　　條件分配 f(y | x) = f(x, y) ÷ f_X(x)')}
-        <p><b>獨立</b>：對所有 x、y 都有 f(x, y) = f_X(x)·f_Y(y)。只要有一格不成立就不獨立。</p>
-        <h3>共變異數與相關係數</h3>
-        ${formula('Cov(X, Y) = E[(X − μ_X)(Y − μ_Y)] = E[XY] − E[X]E[Y]　　ρ = Cov(X, Y) ÷ (σ_X σ_Y)，−1 ≤ ρ ≤ 1')}
-        <ul>
-          <li>Cov(aX + b, cY + d) = ac·Cov(X, Y)；ρ 不受單位影響(a、c 同號時不變)。</li>
-          <li>獨立 ⇒ Cov = 0；但 <b>Cov = 0 不一定獨立</b>(只代表沒有「線性」關係)。例外：二元常態時兩者等價。</li>
-        </ul>
-        <h3>線性組合</h3>
-        ${formula('E[aX + bY] = aE[X] + bE[Y]　　Var(aX + bY) = a²Var(X) + b²Var(Y) + 2ab·Cov(X, Y)')}
-        <p>n 個獨立且同分配(iid)的隨機變數：E[x̄] = μ、Var(x̄) = σ² ÷ n。這是第 6 章抽樣分配的基礎。</p>
-        <h3>條件期望值</h3>
-        ${formula('E[Y | X = x] = Σ y·f(y | x)　　重複期望值定理 E[Y] = E[ E[Y | X] ]')}
-        ${formula('Var(Y) = E[ Var(Y | X) ] + Var( E[Y | X] )')}
-        ${tip('<b>投資組合</b>：兩檔資產各放一半，組合變異數 = ¼σ₁² + ¼σ₂² + ½Cov。只要 ρ &lt; 1，組合的標準差就小於兩者標準差的平均 — 這就是「分散風險」的數學原理。')}`,
+      title: '多元隨機變數', md: 'ch04', st: null, live: 'cov',
     },
     {
-      title: '常見機率模型', st: ['probability-distributions', 'Probability Distributions'], live: 'normal',
-      body: () => `
-        <h3>離散分配</h3>
-        <table class="stattable"><thead><tr><th>分配</th><th>情境</th><th>f(x)</th><th>E[X]</th><th>Var(X)</th></tr></thead><tbody>
-          <tr><td>伯努利 B(1, p)</td><td ${L}>一次試驗，成功記 1</td><td>pˣ(1−p)¹⁻ˣ</td><td>p</td><td>p(1−p)</td></tr>
-          <tr><td>二項 B(n, p)</td><td ${L}>n 次獨立試驗的成功次數</td><td>C(n,x)pˣ(1−p)ⁿ⁻ˣ</td><td>np</td><td>np(1−p)</td></tr>
-          <tr><td>幾何 G(p)</td><td ${L}>第一次成功發生在第 x 次</td><td>(1−p)ˣ⁻¹p</td><td>1/p</td><td>(1−p)/p²</td></tr>
-          <tr><td>負二項</td><td ${L}>第 r 次成功發生在第 x 次</td><td>C(x−1,r−1)pʳ(1−p)ˣ⁻ʳ</td><td>r/p</td><td>r(1−p)/p²</td></tr>
-          <tr><td>超幾何</td><td ${L}>N 個中有 K 個成功，取出不放回 n 個</td><td>C(K,x)C(N−K,n−x)/C(N,n)</td><td>nK/N</td><td>n(K/N)(1−K/N)(N−n)/(N−1)</td></tr>
-          <tr><td>卜瓦松 P(λ)</td><td ${L}>單位時間/空間內事件發生次數</td><td>e^(−λ)λˣ/x!</td><td>λ</td><td>λ</td></tr>
-        </tbody></table>
-        <h3>連續分配</h3>
-        <table class="stattable"><thead><tr><th>分配</th><th>f(x)</th><th>E[X]</th><th>Var(X)</th></tr></thead><tbody>
-          <tr><td>均勻 U(a, b)</td><td>1/(b − a)，a ≤ x ≤ b</td><td>(a+b)/2</td><td>(b−a)²/12</td></tr>
-          <tr><td>指數 Exp(λ)</td><td>λe^(−λx)，x ≥ 0</td><td>1/λ</td><td>1/λ²</td></tr>
-          <tr><td>伽瑪 Γ(α, λ)</td><td>λ^α x^(α−1) e^(−λx) / Γ(α)</td><td>α/λ</td><td>α/λ²</td></tr>
-          <tr><td>常態 N(μ, σ²)</td><td>e^(−(x−μ)²/2σ²) / (σ√2π)</td><td>μ</td><td>σ²</td></tr>
-        </tbody></table>
-        <h3>重要性質</h3>
-        <ul>
-          <li><b>無記憶性</b>：幾何(離散)與指數(連續)分配，P(X &gt; s + t | X &gt; s) = P(X &gt; t)。已經等了多久不影響還要等多久。</li>
-          <li><b>卜瓦松與指數</b>：單位時間發生次數 ~ P(λ)，則兩次事件的間隔時間 ~ Exp(λ)。</li>
-          <li><b>常態的線性組合仍是常態</b>；標準化 Z = (X − μ) ÷ σ ~ N(0, 1)，再查標準常態表。</li>
-          <li>不放回抽樣的超幾何，當 n/N 很小(&lt; 5%)時可用二項近似。</li>
-        </ul>
-        <h3>近似</h3>
-        ${formula('卜瓦松近似：n 大、p 小(n ≥ 20 且 p ≤ 0.05)時，B(n, p) ≈ P(λ = np)')}
-        ${formula('常態近似：np ≥ 5 且 n(1−p) ≥ 5 時，B(n, p) ≈ N(np, np(1−p))，並做連續性校正 P(X ≤ k) ≈ P(Z ≤ (k + 0.5 − np) ÷ √(np(1−p)))')}
-        <p>例：策略勝率 55%，做 20 筆，平均贏 11 筆，標準差 √(20×0.55×0.45) ≈ 2.2 筆；贏不到 8 筆的機率 ≈ P(Z ≤ (7.5 − 11) ÷ 2.22) ≈ 5.8%。</p>`,
+      title: '常見機率模型', md: 'ch05', st: ['probability-distributions', 'Probability Distributions'], live: 'normal',
     },
     {
-      title: '抽樣方法與抽樣分配', st: null, demo: 'clt',
-      body: () => `
-        <h3>抽樣方法</h3>
-        <table class="stattable"><thead><tr><th>方法</th><th>做法</th><th>適用</th></tr></thead><tbody>
-          <tr><td>簡單隨機抽樣</td><td ${L}>每個大小為 n 的樣本被抽到的機率相同</td><td ${L}>母體同質、有完整名冊</td></tr>
-          <tr><td>分層隨機抽樣</td><td ${L}>依特性分層，每層內再隨機抽</td><td ${L}>層內同質、層間異質(例：依產業分層)</td></tr>
-          <tr><td>群集抽樣</td><td ${L}>把母體分成許多群，隨機抽幾個群全部調查</td><td ${L}>群內異質、群間同質，節省成本</td></tr>
-          <tr><td>系統抽樣</td><td ${L}>隨機選起點後，每隔 k 個抽一個</td><td ${L}>名冊沒有週期性時</td></tr>
-        </tbody></table>
-        <p>非隨機抽樣(便利、判斷、配額、雪球)無法計算抽樣誤差，不能做統計推論。<b>抽樣誤差</b>來自「只看了一部分」；<b>非抽樣誤差</b>來自涵蓋不全、無回應、量測偏差等，樣本再大也不會消失。</p>
-        <h3>樣本平均數 x̄ 的抽樣分配</h3>
-        ${formula('E[x̄] = μ　　σ_x̄ = σ ÷ √n(標準誤)；有限母體不放回且 n/N &gt; 5% 時乘上 √[(N − n) ÷ (N − 1)]')}
-        <ul>
-          <li>母體為常態 ⇒ x̄ 不論 n 多少都是常態。</li>
-          <li><b>中央極限定理</b>：母體不是常態，只要 n 夠大(常用 n ≥ 30)，x̄ 近似 N(μ, σ²/n)。下方擲骰子模擬可親眼看到。</li>
-        </ul>
-        <h3>樣本比例 p̂ 的抽樣分配</h3>
-        ${formula('E[p̂] = p　　σ_p̂ = √[p(1 − p) ÷ n]　　np ≥ 5 且 n(1 − p) ≥ 5 時 p̂ 近似常態')}
-        <h3>三大抽樣分配</h3>
-        <table class="stattable"><thead><tr><th>分配</th><th>由來</th><th>主要用途</th></tr></thead><tbody>
-          <tr><td>卡方 χ²(k)</td><td ${L}>k 個獨立標準常態的平方和；(n − 1)s²/σ² ~ χ²(n − 1)</td><td ${L}>σ² 的推論、卡方檢定(第 12 章)</td></tr>
-          <tr><td>t(k)</td><td ${L}>Z ÷ √(χ²(k)/k)；(x̄ − μ) ÷ (s/√n) ~ t(n − 1)</td><td ${L}>σ 未知時 μ 的推論、迴歸係數</td></tr>
-          <tr><td>F(k₁, k₂)</td><td ${L}>[χ²(k₁)/k₁] ÷ [χ²(k₂)/k₂]；(s₁²/σ₁²) ÷ (s₂²/σ₂²) ~ F</td><td ${L}>兩變異數比較、ANOVA、迴歸整體檢定</td></tr>
-        </tbody></table>
-        <ul>
-          <li>t 分配對稱、比 Z 尾巴厚，自由度 → ∞ 時趨近 N(0, 1)；t(k)² = F(1, k)。</li>
-          <li>χ²(k) 平均 k、變異數 2k，右偏；F 分配的倒數性質 F₁₋α(k₁, k₂) = 1 ÷ F_α(k₂, k₁)。</li>
-        </ul>`,
+      title: '抽樣方法與抽樣分配', md: 'ch06', st: null, demo: 'clt',
     },
     {
-      title: '點估計', st: ['frequentist-inference', 'Frequentist Inference'],
-      body: () => `
-        <h3>估計式與估計值</h3>
-        <p><b>估計式</b> θ̂ 是樣本的函數(隨機變數，例如 x̄ = ΣXᵢ/n)；代入實際資料得到的數字叫<b>估計值</b>。</p>
-        <h3>好估計式的性質</h3>
-        <ul>
-          <li><b>不偏性</b>：E[θ̂] = θ。x̄、p̂、s²(除以 n − 1)都是不偏估計式；除以 n 的變異數有偏誤 −σ²/n。</li>
-          <li><b>有效性</b>：都不偏時變異數越小越好。相對效率 = Var(θ̂₂) ÷ Var(θ̂₁)。常態母體下樣本平均數比中位數有效(中位數變異數約為 π/2 倍)。</li>
-          <li><b>一致性</b>：n → ∞ 時 θ̂ 機率收斂到 θ。充分條件：偏誤與變異數都趨近 0。</li>
-          <li><b>充分性</b>：θ̂ 已包含樣本中關於 θ 的所有資訊(費雪–奈曼分解定理)。</li>
-        </ul>
-        <h3>均方誤差</h3>
-        ${formula('MSE(θ̂) = E[(θ̂ − θ)²] = Var(θ̂) + [Bias(θ̂)]²')}
-        <p>有時接受一點偏誤，換來變異數大幅下降，整體 MSE 反而更小。</p>
-        ${formula('克拉瑪–羅下界：不偏估計式的變異數 ≥ 1 ÷ [n·I(θ)]，達到下界者稱為最小變異不偏估計式')}
-        <h3>動差法</h3>
-        <p>令樣本動差等於母體動差，解出參數：</p>
-        ${formula('(1/n)ΣXᵢ = E[X]，(1/n)ΣXᵢ² = E[X²]，…')}
-        <p>例：U(0, θ) 的 E[X] = θ/2，令 x̄ = θ/2 ⇒ θ̂ = 2x̄。</p>
-        <h3>最大概似法(MLE)</h3>
-        ${formula('概似函數 L(θ) = Π f(xᵢ; θ)　→　解 d ln L(θ) ÷ dθ = 0')}
-        <table class="stattable"><thead><tr><th>母體</th><th>MLE</th></tr></thead><tbody>
-          <tr><td>伯努利 p</td><td>p̂ = x̄(樣本比例)</td></tr>
-          <tr><td>卜瓦松 λ</td><td>λ̂ = x̄</td></tr>
-          <tr><td>指數 λ</td><td>λ̂ = 1 ÷ x̄</td></tr>
-          <tr><td>常態 μ, σ²</td><td>μ̂ = x̄，σ̂² = Σ(xᵢ − x̄)² ÷ n(有偏誤)</td></tr>
-          <tr><td>U(0, θ)</td><td>θ̂ = max(Xᵢ)(無法微分求解，要直接看 L(θ))</td></tr>
-        </tbody></table>
-        <p>MLE 具有<b>不變性</b>：θ̂ 是 θ 的 MLE，則 g(θ̂) 是 g(θ) 的 MLE。大樣本下 MLE 近似常態、一致且漸近有效。</p>`,
+      title: '點估計', md: 'ch07', st: ['frequentist-inference', 'Frequentist Inference'],
     },
     {
-      title: '區間估計', st: ['frequentist-inference', 'Frequentist Inference'], live: 'ci',
-      body: () => `
-        <h3>信賴區間的意義</h3>
-        <p>若重複抽樣很多次、每次都用同樣方法算區間，約有 (1 − α) 的區間會包含真正的參數。<b>常見誤解</b>：「μ 有 95% 機率在這個區間」— 頻率學派裡 μ 是固定值，算出來的區間要嘛包含、要嘛不包含。</p>
-        <h3>單一母體</h3>
-        <table class="stattable"><thead><tr><th>參數</th><th>條件</th><th>信賴區間</th></tr></thead><tbody>
-          <tr><td>μ</td><td ${L}>σ 已知(或大樣本)</td><td ${L}>x̄ ± z_(α/2) · σ/√n</td></tr>
-          <tr><td>μ</td><td ${L}>σ 未知、母體常態</td><td ${L}>x̄ ± t_(α/2, n−1) · s/√n</td></tr>
-          <tr><td>p</td><td ${L}>大樣本</td><td ${L}>p̂ ± z_(α/2) · √[p̂(1 − p̂)/n]</td></tr>
-          <tr><td>σ²</td><td ${L}>母體常態</td><td ${L}>[(n−1)s² / χ²_(α/2),　(n−1)s² / χ²_(1−α/2)]</td></tr>
-        </tbody></table>
-        <p>常用臨界值：z₀.₀₅ = 1.645、z₀.₀₂₅ = 1.96、z₀.₀₀₅ = 2.576。</p>
-        <h3>兩母體</h3>
-        <table class="stattable"><thead><tr><th>參數</th><th>條件</th><th>信賴區間</th></tr></thead><tbody>
-          <tr><td>μ₁ − μ₂</td><td ${L}>獨立，σ 已知</td><td ${L}>(x̄₁ − x̄₂) ± z · √(σ₁²/n₁ + σ₂²/n₂)</td></tr>
-          <tr><td>μ₁ − μ₂</td><td ${L}>獨立，σ 未知但相等</td><td ${L}>(x̄₁ − x̄₂) ± t_(n₁+n₂−2) · s_p√(1/n₁ + 1/n₂)，s_p² = [(n₁−1)s₁² + (n₂−1)s₂²] ÷ (n₁+n₂−2)</td></tr>
-          <tr><td>μ₁ − μ₂</td><td ${L}>獨立，σ 未知且不等</td><td ${L}>(x̄₁ − x̄₂) ± t_(ν) · √(s₁²/n₁ + s₂²/n₂)，ν 用 Welch–Satterthwaite 公式</td></tr>
-          <tr><td>μ_D</td><td ${L}>成對樣本</td><td ${L}>d̄ ± t_(n−1) · s_d/√n(把每對差值當成一組樣本)</td></tr>
-          <tr><td>p₁ − p₂</td><td ${L}>獨立大樣本</td><td ${L}>(p̂₁ − p̂₂) ± z · √[p̂₁(1−p̂₁)/n₁ + p̂₂(1−p̂₂)/n₂]</td></tr>
-          <tr><td>σ₁²/σ₂²</td><td ${L}>兩常態母體</td><td ${L}>[(s₁²/s₂²) / F_(α/2)(n₁−1, n₂−1),　(s₁²/s₂²) · F_(α/2)(n₂−1, n₁−1)]</td></tr>
-        </tbody></table>
-        <h3>樣本數的決定</h3>
-        ${formula('估計 μ，誤差界限 E：n = (z_(α/2) · σ ÷ E)²　　估計 p：n = z_(α/2)² · p(1 − p) ÷ E²(p 未知時用 0.5 最保守)')}
-        <p>結果一律<b>無條件進位</b>。誤差減半，樣本數要變 4 倍。</p>`,
+      title: '區間估計', md: 'ch08', st: ['frequentist-inference', 'Frequentist Inference'], live: 'ci',
     },
     {
-      title: '假說檢定', st: null, live: 'ttest',
-      body: () => `
-        <h3>檢定步驟</h3>
-        <ol>
-          <li>設立 <b>H₀</b>(含等號，「沒有差異」)與 <b>H₁</b>(研究者想證明的主張)。</li>
-          <li>選定顯著水準 α，決定檢定統計量與拒絕域(右尾、左尾或雙尾，由 H₁ 的方向決定)。</li>
-          <li>計算檢定統計量或 p 值。</li>
-          <li>落入拒絕域(或 p 值 &lt; α)就拒絕 H₀；否則「不拒絕 H₀」— 不等於證明 H₀ 為真。</li>
-        </ol>
-        <h3>兩種錯誤與檢定力</h3>
-        <table class="stattable"><thead><tr><th></th><th>H₀ 為真</th><th>H₀ 為假</th></tr></thead><tbody>
-          <tr><td>拒絕 H₀</td><td>型一錯誤(機率 α)</td><td>正確(檢定力 1 − β)</td></tr>
-          <tr><td>不拒絕 H₀</td><td>正確(1 − α)</td><td>型二錯誤(機率 β)</td></tr>
-        </tbody></table>
-        <ul>
-          <li>n 固定時 α 與 β 此消彼長；要同時降低兩者只能增加樣本數。</li>
-          <li>檢定力隨「真實值與 μ₀ 的距離」、n、α 增加而增加，隨 σ 增加而減少。畫出 1 − β 對真實值的曲線就是檢定力曲線(OC 曲線則是 β)。</li>
-        </ul>
-        <h3>p 值</h3>
-        <p>H₀ 為真時，得到「至少和觀察值一樣極端」的機率。雙尾檢定要乘以 2。p 值<b>不是</b> H₀ 為真的機率；p 值很小也不代表效果很大。</p>
-        <h3>常用檢定統計量</h3>
-        <table class="stattable"><thead><tr><th>檢定</th><th>條件</th><th>檢定統計量</th></tr></thead><tbody>
-          <tr><td>μ</td><td ${L}>σ 已知或大樣本</td><td ${L}>Z = (x̄ − μ₀) ÷ (σ/√n)</td></tr>
-          <tr><td>μ</td><td ${L}>σ 未知、常態</td><td ${L}>t = (x̄ − μ₀) ÷ (s/√n)，df = n − 1</td></tr>
-          <tr><td>p</td><td ${L}>大樣本</td><td ${L}>Z = (p̂ − p₀) ÷ √[p₀(1 − p₀)/n](分母用 p₀)</td></tr>
-          <tr><td>σ²</td><td ${L}>常態</td><td ${L}>χ² = (n − 1)s² ÷ σ₀²，df = n − 1</td></tr>
-          <tr><td>μ₁ − μ₂</td><td ${L}>獨立、σ 未知相等</td><td ${L}>t = (x̄₁ − x̄₂ − D₀) ÷ [s_p√(1/n₁ + 1/n₂)]</td></tr>
-          <tr><td>μ_D</td><td ${L}>成對</td><td ${L}>t = (d̄ − D₀) ÷ (s_d/√n)</td></tr>
-          <tr><td>p₁ − p₂</td><td ${L}>H₀：p₁ = p₂</td><td ${L}>Z = (p̂₁ − p̂₂) ÷ √[p̄(1 − p̄)(1/n₁ + 1/n₂)]，p̄ 為合併比例</td></tr>
-          <tr><td>σ₁² = σ₂²</td><td ${L}>兩常態</td><td ${L}>F = s₁² ÷ s₂²，df = (n₁ − 1, n₂ − 1)</td></tr>
-        </tbody></table>
-        <p><b>檢定與區間的關係</b>：雙尾檢定在 α 下不拒絕 H₀：μ = μ₀，等價於 μ₀ 落在 (1 − α) 信賴區間內。</p>
-        ${tip('<b>交易者特別注意 · 多重比較</b>：同時回測 100 個策略，就算全部無效，在 α = 0.05 下平均也有 5 個「顯著」。挑最好的那個去實戰，常常是被運氣騙了。樣本外驗證很重要。')}`,
+      title: '假說檢定', md: 'ch09', st: null, live: 'ttest',
     },
     {
-      title: '變異數分析', st: null, live: 'anova',
-      body: () => `
-        <h3>為什麼不兩兩做 t 檢定</h3>
-        <p>k 組兩兩比較要做 C(k, 2) 次檢定，整體型一錯誤會遠大於 α(5 組做 10 次，至少錯一次的機率約 40%)。ANOVA 用一次 F 檢定回答「這些平均數是否全部相等」。</p>
-        <h3>單因子變異數分析</h3>
-        ${formula('H₀：μ₁ = μ₂ = ⋯ = μₖ　　H₁：至少有一個 μᵢ 不同')}
-        <p><b>假設</b>：各組母體為常態、變異數相等、樣本彼此獨立。</p>
-        ${formula('SST = ΣΣ(xᵢⱼ − x̿)² = SSTR + SSE　　SSTR = Σnᵢ(x̄ᵢ − x̿)²(組間)　　SSE = ΣΣ(xᵢⱼ − x̄ᵢ)²(組內)')}
-        <table class="stattable"><thead><tr><th>變異來源</th><th>SS</th><th>df</th><th>MS</th><th>F</th></tr></thead><tbody>
-          <tr><td>處理(組間)</td><td>SSTR</td><td>k − 1</td><td>MSTR = SSTR/(k − 1)</td><td>MSTR / MSE</td></tr>
-          <tr><td>誤差(組內)</td><td>SSE</td><td>n − k</td><td>MSE = SSE/(n − k)</td><td></td></tr>
-          <tr><td>總和</td><td>SST</td><td>n − 1</td><td></td><td></td></tr>
-        </tbody></table>
-        <p>F &gt; F_α(k − 1, n − k) 就拒絕 H₀。直覺：組間差異相對於組內雜訊夠大，才算平均數真的不同。k = 2 時 F = t²，與合併變異數 t 檢定相同。</p>
-        <h3>多重比較</h3>
-        <ul>
-          <li><b>Fisher LSD</b>：|x̄ᵢ − x̄ⱼ| &gt; t_(α/2, n−k)·√[MSE(1/nᵢ + 1/nⱼ)]，F 檢定顯著後才使用。</li>
-          <li><b>Bonferroni</b>：做 m 次比較，每次用 α/m，控制整體型一錯誤。</li>
-          <li><b>Tukey HSD</b>：用學生化全距分配 q，適合所有成對比較。</li>
-        </ul>
-        <h3>隨機集區設計</h3>
-        <p>把干擾因素(例如不同的人、不同的年度)當成「集區」，每個集區內都做所有處理，從誤差中扣掉集區造成的變異：</p>
-        ${formula('SST = SSTR + SSBL + SSE　　df：(k − 1) + (b − 1) + (k − 1)(b − 1)')}
-        <h3>二因子變異數分析</h3>
-        ${formula('SST = SSA + SSB + SSAB + SSE　　分別檢定 A 主效果、B 主效果、A×B 交互作用')}
-        <p>有<b>交互作用</b>時，A 的效果會因 B 的水準而不同(畫交互作用圖會看到線條不平行)，這時單獨解讀主效果容易誤導。</p>`,
+      title: '變異數分析', md: 'ch10', st: null, live: 'anova',
     },
     {
-      title: '線性迴歸', st: ['regression-analysis', 'Regression Analysis'], live: 'regress',
-      body: () => `
-        <h3>相關係數</h3>
-        ${formula('r = Sxy ÷ √(Sxx · Syy)　　Sxy = Σ(xᵢ − x̄)(yᵢ − ȳ)，Sxx = Σ(xᵢ − x̄)²')}
-        <p>r 只衡量<b>線性</b>關係，對離群值敏感；檢定 ρ = 0 用 t = r√(n − 2) ÷ √(1 − r²)，df = n − 2。</p>
-        <h3>簡單線性迴歸模型</h3>
-        ${formula('Y = β₀ + β₁X + ε，ε ~ iid N(0, σ²)')}
-        <p>假設(LINE)：線性、誤差獨立、常態、變異數相等。</p>
-        <h3>最小平方法</h3>
-        ${formula('b₁ = Sxy ÷ Sxx = r · s_y ÷ sₓ　　b₀ = ȳ − b₁x̄　　迴歸線一定通過 (x̄, ȳ)')}
-        <p>斜率 b₁：x 每增加 1 單位，y 平均增加 b₁ 單位。不要在資料範圍以外<b>外插</b>預測。</p>
-        <h3>變異分解與配適度</h3>
-        ${formula('SST = SSR + SSE　　R² = SSR ÷ SST(簡單迴歸時 R² = r²)　　s_e = √[SSE ÷ (n − 2)]')}
-        <h3>迴歸的推論</h3>
-        ${formula('t = b₁ ÷ s_b₁，s_b₁ = s_e ÷ √Sxx，df = n − 2　　F = MSR ÷ MSE，df = (1, n − 2)，簡單迴歸 F = t²')}
-        <ul>
-          <li><b>平均反應的信賴區間</b>：ŷ ± t · s_e√[1/n + (x₀ − x̄)²/Sxx]</li>
-          <li><b>個別值的預測區間</b>：ŷ ± t · s_e√[1 + 1/n + (x₀ − x̄)²/Sxx]，比信賴區間寬；x₀ 離 x̄ 越遠兩者都越寬。</li>
-        </ul>
-        <h3>殘差分析</h3>
-        <ul>
-          <li>殘差對 x 或 ŷ 的圖應該隨機散布；呈喇叭形代表<b>異質變異</b>，呈曲線代表模型不是線性。</li>
-          <li>常態機率圖檢查常態性；Durbin–Watson 檢查時間序列資料的<b>自我相關</b>。</li>
-          <li>標準化殘差 |e| &gt; 2 或 3 為離群值；高槓桿點與影響點(Cook's D)會大幅改變迴歸線。</li>
-        </ul>
-        <h3>複迴歸</h3>
-        ${formula('Y = β₀ + β₁X₁ + ⋯ + βₖXₖ + ε　　調整後 R²ₐ = 1 − (1 − R²)(n − 1) ÷ (n − k − 1)')}
-        <ul>
-          <li>bᵢ：<b>其他變數固定</b>時，Xᵢ 增加 1 單位 y 的平均變化。</li>
-          <li>整體 F 檢定 H₀：β₁ = ⋯ = βₖ = 0；個別 t 檢定 H₀：βᵢ = 0。</li>
-          <li>加入變數 R² 一定不會下降，所以比較模型要用調整後 R²。</li>
-          <li><b>多重共線性</b>：自變數彼此高度相關，係數的標準誤變大、正負號可能怪異(VIF &gt; 10 要注意)；類別變數用虛擬變數(k 類用 k − 1 個)。</li>
-        </ul>
-        ${tip('<b>金融用語 · Beta</b>：個股報酬對大盤報酬做迴歸，斜率就是 β。β = 1.2 代表大盤漲 1%，這檔股票平均漲 1.2%；R² 代表系統性風險占總風險的比例。<b>相關不等於因果</b>：冰淇淋銷量和溺水人數正相關，真正原因是天氣熱。')}`,
+      title: '線性迴歸', md: 'ch11', st: ['regression-analysis', 'Regression Analysis'], live: 'regress',
     },
     {
-      title: '卡方檢定', st: null, live: 'chi2',
-      body: () => `
-        <h3>共同的檢定統計量</h3>
-        ${formula('χ² = Σ (Oᵢ − Eᵢ)² ÷ Eᵢ　　O：觀察次數，E：H₀ 為真時的期望次數')}
-        <p>差距越大 χ² 越大，所以一律是<b>右尾檢定</b>。使用條件：每格期望次數 Eᵢ ≥ 5，不足時要合併相鄰組別。</p>
-        <h3>適合度檢定</h3>
-        <p>H₀：母體符合某個指定的分配(例如骰子公平、各星期的上漲機率相同、資料服從卜瓦松)。</p>
-        ${formula('df = k − 1 − m　　k：組數，m：從樣本估計的參數個數')}
-        <p>例：檢定資料是否為卜瓦松分配，λ 用 x̄ 估計，m = 1；檢定常態且 μ、σ 都用樣本估計，m = 2。</p>
-        <h3>獨立性檢定</h3>
-        <p>一組樣本、同時觀察兩個類別變數，整理成 r × c 列聯表。H₀：兩變數獨立。</p>
-        ${formula('Eᵢⱼ = (第 i 列總和 × 第 j 行總和) ÷ n　　df = (r − 1)(c − 1)')}
-        <p>2 × 2 表格 df = 1，樣本小時可做葉茲連續性校正 Σ(|O − E| − 0.5)² ÷ E。</p>
-        <h3>齊一性檢定</h3>
-        <p>從<b>多個母體</b>各抽一組樣本(每組樣本數事先固定)，檢定各母體在某類別變數上的比例是否相同。計算方式和獨立性檢定完全一樣，差別在抽樣方式與 H₀ 的敘述。</p>
-        <table class="stattable"><thead><tr><th></th><th>獨立性檢定</th><th>齊一性檢定</th></tr></thead><tbody>
-          <tr><td>抽樣</td><td ${L}>一個母體抽一組樣本</td><td ${L}>多個母體各抽一組，列(或行)總和固定</td></tr>
-          <tr><td>H₀</td><td ${L}>兩變數獨立</td><td ${L}>各母體的比例分配相同</td></tr>
-        </tbody></table>
-        <p>k 個母體比例相等的檢定(H₀：p₁ = ⋯ = pₖ)就是 2 × k 的齊一性檢定；k = 2 時 χ² = Z²。</p>`,
+      title: '卡方檢定', md: 'ch12', st: null, live: 'chi2',
     },
     {
-      title: '其他', st: ['bayesian-inference', 'Bayesian Inference'], live: 'runs',
-      body: () => `
-        <h3>無母數統計</h3>
-        <p>不需要假設母體是常態等特定分配，常用資料的<b>等級(排名)</b>或<b>正負號</b>。適合小樣本、母體明顯非常態、有離群值或只有順序尺度的資料；代價是母體真的是常態時，檢定力比有母數方法低。</p>
-        <table class="stattable"><thead><tr><th>無母數方法</th><th>對應的有母數方法</th><th>用途</th></tr></thead><tbody>
-          <tr><td>符號檢定</td><td>單樣本 / 成對 t</td><td ${L}>中位數檢定，只看差值正負號，正號個數 ~ B(n, 0.5)</td></tr>
-          <tr><td>魏克森符號等級檢定</td><td>成對 t</td><td ${L}>差值取絕對值排等級，再分別加總正、負號的等級和</td></tr>
-          <tr><td>魏克森等級和 / 曼–惠尼 U</td><td>兩獨立樣本 t</td><td ${L}>兩組混合排等級，比較其中一組的等級和</td></tr>
-          <tr><td>克魯斯卡–瓦歷斯 H</td><td>單因子 ANOVA</td><td ${L}>k 組混合排等級，H 近似 χ²(k − 1)</td></tr>
-          <tr><td>弗里德曼檢定</td><td>隨機集區 ANOVA</td><td ${L}>每個集區內排等級</td></tr>
-          <tr><td>斯皮爾曼等級相關 r_s</td><td>皮爾森 r</td><td ${L}>r_s = 1 − 6Σdᵢ² ÷ [n(n² − 1)]，衡量單調關係</td></tr>
-          <tr><td>連檢定</td><td>—</td><td ${L}>檢定序列是否隨機</td></tr>
-        </tbody></table>
-        <h3>連檢定</h3>
-        <p>「連」是連續出現相同符號的一段。連數太少代表有趨勢或群聚，太多代表規律交替，兩者都不隨機。n₁、n₂ 為兩種符號的個數，n = n₁ + n₂：</p>
-        ${formula('E[R] = 2n₁n₂ ÷ n + 1　　Var(R) = 2n₁n₂(2n₁n₂ − n) ÷ [n²(n − 1)]　　大樣本 Z = (R − E[R]) ÷ √Var(R)')}
-        <h3>自助法(Bootstrap)</h3>
-        <p>公式難以推導時，從手上的樣本<b>有放回地</b>重複抽出大小為 n 的樣本上千次，每次計算統計量，用這些結果的分布估計標準誤與信賴區間(例如取第 2.5 與 97.5 百分位數)。</p>
-        <h3>貝氏推論</h3>
-        ${formula('後驗 ∝ 概似 × 先驗　　P(θ | 資料) ∝ P(資料 | θ) · P(θ)')}
-        <p>貝氏學派把參數也看成隨機變數，用機率分配表達信念，看到資料後再更新。例：交易策略勝率 θ 的先驗為 Beta(1, 1)(均勻)，觀察到 w 賺 l 賠後，後驗為 Beta(1 + w, 1 + l)，後驗平均 (1 + w) ÷ (2 + w + l)。10 筆 7 賺時後驗平均 8/12 ≈ 66.7%，比 70% 保守；1000 筆 700 賺時 ≈ 69.9%，資料越多先驗影響越小。</p>
-        <table class="stattable"><thead><tr><th></th><th>頻率學派</th><th>貝氏學派</th></tr></thead><tbody>
-          <tr><td>參數</td><td ${L}>固定但未知</td><td ${L}>用機率分配描述的不確定量</td></tr>
-          <tr><td>機率的意義</td><td ${L}>長期重複的相對次數</td><td ${L}>信念的程度</td></tr>
-          <tr><td>區間</td><td ${L}>信賴區間</td><td ${L}>可信區間(可直接說參數有 95% 機率在其中)</td></tr>
-          <tr><td>先驗資訊</td><td ${L}>不使用</td><td ${L}>明確納入</td></tr>
-        </tbody></table>`,
+      title: '其他', md: 'ch13', st: ['bayesian-inference', 'Bayesian Inference'], live: 'runs',
     },
   ];
 

@@ -6,18 +6,30 @@
 
 ```
 content/stats/basic/
-  ch01.md                第 1 章 概論及敘述統計學 ← 直接改這個檔案
+  ch01.md                第 1 章  概論及敘述統計學
+  ch02.md                第 2 章  機率
+  ch03.md                第 3 章  隨機變數
+  ch04.md                第 4 章  多元隨機變數
+  ch05.md                第 5 章  常見機率模型
+  ch06.md                第 6 章  抽樣方法與抽樣分配
+  ch07.md                第 7 章  點估計
+  ch08.md                第 8 章  區間估計
+  ch09.md                第 9 章  假說檢定
+  ch10.md                第 10 章 變異數分析
+  ch11.md                第 11 章 線性迴歸
+  ch12.md                第 12 章 卡方檢定
+  ch13.md                第 13 章 其他
   img/                   章節用到的圖片(ch01-bar.png …)
   r/ch01-figures.R       產生第 1 章圖片的 R 程式
 ```
 
-目前第 1 章使用 Markdown；第 2～13 章仍寫在 `modules/stats/basic.js`(各章的 `body`)，可以逐章搬過來(見最後一節)。
+13 章全部都是 Markdown 檔，要改哪一章就打開對應的 `chNN.md`。章節名稱、互動模擬、台股市場實例則設定在 `modules/stats/basic.js`(見最後一節)。
 
 ## 三種更新方式
 
 ### 方式 A：在 GitHub 網頁上直接改(最簡單，免安裝)
 
-1. 打開 https://github.com/rebornlife0218/little-trader/blob/main/content/stats/basic/ch01.md
+1. 打開 https://github.com/rebornlife0218/little-trader/tree/main/content/stats/basic ，點選要改的章節(例如 `ch01.md`)
 2. 按右上角鉛筆圖示 ✏️(Edit this file)
 3. 修改內容，可切到「Preview」分頁預覽(公式在 GitHub 預覽也看得到)
 4. 按「Commit changes…」→ 再按一次「Commit changes」
@@ -43,7 +55,7 @@ cd C:\Users\User\little-trader
 python -m http.server 8000
 ```
 
-瀏覽器打開 http://localhost:8000/#/stats/basic/1 ，改完檔案按重新整理就能看到結果(本機若沒有 `data/` 資料，下方的「市場實例」會顯示載入失敗，不影響章節內容)。
+瀏覽器打開 http://localhost:8000/#/stats/basic/1 (最後的數字是章節編號)，改完檔案按重新整理就能看到結果(本機若沒有 `data/` 資料，下方的「市場實例」會顯示載入失敗，不影響章節內容)。
 
 ## Markdown 語法速查
 
@@ -61,6 +73,7 @@ python -m http.server 8000
 | 連結 | `[文字](https://網址)` |
 | 換行(表格內) | `<br>` |
 | 註解(不會顯示) | `<!-- 這是註解 -->` |
+| 文氏圖 | `[[venn 種類\|標題\|說明]]`(見下方) |
 
 **表格**：
 
@@ -72,6 +85,13 @@ python -m http.server 8000
 ```
 
 段落之間要**空一行**，否則會黏在一起。
+
+**文氏圖**(第 2 章使用)：一行一張，連續幾行會排成一列。種類有 `inter` 交集、`union` 聯集、`comp` 補集、`diff` 差集、`disjoint` 互斥，標題與說明可以放公式：
+
+```markdown
+[[venn inter|交集 $A \cap B$|A 與 B 同時發生]]
+[[venn union|聯集 $A \cup B$|A 或 B 至少一個發生]]
+```
 
 ## 數學公式(LaTeX 語法)
 
@@ -119,18 +139,20 @@ cd C:\Users\User\little-trader
 
 想新增圖片：在 R 程式裡照著 `dev("檔名.png"); 畫圖指令; dev.off()` 的格式加一行，執行後在 `.md` 裡用 `![圖說](img/檔名.png)` 插入。
 
-## 其他章節改成 Markdown
+## 章節名稱、互動模擬與市場實例
 
-1. 新增 `content/stats/basic/ch02.md`(檔名自訂)，寫入內容
-2. 打開 `modules/stats/basic.js`，找到該章(例如 `title: '機率'`)，加上 `md: 'ch02',`
-3. 有了 `md` 之後，該章的 `body` 就不會再使用，可以刪除
-
-章節名稱、互動模擬(`demo`)、台股市場實例(`live`)仍設定在 `basic.js` 的 `CHAPTERS` 清單裡：
+這些不是文字內容，設定在 `modules/stats/basic.js` 的 `CHAPTERS` 清單裡，一章一行：
 
 ```js
 {
-  title: '概論及敘述統計學',   // 章節名稱(上方章節按鈕與章名)
-  md: 'ch01',                  // 內容檔 content/stats/basic/ch01.md
-  live: 'describe',            // 文末的台股市場實例(選填)
+  title: '機率',                                  // 章節名稱(上方章節按鈕與章名)
+  md: 'ch02',                                     // 內容檔 content/stats/basic/ch02.md
+  st: ['basic-probability', 'Basic Probability'], // 右上角 Seeing Theory 連結(選填，不要就寫 null)
+  demo: ['dice', 'coin'],                         // 文末互動模擬(選填)
+  live: 'describe',                               // 文末台股市場實例(選填)
 },
 ```
+
+- **改章名**：改 `title` 即可。
+- **新增一章**：新增 `content/stats/basic/ch14.md`，再在 `CHAPTERS` 最後加上 `{ title: '新章名', md: 'ch14' },`。
+- 章節的順序就是 `CHAPTERS` 清單的順序。
