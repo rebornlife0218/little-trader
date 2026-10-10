@@ -128,7 +128,7 @@
         ${tip('<b>金融用語</b>：報酬率的標準差就是「波動度」，日報酬標準差 × √252 ≈ 年化波動度。<b>倖存者偏差</b>：只統計還存在的基金，會漏掉清算的爛基金而高估平均績效。樣本怎麼選，比樣本有多大更重要。')}`,
     },
     {
-      title: '機率', st: ['basic-probability', 'Basic Probability'], demo: 'coin',
+      title: '機率', st: ['basic-probability', 'Basic Probability'], demo: ['dice', 'coin'],
       goals: ['理解樣本空間、事件與機率公理', '運用排列組合、加法與乘法法則', '計算條件機率、判斷獨立並使用貝氏定理'],
       body: () => `
         <h3>基本名詞</h3>
@@ -641,10 +641,15 @@
 
   /* ---------- 互動模擬 ---------- */
   const DEMOS = {
+    dice: {
+      html: `<h3>互動模擬 · 擲骰子</h3>
+        <div class="btnrow-l"><button onclick="LTStat.dice(1)">擲 1 次</button><button onclick="LTStat.dice(10)">擲 10 次</button><button onclick="LTStat.dice(100)">擲 100 次</button><button onclick="LTStat.dice(1000)">擲 1000 次</button><button onclick="LTStat.dice(0)">重來</button></div>
+        <div id="diceOut" class="mute" style="margin-top:10px;">按下按鈕開始擲骰子</div>`,
+    },
     coin: {
-      html: `<h3>互動模擬 · 擲硬幣與大數法則</h3>
+      html: `<h3>互動模擬 · 擲錢幣</h3>
         <div class="btnrow-l"><button onclick="LTStat.coin(1)">擲 1 次</button><button onclick="LTStat.coin(10)">擲 10 次</button><button onclick="LTStat.coin(100)">擲 100 次</button><button onclick="LTStat.coin(1000)">擲 1000 次</button><button onclick="LTStat.coin(0)">重來</button></div>
-        <div id="coinOut" class="mute" style="margin-top:10px;">按下按鈕開始擲硬幣</div>`,
+        <div id="coinOut" class="mute" style="margin-top:10px;">按下按鈕開始擲錢幣</div>`,
     },
     clt: {
       html: `<h3>互動模擬 · 中央極限定理(擲骰子取平均)</h3>
@@ -653,20 +658,47 @@
         <div id="cltOut" style="margin-top:10px;"></div>`,
     },
   };
+  // 骰子點數的 SVG(九宮格點位)
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
+  const dieSVG = (v, size = 40) => `<svg width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${v} 點"><rect x="1.5" y="1.5" width="37" height="37" rx="7" fill="var(--panel)" stroke="var(--border-strong)" stroke-width="1.5"/>${PIPS[v].map(k => `<circle cx="${10 + (k % 3) * 10}" cy="${10 + Math.floor(k / 3) * 10}" r="3.4" fill="${v === 1 ? 'var(--up)' : 'var(--text)'}"/>`).join('')}</svg>`;
+  // 錢幣的 SVG：正面金色、反面銀色
+  const coinSVG = (h, size = 40) => `<svg width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${h ? '正面' : '反面'}"><circle cx="20" cy="20" r="18" fill="${h ? 'var(--amber)' : 'var(--dim)'}" stroke="var(--border-strong)" stroke-width="1.5"/><circle cx="20" cy="20" r="14" fill="none" stroke="var(--panel)" stroke-width="1" opacity=".6"/><text x="20" y="25.5" font-size="15" font-weight="700" text-anchor="middle" fill="var(--panel)">${h ? '正' : '反'}</text></svg>`;
+  let diceRolls = [];
   let coinFlips = [];
   let cltMeans = [];
   window.LTStat = {
+    dice(k) {
+      if (k === 0) diceRolls = []; else for (let i = 0; i < k; i++) diceRolls.push(1 + Math.floor(Math.random() * 6));
+      const el = document.getElementById('diceOut'); if (!el) return;
+      const n = diceRolls.length;
+      if (!n) { el.textContent = '按下按鈕開始擲骰子'; return; }
+      const cnt = [0, 0, 0, 0, 0, 0]; diceRolls.forEach(v => cnt[v - 1]++);
+      const even = cnt[1] + cnt[3] + cnt[5], last = diceRolls.slice(-k).slice(-12);
+      const W = 640, H = 180, padB = 34, top = 18, bw = W / 6, maxC = Math.max(...cnt, n / 6 * 1.6);
+      const y = c => H - padB - (H - padB - top) * c / maxC;
+      const bars = cnt.map((c, i) => `<rect x="${i * bw + bw * 0.2}" y="${y(c)}" width="${bw * 0.6}" height="${H - padB - y(c)}" fill="var(--blue)" opacity=".75"/>
+        <text x="${i * bw + bw / 2}" y="${y(c) - 5}" font-size="11" text-anchor="middle" fill="var(--text)">${c} 次(${(c / n * 100).toFixed(1)}%)</text>
+        <text x="${i * bw + bw / 2}" y="${H - 12}" font-size="12" text-anchor="middle" fill="var(--mute)">${i + 1} 點</text>`).join('');
+      el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${last.map((v, i) => dieSVG(v, i === last.length - 1 ? 48 : 34)).join('')}</div>
+        <div>擲了 <b>${n}</b> 次，平均點數 <b>${(diceRolls.reduce((a, b) => a + b, 0) / n).toFixed(3)}</b>(期望值 3.5)，事件「擲出偶數」比例 <b>${(even / n * 100).toFixed(1)}%</b>(理論 50%)</div>
+        <svg viewBox="0 0 ${W} ${H}" class="chart-svg">${bars}<line x1="0" x2="${W}" y1="${y(n / 6)}" y2="${y(n / 6)}" stroke="var(--amber)" stroke-dasharray="4 3"/></svg>
+        <div class="note">上方顯示這次擲出的骰子(最多 12 顆，最右邊較大的是最新一顆)。長條為各點數出現的次數，橘色虛線為期望次數 n × 1/6 = ${(n / 6).toFixed(1)}。次數少時長條高低不齊，擲越多次各點數的比例越接近 1/6 ≈ 16.7%(大數法則)。</div>`;
+    },
     coin(k) {
       if (k === 0) coinFlips = []; else for (let i = 0; i < k; i++) coinFlips.push(Math.random() < 0.5 ? 1 : 0);
       const el = document.getElementById('coinOut'); if (!el) return;
-      if (!coinFlips.length) { el.textContent = '按下按鈕開始擲硬幣'; return; }
-      let h = 0; const path = coinFlips.map((f, i) => { h += f; return h / (i + 1); });
-      const W = 640, H = 160, step = Math.max(1, Math.floor(path.length / 400));
-      const pts = path.filter((_, i) => i % step === 0 || i === path.length - 1).map((p, i, a) => `${(i / Math.max(a.length - 1, 1)) * W},${H - p * H}`).join(' ');
-      el.innerHTML = `<div>擲了 <b>${coinFlips.length}</b> 次，正面 <b>${h}</b> 次，正面比例 <b>${(h / coinFlips.length * 100).toFixed(1)}%</b></div>
-        <svg viewBox="0 0 ${W} ${H}" class="chart-svg"><line x1="0" x2="${W}" y1="${H / 2}" y2="${H / 2}" stroke="var(--amber)" stroke-dasharray="4 3"/>
-        <polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2"/></svg>
-        <div class="note">藍線為累積正面比例，橘色虛線為真實機率 50%。次數越多，藍線越貼近 50%。</div>`;
+      const n = coinFlips.length;
+      if (!n) { el.textContent = '按下按鈕開始擲錢幣'; return; }
+      const h = coinFlips.reduce((a, b) => a + b, 0), cnt = [h, n - h], last = coinFlips.slice(-k).slice(-12);
+      const W = 640, H = 180, padB = 34, top = 18, bw = W / 2, maxC = Math.max(...cnt, n / 2 * 1.3);
+      const y = c => H - padB - (H - padB - top) * c / maxC;
+      const bars = cnt.map((c, i) => `<rect x="${i * bw + bw * 0.3}" y="${y(c)}" width="${bw * 0.4}" height="${H - padB - y(c)}" fill="${i ? 'var(--dim)' : 'var(--amber)'}" opacity=".8"/>
+        <text x="${i * bw + bw / 2}" y="${y(c) - 5}" font-size="12" text-anchor="middle" fill="var(--text)">${c} 次(${(c / n * 100).toFixed(1)}%)</text>
+        <text x="${i * bw + bw / 2}" y="${H - 12}" font-size="12" text-anchor="middle" fill="var(--mute)">${i ? '反面' : '正面'}</text>`).join('');
+      el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">${last.map((v, i) => coinSVG(v, i === last.length - 1 ? 48 : 34)).join('')}</div>
+        <div>擲了 <b>${n}</b> 次，正面 <b>${h}</b> 次、反面 <b>${n - h}</b> 次，正面比例 <b>${(h / n * 100).toFixed(1)}%</b>(理論 50%)</div>
+        <svg viewBox="0 0 ${W} ${H}" class="chart-svg">${bars}<line x1="0" x2="${W}" y1="${y(n / 2)}" y2="${y(n / 2)}" stroke="var(--blue)" stroke-dasharray="4 3"/></svg>
+        <div class="note">上方顯示這次擲出的錢幣(最多 12 枚，最右邊較大的是最新一枚)。長條為正面、反面出現的次數，藍色虛線為期望次數 n × 1/2 = ${(n / 2).toFixed(1)}。擲越多次，兩邊的比例越接近各 50%(大數法則)。</div>`;
     },
     clt(k) {
       const n = +document.getElementById('cltN').value;
@@ -703,7 +735,7 @@
           </div>
           <div class="goals"><b>學習目標</b><ul>${ch.goals.map(g => `<li>${g}</li>`).join('')}</ul></div>
           ${ch.body()}
-          ${ch.demo ? `<div class="demo-box">${DEMOS[ch.demo].html}</div>` : ''}
+          ${[].concat(ch.demo || []).map(d => `<div class="demo-box">${DEMOS[d].html}</div>`).join('')}
           ${ch.live ? `<div class="live-box" id="liveBox"><span class="mute">正在用台股資料計算市場實例…</span></div>` : ''}
           <div class="chap-foot">${nav(idx - 1, '← 上一章')}${nav(idx + 1, '下一章 →')}</div>
         </article>
@@ -713,8 +745,10 @@
             <li><b>Seeing Theory</b>(布朗大學)：<a href="${ST}" target="_blank" rel="noopener">${ST} ↗</a> 互動視覺化教材，第 ${CHAPTERS.map((c, i) => c.st ? i + 1 : 0).filter(Boolean).join("、")} 章可搭配使用</li>
             <li>章節架構參考<b>大碩補習班 張翔老師</b>的統計學課程，編排略有調整</li></ul>
         </div>`;
-      if (ch.demo === 'coin') { coinFlips = []; }
-      if (ch.demo === 'clt') { cltMeans = []; window.LTStat.clt(0); }
+      const demos = [].concat(ch.demo || []);
+      if (demos.includes('dice')) diceRolls = [];
+      if (demos.includes('coin')) coinFlips = [];
+      if (demos.includes('clt')) { cltMeans = []; window.LTStat.clt(0); }
       if (ch.live) {
         try {
           const html = await LIVE[ch.live]();
