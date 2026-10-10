@@ -54,6 +54,27 @@
   }
   const formula = s => `<div class="formula">${s}</div>`;
   const tip = s => `<div class="callout">${s}</div>`;
+  // 文氏圖：kind = inter 交集 / union 聯集 / comp 補集 / diff 差集 / disjoint 互斥，著色部分為該事件
+  function venn(kind, caption) {
+    const id = 'venn-' + kind, apart = kind === 'disjoint';
+    const A = apart ? 'cx="58" cy="62" r="30"' : 'cx="72" cy="62" r="36"', B = apart ? 'cx="122" cy="62" r="30"' : 'cx="108" cy="62" r="36"';
+    const fill = 'fill="var(--amber)" fill-opacity=".55"';
+    const shade = {
+      inter: `<clipPath id="${id}"><circle ${B}/></clipPath><circle ${A} ${fill} clip-path="url(#${id})"/>`,
+      union: `<g opacity=".55"><circle ${A} fill="var(--amber)"/><circle ${B} fill="var(--amber)"/></g>`,
+      comp: `<mask id="${id}"><rect x="0" y="0" width="180" height="124" fill="#fff"/><circle ${A} fill="#000"/></mask><rect x="4" y="4" width="172" height="116" rx="6" ${fill} mask="url(#${id})"/>`,
+      diff: `<mask id="${id}"><circle ${A} fill="#fff"/><circle ${B} fill="#000"/></mask><rect x="0" y="0" width="180" height="124" ${fill} mask="url(#${id})"/>`,
+      disjoint: `<circle ${A} ${fill}/><circle ${B} ${fill}/>`,
+    }[kind];
+    const ax = apart ? 58 : 60, bx = apart ? 122 : 120;
+    return `<figure class="venn"><svg viewBox="0 0 180 124" role="img" aria-label="${caption.replace(/<[^>]+>/g, ' ')}">
+      <rect x="4" y="4" width="172" height="116" rx="6" fill="none" stroke="var(--border-strong)"/>${shade}
+      <circle ${A} fill="none" stroke="var(--text)" stroke-width="1.3"/><circle ${B} fill="none" stroke="var(--text)" stroke-width="1.3"/>
+      <text x="14" y="20" font-size="12" fill="var(--mute)">S</text>
+      <text x="${ax}" y="66" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">A</text>
+      <text x="${bx}" y="66" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">B</text>
+    </svg><figcaption>${caption}</figcaption></figure>`;
+  }
   const stLink = (path, name) => `<a href="${ST}${path}/index.html" target="_blank" rel="noopener">Seeing Theory · ${name} ↗</a>`;
 
   // 直方圖(SVG)＋常態曲線
@@ -129,33 +150,79 @@
     },
     {
       title: '機率', st: ['basic-probability', 'Basic Probability'], demo: ['dice', 'coin'],
-      goals: ['理解樣本空間、事件與機率公理', '運用排列組合、加法與乘法法則', '計算條件機率、判斷獨立並使用貝氏定理'],
+      goals: ['理解 Kolmogorov 公設化機率，並由公設推導機率的基本性質', '用文氏圖理解交集、聯集、補集，運用排列組合、條件機率與獨立', '用 Monty Hall 問題體會條件機率，理解貝氏定理「用新訊息修正機率」的意義'],
       body: () => `
         <h3>基本名詞</h3>
         <ul>
-          <li><b>隨機試驗</b>：結果事先無法確定的過程；<b>樣本空間 S</b>：所有可能結果的集合；<b>事件</b>：S 的子集合。</li>
-          <li><b>互斥</b>：A ∩ B = ∅，不會同時發生；<b>周延</b>：A₁ ∪ ⋯ ∪ Aₖ = S，一定有一個發生。</li>
+          <li><b>隨機試驗</b>：結果事先無法確定的過程，例如擲骰子、明天大盤漲或跌。</li>
+          <li><b>樣本空間 S</b>：所有可能結果的集合，擲一顆骰子 S = {1, 2, 3, 4, 5, 6}。</li>
+          <li><b>事件</b>：S 的子集合，例如「擲出偶數」A = {2, 4, 6}。只含一個結果的叫簡單事件，∅ 為不可能事件，S 為必然事件。</li>
         </ul>
-        <h3>機率的定義</h3>
+        <h3>事件的運算：交集、聯集、補集</h3>
+        <div class="venn-row">
+          ${venn('inter', '交集 A ∩ B<br><small>A 與 B 同時發生</small>')}
+          ${venn('union', '聯集 A ∪ B<br><small>A 或 B 至少一個發生</small>')}
+          ${venn('comp', '補集 Aᶜ<br><small>A 不發生</small>')}
+          ${venn('diff', '差集 A − B = A ∩ Bᶜ<br><small>A 發生但 B 不發生</small>')}
+          ${venn('disjoint', '互斥 A ∩ B = ∅<br><small>A、B 不可能同時發生</small>')}
+        </div>
+        <p>擲骰子例：A = {2, 4, 6}(偶數)、B = {4, 5, 6}(大於 3)，則 A ∩ B = {4, 6}、A ∪ B = {2, 4, 5, 6}、Aᶜ = {1, 3, 5}、A − B = {2}。</p>
+        ${formula('交換律、結合律　　分配律 A ∩ (B ∪ C) = (A ∩ B) ∪ (A ∩ C)　　笛摩根定律 (A ∪ B)ᶜ = Aᶜ ∩ Bᶜ，(A ∩ B)ᶜ = Aᶜ ∪ Bᶜ')}
+        <p>若 A₁, …, Aₙ 兩兩互斥且 A₁ ∪ ⋯ ∪ Aₙ = S(周延)，稱為 S 的一個<b>分割</b>：每次試驗恰好有一個 Aᵢ 發生。貝氏定理就建立在分割上。</p>
+        <h3>Kolmogorov 公設化機率</h3>
+        <p>機率有三種常見的解釋：<b>古典機率</b>(結果同樣可能時 P(A) = n(A) ÷ n(S))、<b>相對次數</b>(長期重複試驗的發生比例，見下方模擬)、<b>主觀機率</b>(個人的信心程度)。但每一種都有適用不到的情況，例如古典機率要求「同樣可能」、相對次數無法真的無限重複。</p>
+        <p>1933 年蘇聯數學家 <b>Kolmogorov</b> 不去爭論機率「是什麼」，而是規定機率「必須滿足什麼」：只要一個函數 P 對樣本空間 S 中的每個事件 A 給出一個實數，並滿足以下三個<b>公設</b>，就稱為機率。</p>
+        <table class="stattable"><thead><tr><th>公設</th><th>內容</th><th>意義</th></tr></thead><tbody>
+          <tr><td>公設一　非負性</td><td ${L}>對任意事件 A，P(A) ≥ 0</td><td ${L}>機率不會是負的</td></tr>
+          <tr><td>公設二　規範性</td><td ${L}>P(S) = 1</td><td ${L}>一定有某個結果發生</td></tr>
+          <tr><td>公設三　可數可加性</td><td ${L}>A₁, A₂, … 兩兩互斥時，P(A₁ ∪ A₂ ∪ ⋯) = P(A₁) + P(A₂) + ⋯</td><td ${L}>互斥事件的機率可以直接相加</td></tr>
+        </tbody></table>
+        <p>古典、相對次數、主觀機率都滿足這三個公設，所以由公設推導出的所有定理對它們都成立。<b>由公設推導的性質</b>：</p>
         <ul>
-          <li><b>古典機率</b>：每個結果同樣可能時，P(A) = n(A) ÷ n(S)。</li>
-          <li><b>相對次數</b>：重複試驗後事件發生的比例(大數法則，見下方模擬)。</li>
-          <li><b>主觀機率</b>：個人對事件的信心程度。</li>
+          <li><b>P(∅) = 0</b>：S = S ∪ ∅ ∪ ∅ ∪ ⋯ 兩兩互斥，由公設三得 P(∅) = 0。</li>
+          <li><b>餘事件 P(Aᶜ) = 1 − P(A)</b>：A 與 Aᶜ 互斥且 A ∪ Aᶜ = S，由公設二、三得 P(A) + P(Aᶜ) = 1。</li>
+          <li><b>0 ≤ P(A) ≤ 1</b>：由公設一與上一條。</li>
+          <li><b>單調性</b>：A ⊂ B ⇒ P(A) ≤ P(B)，因為 B = A ∪ (B − A) 互斥，P(B − A) ≥ 0。</li>
+          <li><b>加法定理 P(A ∪ B) = P(A) + P(B) − P(A ∩ B)</b>：把 A ∪ B 拆成互斥的 A 與 B − A，而 P(B − A) = P(B) − P(A ∩ B)。看上方聯集的圖，A ∩ B 被 A、B 各算了一次，所以要減掉一次。</li>
         </ul>
-        ${formula('機率公理：P(A) ≥ 0　　P(S) = 1　　A₁, A₂, … 兩兩互斥時 P(∪Aᵢ) = ΣP(Aᵢ)')}
+        ${formula('三個事件：P(A ∪ B ∪ C) = P(A) + P(B) + P(C) − P(A ∩ B) − P(A ∩ C) − P(B ∩ C) + P(A ∩ B ∩ C)')}
         <h3>計數方法</h3>
         ${formula('乘法原理 n₁ × n₂ × ⋯　　排列 P(n, r) = n! ÷ (n − r)!　　組合 C(n, r) = n! ÷ [r!(n − r)!]')}
         <p>例：從 10 檔股票挑 3 檔組成投資組合(不管順序)，共 C(10, 3) = 120 種。</p>
-        <h3>機率法則</h3>
-        ${formula('餘事件 P(Aᶜ) = 1 − P(A)　　加法 P(A ∪ B) = P(A) + P(B) − P(A ∩ B)')}
-        ${formula('條件機率 P(A | B) = P(A ∩ B) ÷ P(B)　　乘法 P(A ∩ B) = P(B)·P(A | B)')}
-        <p><b>獨立</b>：P(A ∩ B) = P(A)·P(B)，等價於 P(A | B) = P(A)。注意「互斥」與「獨立」不同：機率皆為正的兩事件若互斥，一定不獨立(一個發生，另一個就不可能發生)。</p>
-        <h3>全機率定理與貝氏定理</h3>
-        ${formula('B₁…Bₖ 互斥且周延：P(A) = Σ P(Bᵢ)·P(A | Bᵢ)　　P(Bⱼ | A) = P(Bⱼ)·P(A | Bⱼ) ÷ Σ P(Bᵢ)·P(A | Bᵢ)')}
-        <p><b>經典例子</b>：疾病盛行率 1%，有病 99% 驗出陽性、沒病 1% 誤判陽性。陽性者真的有病的機率：</p>
-        ${formula('P(陽性) = 0.01×0.99 + 0.99×0.01 = 0.0198　→　P(有病 | 陽性) = 0.0099 ÷ 0.0198 = 50%')}
-        <p>只有一半，因為沒病的人太多。<b>先驗機率(基礎比率)</b>非常重要。</p>
-        ${tip('<b>市場實例</b>：「出現某K棒型態後上漲的機率」是條件機率 P(上漲 | 型態)，要和 P(上漲) 比較才知道型態有沒有資訊。<b>賭徒謬誤</b>：連跌 5 天不代表明天一定反彈，大數法則是靠次數多「稀釋」偏差，而不是「補回來」。')}`,
+        <h3>條件機率與獨立</h3>
+        ${formula('條件機率 P(A | B) = P(A ∩ B) ÷ P(B)，P(B) &gt; 0　　乘法法則 P(A ∩ B) = P(B)·P(A | B)')}
+        <p>「已知 B 發生」等於把樣本空間從 S 縮小成 B，再看 A 占 B 的多少(交集的圖中，著色部分占 B 的比例)。</p>
+        <p><b>獨立</b>：P(A ∩ B) = P(A)·P(B)，等價於 P(A | B) = P(A)，知道 B 發生不會改變 A 的機率。注意「互斥」與「獨立」不同：機率皆為正的兩事件若互斥，一定不獨立(一個發生，另一個就不可能發生)。</p>
+        ${tip('<b>市場實例</b>：「出現某K棒型態後上漲的機率」是條件機率 P(上漲 | 型態)，要和 P(上漲) 比較才知道型態有沒有資訊。<b>賭徒謬誤</b>：每天漲跌若獨立，連跌 5 天也不代表明天一定反彈；大數法則是靠次數多「稀釋」偏差，而不是「補回來」。')}
+        <h3>Monty Hall 問題(三門問題)</h3>
+        <p>美國電視遊戲節目《Let's Make a Deal》：三扇門後面有一輛汽車和兩隻山羊。你先選一扇門(假設 1 號門)，<b>知道答案的主持人 Monty Hall</b> 一定會從剩下的兩扇門中，打開一扇後面是山羊的門(假設打開 3 號門)，然後問你：要不要換到 2 號門？</p>
+        <p>直覺會說「剩兩扇門，各 1/2，換不換都一樣」，但答案是<b>換門贏的機率是 2/3</b>。列出汽車所在位置的三種等可能情況：</p>
+        <table class="stattable"><thead><tr><th>汽車在</th><th>機率</th><th>主持人開</th><th>不換(留 1 號)</th><th>換門</th></tr></thead><tbody>
+          <tr><td>1 號門</td><td>1/3</td><td>2 號或 3 號</td><td>贏</td><td>輸</td></tr>
+          <tr><td>2 號門</td><td>1/3</td><td>只能開 3 號</td><td>輸</td><td>贏</td></tr>
+          <tr><td>3 號門</td><td>1/3</td><td>只能開 2 號</td><td>輸</td><td>贏</td></tr>
+          <tr><td colspan="3">贏的機率</td><td><b>1/3</b></td><td><b>2/3</b></td></tr>
+        </tbody></table>
+        <p><b>關鍵在於主持人不是隨機開門</b>：他知道汽車在哪，而且一定開山羊門。你一開始選對的機率只有 1/3，這個機率不會因為主持人開門而改變；剩下的 2/3 原本分散在 2、3 號門，3 號門被排除後就全部集中到 2 號門。想像成 100 扇門：你選 1 扇，主持人打開其餘 98 扇山羊門，只留下 1 扇，你一定會想換。</p>
+        <p>「主持人打開 3 號門」就是一個<b>新的訊息</b>，下一節用貝氏定理正式計算它如何改變各扇門的機率。</p>
+        <h3>貝氏定理</h3>
+        <p>設 A₁, A₂, …, Aₙ 是樣本空間 S 的一個分割(互斥且周延)，B 為任一事件，P(B) &gt; 0。</p>
+        ${formula('全機率定理：P(B) = P(A₁)P(B | A₁) + P(A₂)P(B | A₂) + ⋯ + P(Aₙ)P(B | Aₙ)')}
+        ${formula('貝氏定理：P(Aᵢ | B) = P(Aᵢ)·P(B | Aᵢ) ÷ [ P(A₁)P(B | A₁) + ⋯ + P(Aₙ)P(B | Aₙ) ]')}
+        <table class="stattable"><thead><tr><th>名稱</th><th>符號</th><th>意義</th></tr></thead><tbody>
+          <tr><td>事前機率(先驗)</td><td>P(Aᵢ)</td><td ${L}>還沒得到新訊息之前，對 Aᵢ 的評估</td></tr>
+          <tr><td>概似</td><td>P(B | Aᵢ)</td><td ${L}>如果 Aᵢ 是真的，觀察到 B 的機率</td></tr>
+          <tr><td>事後機率(後驗)</td><td>P(Aᵢ | B)</td><td ${L}>得知 B 已發生之後，對 Aᵢ 重新評估的機率</td></tr>
+        </tbody></table>
+        <div class="callout"><b>貝氏定理的意義</b><br>有新的訊息進來，即認知到事件B已經發生新的事實，此時事件A1~An不宜再用事前機率評估，既然事件B已發生，就要重新估算，在給定事件B已發生的條件下，事件A1~An發生的條件機率。</div>
+        <p>換句話說，貝氏定理是一套<b>用新證據修正舊看法</b>的規則：事後機率 ∝ 事前機率 × 概似。原本就比較可能的 Aᵢ(事前機率大)，或是最能解釋 B 為什麼發生的 Aᵢ(概似大)，事後機率就會變大。今天的事後機率，又可以當成下一次有新訊息時的事前機率，不斷更新。</p>
+        <p><b>例一 · Monty Hall</b>：Aᵢ = 汽車在 i 號門，事前機率各 1/3；B = 主持人打開 3 號門(你選 1 號)。</p>
+        ${formula('概似：P(B | A₁) = 1/2(1 號有車時，2、3 號他隨便開一扇)　P(B | A₂) = 1(只能開 3 號)　P(B | A₃) = 0(不會開汽車門)')}
+        ${formula('P(B) = (1/3)(1/2) + (1/3)(1) + (1/3)(0) = 1/2　→　P(A₁ | B) = (1/6) ÷ (1/2) = 1/3，P(A₂ | B) = (1/3) ÷ (1/2) = 2/3')}
+        <p>新訊息讓 2 號門的機率從事前的 1/3 修正為事後的 2/3，所以要換門。</p>
+        <p><b>例二 · 醫學檢驗</b>：疾病盛行率 1%(事前機率)，有病時 99% 驗出陽性、沒病時 1% 誤判陽性(概似)。某人驗出陽性(新訊息 B)，真的有病的機率：</p>
+        ${formula('P(陽性) = 0.01 × 0.99 + 0.99 × 0.01 = 0.0198　→　P(有病 | 陽性) = 0.0099 ÷ 0.0198 = 50%')}
+        <p>有病的機率從 1% 修正為 50%，但仍只有一半，因為沒病的人太多，1% 的誤判就產生和真陽性一樣多的假陽性。<b>事前機率(基礎比率)非常重要</b>，只看檢驗準確率 99% 會嚴重高估。若再驗一次仍是陽性，就把 50% 當成新的事前機率再更新一次，有病的機率會升到 99%。</p>`,
     },
     {
       title: '隨機變數', st: ['probability-distributions', 'Probability Distributions'],

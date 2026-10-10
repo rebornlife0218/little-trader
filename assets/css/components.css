@@ -303,3 +303,7 @@
   .panel.election{border-color:var(--amber);border-left-width:3px;}
   .tag.elec{background:var(--amber);color:var(--on-amber);border-color:var(--amber);}
   .btnrow-l button.active{border-color:var(--amber);color:var(--amber);}
+  .venn-row{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 12px;}
+  .venn{margin:0;width:170px;text-align:center;font-size:12.5px;line-height:1.5;color:var(--text);}
+  .venn svg{width:100%;height:auto;display:block;}
+  .venn small{color:var(--mute);}
