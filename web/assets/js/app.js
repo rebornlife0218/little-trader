@@ -9,7 +9,7 @@ const LT = (() => {
     { key: 'index', name: '指數', desc: '全球主要指數的急跌反彈與K棒型態統計' },
     { key: 'etf', name: 'ETF', desc: 'ETF 折溢價與即將發行的新 ETF' },
     { key: 'stock', name: '個股', desc: '處置股、隔日沖等個股主題研究' },
-    { key: 'option', name: '選擇權', desc: '臺指選擇權的隱含波動率、籌碼與策略損益' },
+    { key: 'option', name: '選擇權', desc: '臺指選擇權與台指期：隱含波動率、籌碼、價差與策略損益' },
     { key: 'stats', name: '統計學', desc: '統計學與計量方法的學習資源' },
     { key: 'other', name: '其他', desc: '研究與交易時常用的網站推薦' },
   ];
@@ -17,7 +17,7 @@ const LT = (() => {
   const DATASETS = [
     { key: 'indices', name: '指數' },
     { key: 'etf_upcoming', name: '即將發行ETF' },
-    { key: 'options', name: '選擇權' },
+    { key: 'options', name: '選擇權與台指期' },
   ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
   const pages = [];

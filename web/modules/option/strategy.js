@@ -3,7 +3,7 @@
    策略定義在 lib.js 的 STRATEGIES，新增策略只要加一筆。 */
 (() => {
   const { fmt, esc, codeName, MULT, STRATEGIES, pnl } = LTOpt;
-  const TYPE = { C: '買權', P: '賣權', F: '小台期貨' };
+  const TYPE = { C: '買權', P: '賣權', F: '小台期貨' };   // 標的部位以小台(每點 50 元，與選擇權相同)計
 
   LT.register({
     section: 'option', key: 'strategy', name: '策略損益圖',
@@ -12,7 +12,7 @@
       let D;
       try { D = await LTOpt.load(); } catch (err) { if (ctx.alive()) el.innerHTML = LTOpt.errorPanel(err.message); return; }
       if (!ctx.alive()) return;
-      const { meta, chain } = D;
+      const { meta, chain, futures } = D;
       const exps = chain.expiries.filter(e => e.days > 0);
       const near = exps.find(e => !e.code[6]) || exps[0];
       const groups = [...new Set(STRATEGIES.map(s => s.group))];
@@ -52,7 +52,7 @@
         const K = st.strikes.map(n => atm + n * step);
         legs = st.legs.map(l => {
           const leg = { ...l, qty: l.qty || 1 };
-          if (l.type === 'F') { leg.K = null; leg.entry = Math.round(F); }
+          if (l.type === 'F') { const f = LTOpt.futuresFor(futures, e.code); leg.K = null; leg.entry = Math.round(f ? f.price : F); leg.src = f ? `台指期 ${f.code.slice(4, 6)} 月收盤` : '遠期價格'; }
           else { leg.K = K[l.k - 1]; leg.entry = marketPrice(e, leg.type, leg.K); }
           return leg;
         });
@@ -71,7 +71,7 @@
             <td class="${l.side > 0 ? 'up' : 'down'}">${l.side > 0 ? '買進' : '賣出'}</td><td>${TYPE[l.type]}</td><td>${l.qty}</td>
             <td>${l.type === 'F' ? '—' : `<input type="number" step="50" data-i="${i}" data-f="K" value="${l.K}">`}</td>
             <td><input type="number" step="0.5" data-i="${i}" data-f="entry" value="${l.entry}"></td>
-            <td class="mute">${l.type === 'F' ? '遠期價格' : (e.strikes.find(x => x.k === l.K) ? '市場結算價' : '理論價')}</td></tr>`).join('')}</tbody>`;
+            <td class="mute">${l.type === 'F' ? l.src : (e.strikes.find(x => x.k === l.K) ? '市場結算價' : '理論價')}</td></tr>`).join('')}</tbody>`;
         $('stLegs').querySelectorAll('input').forEach(inp => inp.oninput = () => {
           const l = legs[+inp.dataset.i];
           l[inp.dataset.f] = +inp.value;

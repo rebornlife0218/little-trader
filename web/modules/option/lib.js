@@ -1,6 +1,6 @@
 /* 選擇權共用工具(LTOpt)：Black-Scholes 定價與 Greeks、策略定義、資料載入
-   三個頁面(市場概況、Black-Scholes 計算器、策略損益圖)都靠這支，要先於它們載入。
-   資料集：data/options/(pipeline/options/update.py)、data/indices/TAIEX.json(現貨價) */
+   各頁面(市場概況、台指期貨、Black-Scholes 計算器、策略損益圖)都靠這支，要先於它們載入。
+   資料集：data/options/(pipeline/options/update.py：選擇權與台指期)、data/indices/TAIEX.json(現貨價) */
 const LTOpt = (() => {
   const MULT = 50;            // 臺指選擇權每點 50 元
   const R_DEFAULT = 0.017;    // 預設無風險利率(約一年期定存)
@@ -80,12 +80,19 @@ const LTOpt = (() => {
 
   /* ---------- 資料 ---------- */
   async function load() {
-    const [chain, hist, taiex] = await Promise.all([
+    const [chain, hist, fut, taiex] = await Promise.all([
       LT.loadJSON('options', 'chain.json'), LT.loadJSON('options', 'history.json'),
+      LT.loadJSON('options', 'futures.json').catch(() => null),
       LT.loadJSON('indices', 'TAIEX.json').catch(() => null),
     ]);
     const spot = taiex ? { date: taiex.data.d[taiex.data.d.length - 1], close: taiex.data.c[taiex.data.c.length - 1], data: taiex.data } : null;
-    return { meta: chain.meta, chain: chain.data, hist: hist.data, spot };
+    return { meta: chain.meta, chain: chain.data, hist: hist.data, futures: fut && fut.data, spot };
+  }
+  // 與選擇權到期月份相同的台指期(沒有就用近月)：{ code, price }
+  function futuresFor(futures, optCode) {
+    const list = futures && futures.curve ? futures.curve.contracts : [];
+    const f = list.find(x => x.code === optCode.slice(0, 6)) || list[0];
+    return f ? { code: f.code, price: f.c ?? f.s } : null;
   }
   // 契約代碼 → 中文：202610 → 2026/10 月契約、202610W2 → 10 月第 2 週(三)、202610F2 → 10 月第 2 週(五)
   function codeName(code) {
@@ -100,5 +107,5 @@ const LTOpt = (() => {
   const tex = s => window.katex ? katex.renderToString(s, { displayMode: true, throwOnError: false }) : esc(s);
   const errorPanel = msg => `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>${esc(msg)}</p></div></div>`;
 
-  return { MULT, R_DEFAULT, npdf, ncdf, price, greeks, impliedVol, STRATEGIES, legValue, pnl, load, codeName, fmt, pct, esc, tex, errorPanel };
+  return { MULT, R_DEFAULT, npdf, ncdf, price, greeks, impliedVol, STRATEGIES, legValue, pnl, load, futuresFor, codeName, fmt, pct, esc, tex, errorPanel };
 })();

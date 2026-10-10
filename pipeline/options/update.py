@@ -1,8 +1,9 @@
 """
-資料集 options：臺指選擇權(TXO)每日行情 → web/data/options/
+資料集 options：臺指選擇權(TXO)與臺股期貨(TX)每日行情 → web/data/options/
   - 來源：臺灣期貨交易所「選擇權每日交易行情下載」(一次最多查一個月)
   - history.json：每日的 30 天平價隱含波動率、Put/Call 比、成交量與未平倉量(第一次回補 1 年，之後增量更新)
   - chain.json：最新交易日各到期契約的 T 字報價(結算價、成交量、未平倉量、隱含波動率)
+  - futures.json：台指期近月走勢、三大法人淨未平倉、期限結構(見 futures.py)
 排程：.github/workflows/data-options.yml；本機手動：python pipeline/options/update.py
 
 計算方式
@@ -23,6 +24,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common import TW, dataset_dir, load_published, write_json, write_meta  # noqa: E402
+import futures  # noqa: E402
 
 DATASET = 'options'
 URL = 'https://www.taifex.com.tw/cht/3/dlOptDataDown'
@@ -226,10 +228,12 @@ def main():
         chain = {'date': latest_day.isoformat(), 'r': R, 'multiplier': 50, 'expiries': latest_exps}
 
     hist = sorted(rows.values(), key=lambda r: r['d'])
+    fut = futures.update(load_published(DATASET, 'futures.json'), today, BACKFILL_DAYS)
     out_dir = dataset_dir(DATASET)
+    write_json(out_dir / 'futures.json', fut)
     write_json(out_dir / 'history.json', {k: [r[k] for r in hist] for k in HIST_KEYS})
     write_json(out_dir / 'chain.json', chain)
-    meta = write_meta(DATASET, '臺灣期貨交易所 選擇權每日交易行情', 'https://www.taifex.com.tw/cht/3/dlOptDataDown',
+    meta = write_meta(DATASET, '臺灣期貨交易所 期貨、選擇權每日交易行情與三大法人', 'https://www.taifex.com.tw/cht/3/dlOptDataDown',
                       '週一~週五 16:00、06:00(台北時間)', last_trade_date=chain['date'], days=len(hist))
     last = hist[-1]
     print(f"完成：{len(hist)} 個交易日，最新 {last['d']}，30 天 IV {last['iv30']}，P/C OI {last['pcoi']}%")

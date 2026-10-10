@@ -20,6 +20,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/stock.js                  個股(建置中)
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入
     option/market.js                選擇權市場概況
+    option/futures.js               台指期貨
     option/calculator.js            Black-Scholes 計算器
     option/strategy.js              策略損益圖
     stats/basic.js                  初級統計學(章節設定、互動模擬、台股實例；內容在 content/)
@@ -34,7 +35,8 @@ pipeline/                           資料抓取，一個資料集一個資料�
   requirements.txt
   indices/update.py、twse.py        全球指數(Yahoo Finance)；台灣加權改用證交所資料
   etf_upcoming/update.py            即將發行 ETF(MoneyDJ)
-  options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價
+  options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
+  options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
 
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
@@ -57,7 +59,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 |---|---|---|---|
 | indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
-| options | 臺灣期貨交易所 選擇權每日交易行情 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價) |
+| options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
 
@@ -102,6 +104,9 @@ LT.register({
 - **隱含波動率**：以結算價反推 Black-76 的 σ(二分法)，r = 1.7%。
 - **30 天 IV**：各到期契約的價平 IV 換成總變異數 σ²T，在 30 天前後兩個到期日之間線性內插。
 - **Put/Call 比**：成交量含一般與盤後時段；未平倉量不含當日到期契約(與期交所公布的數字一致)。
+- **台指期近月**：到期日(第 3 個週三)在交易日之後、最早到期的月契約，到期當天換到下一個月份；成交量為全部月份(含盤後)，未平倉不含當日到期契約。
+- **期現貨價差**：在網頁端用台指期近月收盤減去加權指數收盤(indices 資料集)。
+- **策略損益圖的標的部位**：以小台計(每點 50 元，與選擇權相同)，價格帶入與選擇權同月份的台指期收盤價。
 - **策略**：定義在 `web/modules/option/lib.js` 的 `STRATEGIES`，新增策略只要加一筆(腳的買賣方向、口數、使用第幾個履約價、預設履約價相對價平的檔數)。
 
 ## 本機預覽
