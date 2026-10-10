@@ -1,0 +1,41 @@
+name: 資料集更新(共用)
+
+# 所有資料集共用的更新流程，由 data-<資料集>.yml 依各自排程呼叫：
+#   pipeline/<資料集>/update.py → web/data/<資料集>/ → 發佈到 data 分支 → 重新部署網站
+on:
+  workflow_call:
+    inputs:
+      dataset:
+        description: 資料集名稱(= pipeline/ 底下的資料夾名稱)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: data-branch        # 各資料集輪流寫入 data 分支
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r pipeline/requirements.txt
+      - name: 更新資料 ${{ inputs.dataset }}
+        run: python pipeline/${{ inputs.dataset }}/update.py
+      - name: 發佈到 data 分支
+        run: bash pipeline/publish_data.sh ${{ inputs.dataset }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy:
+    needs: update
+    uses: ./.github/workflows/deploy.yml

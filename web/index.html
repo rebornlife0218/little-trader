@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<!-- 資安：只允許載入本站與 Google Fonts 的資源、只連線回本站，阻擋外部惡意腳本與資料外洩 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Little Trader</title>
+<meta name="description" content="Little Trader 小交易員：指數、ETF、個股、選擇權、統計學與市場研究" />
+<link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/vendor/katex/katex.min.css">
+<link rel="stylesheet" href="assets/css/components.css">
+<link rel="stylesheet" href="assets/css/layout.css">
+<script>(function(){ var r=document.documentElement; r.dataset.theme='dark';
+  try{ if(localStorage.getItem('lt.sideCollapsed')==='1') r.classList.add('side-collapsed');
+       if(localStorage.getItem('lt.theme')==='light') r.dataset.theme='light'; }catch(e){} })();</script>
+</head>
+<body>
+<div class="topbar">
+  <a class="brand" href="#/" title="回到首頁"><img class="logo" src="assets/img/logo.svg" alt=""><div class="name">Little <span>Trader</span></div></a>
+  <button id="navToggle" aria-label="選單">☰ 選單</button>
+</div>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="side-head">
+      <a class="brand" href="#/" title="回到首頁">
+        <img class="logo" src="assets/img/logo.svg" alt="Little Trader">
+        <div class="brand-text"><div class="name">Little <span>Trader</span></div><div class="tagline">小交易員的研究室</div></div>
+      </a>
+      <button id="sideCollapse" class="side-collapse" title="收起側欄" aria-label="收起側欄">«</button>
+    </div>
+    <nav id="sideNav"></nav>
+    <div class="side-foot"><button class="theme-toggle"></button></div>
+  </aside>
+  <div class="main">
+    <main id="content"></main>
+    <footer class="copy">COPYRIGHT © <span id="copyYear"></span> Little Trader. All rights reserved.<br>各頁資料來源與更新時間標示於頁面上方，內容僅供研究參考，不構成投資建議。</footer>
+  </div>
+</div>
+
+<!-- 網站框架 -->
+<script src="assets/js/app.js"></script>
+<script src="assets/js/chart.js"></script>
+<script src="modules/home/home.js"></script>
+<!-- 第三方套件(放在本站，符合資安設定)：Markdown 解析、數學公式排版 -->
+<script src="assets/vendor/marked/marked.js"></script>
+<script src="assets/vendor/katex/katex.min.js"></script>
+<!-- 研究模組：新增研究內容時在此加入 -->
+<script src="modules/indices/indices.js"></script>
+<script src="modules/etf/etf.js"></script>
+<script src="modules/stock/stock.js"></script>
+<script src="modules/option/lib.js"></script>
+<script src="modules/option/market.js"></script>
+<script src="modules/option/calculator.js"></script>
+<script src="modules/option/strategy.js"></script>
+<script src="modules/stats/basic.js"></script>
+<script src="modules/stats/stats.js"></script>
+<script src="modules/other/other.js"></script>
+<script>LT.start();</script>
+</body>
+</html>

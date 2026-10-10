@@ -1,92 +1,52 @@
-# Little Trader
+# Little Trader 小交易員的研究室
 
-指數、ETF、個股、統計學與市場研究網站。COPYRIGHT © Little Trader
+**網站：https://rebornlife0218.github.io/little-trader/**
 
-網站：https://rebornlife0218.github.io/little-trader/
+用公開資料研究台股與全球市場，把研究結果整理成圖表與統計，並收錄統計學教材。
 
-## 架構
+| 區塊 | 內容 |
+|---|---|
+| 指數 | 全球主要指數的急跌反彈、均線支撐壓力、週期性分析與 K 棒型態統計 |
+| ETF | ETF 折溢價說明、即將發行的新 ETF |
+| 個股 | 處置股、隔日沖等主題研究(建置中) |
+| 選擇權 | 臺指選擇權的隱含波動率、Put/Call 比、T 字報價與未平倉量、Black-Scholes 計算器、24 種策略損益圖 |
+| 統計學 | 初級統計學 13 章(公式、R 範例、台股實例、互動模擬)、Seeing Theory |
+| 其他 | 常用網站推薦 |
 
-每個研究區塊由「前端模組」與「資料集」組成，各自維護、各自排程，互不影響。
+## 運作方式
 
-```
-index.html                     網站外框(左側欄 + 內容 + 頁尾)，在此載入各模組
-assets/css/                    共用樣式(components.css 色彩變數/元件，含暗色與淺色主題；layout.css 版型)
-assets/js/app.js               框架：側欄區塊、頁面註冊、路由、資料集載入工具
-assets/img/logo.svg            吉祥物 LOGO「小K」
-
-modules/<模組>/                前端模組(顯示畫面)
-  home/home.js                 首頁(點 LOGO 回到這裡)：各區塊入口與資料更新狀態
-  indices/indices.js           指數：大盤漲跌分析(跌深反彈、常見迷思、週期性分析)、K棒型態分析
-  etf/etf.js                   ETF：ETF折溢價(說明＋參考連結)、即將發行ETF
-  stock/stock.js               個股：處置股、隔日沖(建置中)
-  stats/basic.js               統計學 · 初級統計學(13 章，含市場實例與互動模擬)
-
-content/stats/basic/           初級統計學的章節內容(Markdown＋LaTeX 公式，可直接編輯，見 content/README.md)
-assets/vendor/                 第三方套件放在本站：marked(Markdown 解析)、KaTeX(數學公式)
-  stats/stats.js               統計學 · 計量(建置中)、Seeing Theory
-  other/other.js               其他：好用推薦(外部網站連結與簡介，改 RECOMMENDS 清單即可)
-
-scripts/<資料集>/update.py     資料集更新程式 → 輸出到 data/<資料集>/
-  indices/                     Yahoo Finance 全球指數；台灣加權開高低收量改用證交所(twse.py，1999-01-05 起，以 data 分支的 TAIEX.json 為快取)
-  etf_upcoming/                MoneyDJ 新基金一覽表(只取名稱含 ETF 者)
-scripts/common.py              共用：輸出資料夾、寫 meta.json
-scripts/publish_data.sh        把某個資料集發佈到 data 分支
-
-.github/workflows/
-  data-indices.yml             指數資料：台北 週一~五 05:30、15:30
-  data-etf.yml                 即將發行ETF：台北 週一~五 08:30、17:30
-  deploy.yml                   部署網站(main 程式 + data 分支資料)
-```
-
-### 資料怎麼流動
-
-1. 各資料集的 workflow 依自己的排程執行 `scripts/<資料集>/update.py`，產生 `data/<資料集>/`。
-2. `publish_data.sh` 只替換 data 分支裡**該資料集**的資料夾，其他資料集不動。data 分支永遠只有一個 commit，repo 不會越來越大。
-3. 接著呼叫 `deploy.yml`，把 main 的程式與 data 分支的資料一起部署到 GitHub Pages。
-4. 推送程式到 main 也會自動部署(沿用 data 分支現有資料)。
-
-每個資料集一定有 `meta.json`(更新時間、資料來源、排程、version)，網頁用 `LT.sourceLine(meta)` 在頁面上方顯示「資料來源 · 更新時間 · 排程」。
-
-## 新增研究內容
-
-### 只是頁面(或外部連結、建置中頁面)
-
-在 `modules/<區塊>/` 新增 JS，於 `index.html` 的「研究模組」處加上 `<script>`：
-
-```js
-LT.register({ section: 'etf', key: 'x', name: '外部網站', href: 'https://...' });       // 側欄直接開新分頁
-LT.register({ section: 'stock', key: 'disposition', name: '處置股', desc: '一句話說明' }); // 建置中頁面(沒有 mount)
-
-LT.register({
-  section: 'stock',            // 'index' | 'etf' | 'stock' | 'stats' | 'other'(定義在 app.js 的 SECTIONS)
-  key: 'my-study',             // 網址：#/stock/my-study
-  name: '我的研究',             // 側欄顯示名稱
-  async mount(el, ctx) {       // el 是內容區；ctx.alive() 為 false 代表使用者已切到別頁
-    const { meta, data } = await LT.loadJSON('my_dataset', 'items.json');
-    if (!ctx.alive()) return;
-    el.innerHTML = `<header class="top"><div><h1>我的研究</h1>${LT.sourceLine(meta)}</div></header>…`;
-  },
-});
-```
-
-新增側欄區塊：編輯 `assets/js/app.js` 的 `SECTIONS`。
-
-### 需要新的資料集
-
-1. 建立 `scripts/<資料集>/update.py`：用 `common.dataset_dir()` 取得輸出資料夾、`common.write_json()` 寫資料、最後 `common.write_meta(名稱, 來源名稱, 來源網址, 排程說明)`。
-2. 複製 `.github/workflows/data-etf.yml` 改名，修改排程(cron 為 UTC，台北時間減 8 小時)、執行的腳本與 `publish_data.sh <資料集>`。
-3. 有新的 Python 套件就加到 `requirements.txt`。
-
-## 本機預覽
+網站是純靜態網頁(GitHub Pages)，沒有後端伺服器；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。
 
 ```
-pip install -r requirements.txt
-python scripts/indices/update.py
-python scripts/etf_upcoming/update.py
-python -m http.server 8000
+ 資料來源                    GitHub Actions(依各資料集排程)                 GitHub Pages
+ ───────────                 ──────────────────────────────                 ────────────
+ Yahoo Finance ─┐            pipeline/<資料集>/update.py
+ 臺灣證券交易所 ─┼──抓取──▶  整理成 JSON ＋ meta.json(來源、更新時間)  ──▶  data 分支
+ 臺灣期貨交易所 ─┤                                                               │
+ MoneyDJ ───────┘                                                                ▼
+                             main 分支的 web/(網頁程式與教材)  ──────────▶  部署 = web/ ＋ data/
+                                                                                 │
+                                                                                 ▼
+                                                              瀏覽器：依網址載入對應頁面與資料、繪製圖表
 ```
-開啟 http://localhost:8000(`data/` 不進版控)
 
-## 手動更新
+- **main 分支**：程式與內容。`web/` 是網站本身，`pipeline/` 是資料抓取程式。
+- **data 分支**：只放最新一份資料(每個資料集一個資料夾)，各資料集各自排程更新、互不影響，也不會讓 repo 越來越大。
+- **部署**：程式推送到 main、或任一資料集更新完成，都會把 `web/` 和 data 分支合併後發佈到 GitHub Pages。
 
-GitHub repo → Actions → 選擇「資料 · 指數」或「資料 · 即將發行ETF」→ Run workflow。
+## 專案結構
+
+```
+web/                    網站(GitHub Pages 的根目錄)
+  index.html            外框：側欄、內容區、頁尾，載入所有模組
+  assets/               共用框架(路由、資料載入、圖表)、樣式、第三方套件
+  modules/<區塊>/        各區塊的頁面(指數、ETF、個股、選擇權、統計學、其他)
+  content/              Markdown 教材(統計學各章)
+pipeline/               資料抓取程式，一個資料集一個資料夾
+.github/workflows/      排程與部署
+docs/                   維護文件
+```
+
+維護與擴充方式(新增頁面、資料集、教材編輯)請見 [docs/](docs/)。
+
+COPYRIGHT © Little Trader　內容僅供研究參考，不構成投資建議。

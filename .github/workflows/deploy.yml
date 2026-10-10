@@ -1,6 +1,6 @@
 name: 部署網站
 
-# 網站程式(main) + 最新資料(data 分支) → GitHub Pages
+# 網站程式(main 的 web/) + 最新資料(data 分支) → GitHub Pages
 # 觸發：程式更新(push)、手動、或各資料集更新完成後呼叫
 on:
   push:
@@ -27,8 +27,9 @@ jobs:
 
       - name: 組合網站檔案
         run: |
-          mkdir -p _site/data
-          cp -r index.html assets modules content _site/
+          mkdir -p _site
+          cp -r web/. _site/
+          rm -rf _site/data && mkdir -p _site/data
           if git fetch -q --depth=1 origin data; then
             git archive FETCH_HEAD | tar -x -C _site/data
           else

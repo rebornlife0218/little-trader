@@ -1,0 +1,20 @@
+name: 資料 · 即將發行ETF
+
+# 資料集 etf_upcoming：pipeline/etf_upcoming/update.py → data 分支的 etf_upcoming/
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '30 0 * * 1-5'    # 台北 週一~週五 08:30
+    - cron: '30 9 * * 1-5'    # 台北 週一~週五 17:30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    uses: ./.github/workflows/_dataset.yml
+    with:
+      dataset: etf_upcoming
