@@ -137,6 +137,8 @@ cd C:\Users\User\little-trader
 "C:\Program Files\R\R-4.4.1\bin\Rscript.exe" web/content/stats/basic/r/ch01-figures.R web/content/stats/basic/img
 ```
 
+第一次執行前要先在 R 安裝 `mfp` 套件(`install.packages("mfp")`，bodyfat 資料在裡面)；Protein 資料會從網路讀取。
+
 想新增圖片：在 R 程式裡照著 `dev("檔名.png"); 畫圖指令; dev.off()` 的格式加一行，執行後在 `.md` 裡用 `![圖說](img/檔名.png)` 插入。
 
 ## 章節名稱、互動模擬與市場實例
