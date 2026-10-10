@@ -19,7 +19,7 @@ modules/<模組>/                前端模組(顯示畫面)
   indices/indices.js           指數：大盤漲跌分析(跌深反彈、常見迷思、週期性分析)、K棒型態分析
   etf/etf.js                   ETF：ETF折溢價(說明＋參考連結)、即將發行ETF
   stock/stock.js               個股：處置股、隔日沖(建置中)
-  stats/basic.js               統計學 · 初級統計學(10 章，含市場實例與互動模擬)
+  stats/basic.js               統計學 · 初級統計學(13 章，含市場實例與互動模擬)
   stats/stats.js               統計學 · 計量(建置中)、Seeing Theory
   other/other.js               其他：好用推薦(外部網站連結與簡介，改 RECOMMENDS 清單即可)
 
