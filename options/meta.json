@@ -1,0 +1,13 @@
+{
+  "dataset": "options",
+  "updated_at": "2026-10-11 01:16",
+  "version": "202610110116",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "臺灣期貨交易所 期貨、選擇權每日交易行情與三大法人",
+    "url": "https://www.taifex.com.tw/cht/3/dlOptDataDown"
+  },
+  "schedule": "週一~週五 16:00、06:00(台北時間)",
+  "last_trade_date": "2026-10-08",
+  "days": 244
+}
