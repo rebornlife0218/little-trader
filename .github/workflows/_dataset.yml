@@ -19,7 +19,7 @@ jobs:
   update:
     runs-on: ubuntu-latest
     concurrency:
-      group: data-branch        # 各資料集輪流寫入 data 分支
+      group: data-${{ inputs.dataset }}   # 同一資料集不重複執行；不同資料集可同時更新(publish_data.sh 會處理搶寫)
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
