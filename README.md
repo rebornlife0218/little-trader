@@ -20,6 +20,9 @@ modules/<模組>/                前端模組(顯示畫面)
   etf/etf.js                   ETF：ETF折溢價(說明＋參考連結)、即將發行ETF
   stock/stock.js               個股：處置股、隔日沖(建置中)
   stats/basic.js               統計學 · 初級統計學(13 章，含市場實例與互動模擬)
+
+content/stats/basic/           初級統計學的章節內容(Markdown＋LaTeX 公式，可直接編輯，見 content/README.md)
+assets/vendor/                 第三方套件放在本站：marked(Markdown 解析)、KaTeX(數學公式)
   stats/stats.js               統計學 · 計量(建置中)、Seeing Theory
   other/other.js               其他：好用推薦(外部網站連結與簡介，改 RECOMMENDS 清單即可)
 

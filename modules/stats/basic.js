@@ -1,7 +1,8 @@
 /* 統計學 · 初級統計學
    給第一次修統計學的學生：13 章架構參考大碩補習班張翔老師的統計學課程(編排略有調整)，
    並用本站的台股加權指數資料做「市場實例」，部分章節附互動模擬。
-   網址：#/stats/basic/<章節編號> */
+   網址：#/stats/basic/<章節編號>
+   章節內容可寫在 content/stats/basic/*.md(設定 md 欄位)，編輯方式見 content/README.md */
 (() => {
   const ST = 'https://seeing-theory.brown.edu/';
   const BOOKS = [
@@ -94,63 +95,59 @@
     return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" role="img" aria-label="直方圖">${g}</svg>`;
   }
 
+  /* ---------- Markdown 章節：content/stats/basic/<名稱>.md ----------
+     $...$ 行內公式、$$...$$ 獨立公式(KaTeX)；> 引言顯示為提示框；單獨一行的圖片會加上圖說 */
+  const MD_DIR = 'content/stats/basic/';
+  async function loadChapter(name) {
+    const r = await fetch(MD_DIR + name + '.md', { cache: 'no-cache' });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    // 先把程式碼收起來(R 的 birthwt$bwt 不是公式)，再把公式換成佔位符，避免被 Markdown 改寫
+    const code = [], math = [];
+    let src = (await r.text()).replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/```[\s\S]*?```|`[^`\n]+`/g, m => `%%CODE${code.push(m) - 1}%%`)
+      .replace(/\$\$([\s\S]+?)\$\$/g, (_, t) => `\n\n%%MATH${math.push([t, true]) - 1}%%\n\n`)
+      .replace(/\\\$/g, '%%DOLLAR%%')
+      .replace(/\$([^$\n]+?)\$/g, (_, t) => `%%MATH${math.push([t, false]) - 1}%%`)
+      .replace(/%%CODE(\d+)%%/g, (_, i) => code[i]);
+    const tex = ([t, display]) => katex.renderToString(t, { displayMode: display, throwOnError: false });
+    const html = marked.parse(src)
+      .replace(/<p>%%MATH(\d+)%%<\/p>/g, (_, i) => tex(math[i]))
+      .replace(/%%MATH(\d+)%%/g, (_, i) => tex(math[i]))
+      .replace(/%%DOLLAR%%/g, '$');
+    const box = document.createElement('div');
+    box.innerHTML = html;
+    box.querySelectorAll('img').forEach(img => {
+      const s = img.getAttribute('src');
+      if (!/^(https?:|\/|data:)/.test(s)) img.setAttribute('src', MD_DIR + s);
+      img.loading = 'lazy';
+      const p = img.parentElement;
+      if (p.tagName === 'P' && p.childNodes.length === 1) {
+        const fig = document.createElement('figure');
+        fig.className = 'md-fig';
+        fig.innerHTML = `<figcaption></figcaption>`;
+        fig.querySelector('figcaption').textContent = img.alt;
+        fig.prepend(img);
+        p.replaceWith(fig);
+      }
+    });
+    box.querySelectorAll('blockquote').forEach(q => q.classList.add('callout'));
+    box.querySelectorAll('table').forEach(t => { t.classList.add('stattable', 'md-table'); t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`; });
+    // 章名已是 h2：Markdown 的 ## → h3(大節)、### → h4(小節)
+    const retag = (sel, tag, cls) => box.querySelectorAll(sel).forEach(h => { const e = document.createElement(tag); e.className = cls; e.innerHTML = h.innerHTML; h.replaceWith(e); });
+    retag('h3', 'h4', 'md-h3');
+    retag('h2', 'h3', 'md-h2');
+    return box.innerHTML;
+  }
+
   /* ---------- 章節(架構參考大碩補習班張翔老師的統計學課程，編排略有調整) ---------- */
   const L = 'style="text-align:left"';
   const CHAPTERS = [
     {
-      title: '敘述統計學', st: null, live: 'describe',
-      goals: ['分辨母體與樣本、參數與統計量、變數的尺度', '用次數分配表與圖形整理資料', '計算集中趨勢、離散程度、相對位置與分配形狀的量數'],
-      body: () => `
-        <h3>統計學的架構</h3>
-        <ul>
-          <li><b>敘述統計</b>：把手上的資料整理成表格、圖形與數字，讓人一眼看懂。</li>
-          <li><b>推論統計</b>：用樣本去推估(第 7、8 章)或檢驗(第 9～13 章)母體的特性，並說明推論有多可靠；中間的橋樑就是機率(第 2～6 章)。</li>
-        </ul>
-        <h3>母體與樣本</h3>
-        <ul>
-          <li><b>母體</b>：想研究的全部對象。描述母體的數字叫<b>參數</b>，用希臘字母：μ、σ²、p。參數固定但通常未知。</li>
-          <li><b>樣本</b>：實際蒐集到的一部分。描述樣本的數字叫<b>統計量</b>，用英文字母：x̄、s²、p̂。統計量隨樣本而變，是隨機變數。</li>
-        </ul>
-        <h3>衡量尺度</h3>
-        <table class="stattable"><thead><tr><th>尺度</th><th>特性</th><th>例子</th></tr></thead><tbody>
-          <tr><td>名目尺度</td><td ${L}>只能分類，不能排序</td><td ${L}>產業別、交易所</td></tr>
-          <tr><td>順序尺度</td><td ${L}>可以排序，但差距無意義</td><td ${L}>信用評等 AAA、AA、A</td></tr>
-          <tr><td>區間尺度</td><td ${L}>差距有意義，但沒有絕對零點(不能算倍數)</td><td ${L}>溫度(°C)</td></tr>
-          <tr><td>比率尺度</td><td ${L}>有絕對零點，可以算倍數</td><td ${L}>股價、成交量</td></tr>
-        </tbody></table>
-        <h3>資料整理與圖表</h3>
-        <ul>
-          <li><b>次數分配表</b>：分組後計算次數、相對次數、累積次數。組數常用 5～20 組，或史特吉斯法則 k ≈ 1 + 3.322 log₁₀ n。</li>
-          <li>類別資料：長條圖、圓餅圖；數值資料：直方圖、莖葉圖、盒形圖；兩變數：散佈圖；時間資料：折線圖。</li>
-        </ul>
-        <h3>集中趨勢</h3>
-        ${formula('算術平均數 x̄ = Σxᵢ ÷ n　　加權平均數 = Σwᵢxᵢ ÷ Σwᵢ　　幾何平均數 G = (x₁x₂⋯xₙ)^(1/n)')}
-        <ul>
-          <li><b>中位數</b>：排序後最中間的值，不受極端值影響；<b>眾數</b>：出現次數最多的值。</li>
-          <li>算術平均 ≥ 幾何平均 ≥ 調和平均。<b>平均報酬率要用幾何平均</b>：+50% 再 −50%，算術平均 0%，實際卻賠 25%。</li>
-        </ul>
-        <h3>離散程度</h3>
-        ${formula('母體變異數 σ² = Σ(xᵢ − μ)² ÷ N　　樣本變異數 s² = Σ(xᵢ − x̄)² ÷ (n − 1) = [Σxᵢ² − n·x̄²] ÷ (n − 1)')}
-        <ul>
-          <li>樣本變異數除以 <b>n − 1</b>(自由度)，才是 σ² 的不偏估計(證明見第 7 章)。</li>
-          <li><b>全距</b> = 最大 − 最小；<b>四分位距 IQR</b> = Q₃ − Q₁；<b>變異係數 CV</b> = s ÷ x̄(比較單位不同的資料)。</li>
-        </ul>
-        <h3>相對位置</h3>
-        ${formula('z 分數 = (x − x̄) ÷ s　　離群值：x &lt; Q₁ − 1.5·IQR 或 x &gt; Q₃ + 1.5·IQR')}
-        <ul>
-          <li><b>柴比雪夫定理</b>：任何分配，落在平均數 ±k 個標準差內的比例至少 1 − 1/k²(k &gt; 1)。±2s 至少 75%、±3s 至少 88.9%。</li>
-          <li><b>經驗法則</b>：資料呈鐘形時，約 68%、95%、99.7% 落在 ±1、2、3 個標準差內。</li>
-        </ul>
-        <h3>分配形狀</h3>
-        <ul>
-          <li><b>偏態係數</b>：&gt;0 右偏(平均數 &gt; 中位數 &gt; 眾數)；&lt;0 左偏(平均數 &lt; 中位數 &lt; 眾數)；≈0 對稱。</li>
-          <li><b>峰態係數</b>：常態分配為 3(超額峰度為 0)；超額峰度 &gt; 0 為高狹峰、肥尾。</li>
-        </ul>
-        ${tip('<b>金融用語</b>：報酬率的標準差就是「波動度」，日報酬標準差 × √252 ≈ 年化波動度。<b>倖存者偏差</b>：只統計還存在的基金，會漏掉清算的爛基金而高估平均績效。樣本怎麼選，比樣本有多大更重要。')}`,
+      // 內容在 content/stats/basic/ch01.md(Markdown＋LaTeX 公式，編輯方式見 content/README.md)
+      title: '概論及敘述統計學', md: 'ch01', live: 'describe',
     },
     {
       title: '機率', st: ['basic-probability', 'Basic Probability'], demo: ['dice', 'coin'],
-      goals: ['理解 Kolmogorov 公設化機率，並由公設推導機率的基本性質', '用文氏圖理解交集、聯集、補集，運用排列組合、條件機率與獨立', '用 Monty Hall 問題體會條件機率，理解貝氏定理「用新訊息修正機率」的意義'],
       body: () => `
         <h3>基本名詞</h3>
         <ul>
@@ -226,7 +223,6 @@
     },
     {
       title: '隨機變數', st: ['probability-distributions', 'Probability Distributions'],
-      goals: ['區分離散與連續隨機變數，使用 PMF、PDF 與 CDF', '計算期望值、變異數與它們的運算性質', '認識動差與動差生成函數'],
       body: () => `
         <h3>隨機變數</h3>
         <p>把樣本空間中的每個結果對應到一個實數的函數，記為 X。</p>
@@ -254,7 +250,6 @@
     },
     {
       title: '多元隨機變數', st: null, live: 'cov',
-      goals: ['使用聯合、邊際與條件分配', '計算共變異數與相關係數，判斷獨立', '計算線性組合的期望值與變異數'],
       body: () => `
         <h3>聯合分配</h3>
         ${formula('離散 f(x, y) = P(X = x, Y = y)　　連續 P((X, Y) ∈ A) = ∬_A f(x, y) dx dy')}
@@ -276,7 +271,6 @@
     },
     {
       title: '常見機率模型', st: ['probability-distributions', 'Probability Distributions'], live: 'normal',
-      goals: ['使用常見的離散分配：二項、卜瓦松、幾何、超幾何', '使用常見的連續分配：均勻、指數、常態', '用卜瓦松、常態近似二項分配'],
       body: () => `
         <h3>離散分配</h3>
         <table class="stattable"><thead><tr><th>分配</th><th>情境</th><th>f(x)</th><th>E[X]</th><th>Var(X)</th></tr></thead><tbody>
@@ -308,7 +302,6 @@
     },
     {
       title: '抽樣方法與抽樣分配', st: null, demo: 'clt',
-      goals: ['認識簡單隨機、分層、群集、系統抽樣', '推導樣本平均數與樣本比例的抽樣分配、理解中央極限定理', '認識卡方、t、F 三大抽樣分配'],
       body: () => `
         <h3>抽樣方法</h3>
         <table class="stattable"><thead><tr><th>方法</th><th>做法</th><th>適用</th></tr></thead><tbody>
@@ -339,7 +332,6 @@
     },
     {
       title: '點估計', st: ['frequentist-inference', 'Frequentist Inference'],
-      goals: ['用不偏性、有效性、一致性、充分性評估估計式', '理解均方誤差與偏誤–變異的取捨', '用動差法與最大概似法求估計式'],
       body: () => `
         <h3>估計式與估計值</h3>
         <p><b>估計式</b> θ̂ 是樣本的函數(隨機變數，例如 x̄ = ΣXᵢ/n)；代入實際資料得到的數字叫<b>估計值</b>。</p>
@@ -371,7 +363,6 @@
     },
     {
       title: '區間估計', st: ['frequentist-inference', 'Frequentist Inference'], live: 'ci',
-      goals: ['建立單一母體 μ、p、σ² 的信賴區間', '建立兩母體差異與變異數比的信賴區間', '正確解讀信賴區間並估算需要的樣本數'],
       body: () => `
         <h3>信賴區間的意義</h3>
         <p>若重複抽樣很多次、每次都用同樣方法算區間，約有 (1 − α) 的區間會包含真正的參數。<b>常見誤解</b>：「μ 有 95% 機率在這個區間」— 頻率學派裡 μ 是固定值，算出來的區間要嘛包含、要嘛不包含。</p>
@@ -398,7 +389,6 @@
     },
     {
       title: '假說檢定', st: null, live: 'ttest',
-      goals: ['寫出虛無假說與對立假說，執行檢定步驟', '理解型一、型二錯誤、檢定力與 p 值', '進行單一母體與兩母體的 μ、p、σ² 檢定'],
       body: () => `
         <h3>檢定步驟</h3>
         <ol>
@@ -434,7 +424,6 @@
     },
     {
       title: '變異數分析', st: null, live: 'anova',
-      goals: ['用單因子 ANOVA 檢定多個母體平均數是否相等', '理解隨機集區設計與二因子 ANOVA(交互作用)', '用多重比較找出哪些組別有差異'],
       body: () => `
         <h3>為什麼不兩兩做 t 檢定</h3>
         <p>k 組兩兩比較要做 C(k, 2) 次檢定，整體型一錯誤會遠大於 α(5 組做 10 次，至少錯一次的機率約 40%)。ANOVA 用一次 F 檢定回答「這些平均數是否全部相等」。</p>
@@ -463,7 +452,6 @@
     },
     {
       title: '線性迴歸', st: ['regression-analysis', 'Regression Analysis'], live: 'regress',
-      goals: ['用最小平方法建立簡單線性迴歸並解讀係數', '用 R²、t 檢定、F 檢定評估模型', '區分信賴區間與預測區間、做殘差分析並認識複迴歸'],
       body: () => `
         <h3>相關係數</h3>
         ${formula('r = Sxy ÷ √(Sxx · Syy)　　Sxy = Σ(xᵢ − x̄)(yᵢ − ȳ)，Sxx = Σ(xᵢ − x̄)²')}
@@ -500,7 +488,6 @@
     },
     {
       title: '卡方檢定', st: null, live: 'chi2',
-      goals: ['用適合度檢定判斷資料是否符合某個分配', '用獨立性檢定判斷兩個類別變數是否相關', '分辨獨立性檢定與齊一性檢定'],
       body: () => `
         <h3>共同的檢定統計量</h3>
         ${formula('χ² = Σ (Oᵢ − Eᵢ)² ÷ Eᵢ　　O：觀察次數，E：H₀ 為真時的期望次數')}
@@ -523,7 +510,6 @@
     },
     {
       title: '其他', st: ['bayesian-inference', 'Bayesian Inference'], live: 'runs',
-      goals: ['認識無母數統計方法及其使用時機', '使用符號檢定、魏克森檢定、克-瓦檢定、等級相關與連檢定', '認識自助法與貝氏推論'],
       body: () => `
         <h3>無母數統計</h3>
         <p>不需要假設母體是常態等特定分配，常用資料的<b>等級(排名)</b>或<b>正負號</b>。適合小樣本、母體明顯非常態、有離群值或只有順序尺度的資料；代價是母體真的是常態時，檢定力比有母數方法低。</p>
@@ -800,8 +786,7 @@
             <h2>第 ${idx + 1} 章　${ch.title}</h2>
             ${ch.st ? `<div class="chap-st">搭配互動教材：${stLink(ch.st[0], ch.st[1])}</div>` : ''}
           </div>
-          <div class="goals"><b>學習目標</b><ul>${ch.goals.map(g => `<li>${g}</li>`).join('')}</ul></div>
-          ${ch.body()}
+          <div id="chapBody">${ch.md ? '<span class="mute">載入章節內容…</span>' : ch.body()}</div>
           ${[].concat(ch.demo || []).map(d => `<div class="demo-box">${DEMOS[d].html}</div>`).join('')}
           ${ch.live ? `<div class="live-box" id="liveBox"><span class="mute">正在用台股資料計算市場實例…</span></div>` : ''}
           <div class="chap-foot">${nav(idx - 1, '← 上一章')}${nav(idx + 1, '下一章 →')}</div>
@@ -816,6 +801,17 @@
       if (demos.includes('dice')) diceRolls = [];
       if (demos.includes('coin')) coinFlips = [];
       if (demos.includes('clt')) { cltMeans = []; window.LTStat.clt(0); }
+      if (ch.md) {
+        const box = document.getElementById('chapBody');
+        try {
+          const html = await loadChapter(ch.md);
+          if (!ctx.alive()) return;
+          box.innerHTML = html;
+        } catch (err) {
+          if (!ctx.alive()) return;
+          box.innerHTML = `<span class="mute">章節內容載入失敗：${err.message}</span>`;
+        }
+      }
       if (ch.live) {
         try {
           const html = await LIVE[ch.live]();
