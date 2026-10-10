@@ -344,3 +344,6 @@
   table.heat td{font-size:11.5px;padding:5px 6px;}
   table.heat td:first-child{text-align:center;}
   .greek-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px 22px;margin-top:10px;}
+
+  /* 統計學章節文末的台股市場實例：表格在手機上可左右捲動，不撐寬整頁 */
+  .live-box{overflow-x:auto;}
