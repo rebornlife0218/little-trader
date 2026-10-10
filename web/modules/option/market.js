@@ -31,7 +31,7 @@
       let D;
       try { D = await LTOpt.load(); } catch (err) { if (ctx.alive()) el.innerHTML = LTOpt.errorPanel(err.message); return; }
       if (!ctx.alive()) return;
-      const { meta, chain, hist, spot } = D;
+      const { meta, chain, hist, spot, futures } = D;
       const n = hist.d.length - 1;
       // 歷史波動率對齊選擇權資料的日期
       let hv = hist.d.map(() => null);
@@ -40,6 +40,7 @@
         hv = hist.d.map(d => at.get(d) ?? null);
       }
       const near = chain.expiries.find(e => !e.code[6]) || chain.expiries[0];
+      const fut = LTOpt.futuresFor(futures, near.code);
       el.innerHTML = `
         <header class="top"><div>
           <h1>選擇權市場概況</h1>
@@ -49,7 +50,7 @@
         <div class="panel"><div class="statgrid">
           <div class="stat"><div class="v" style="font-size:18px;">${esc(chain.date)}</div><div class="l">最新交易日</div></div>
           <div class="stat"><div class="v">${spot ? fmt(spot.close, 0) : '—'}</div><div class="l">加權指數收盤${spot ? `(${esc(spot.date)})` : ''}</div></div>
-          <div class="stat"><div class="v">${fmt(near.fwd, 0)}</div><div class="l">近月遠期價格(${esc(codeName(near.code))})</div></div>
+          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="#/option/futures">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
           <div class="stat"><div class="v">${pct(hist.iv30[n])}</div><div class="l">30 天隱含波動率</div></div>
           <div class="stat"><div class="v">${pct(hv[n])}</div><div class="l">20 日歷史波動率</div></div>
           <div class="stat"><div class="v">${fmt(hist.pcoi[n], 1)}%</div><div class="l">Put/Call 未平倉比</div></div>
