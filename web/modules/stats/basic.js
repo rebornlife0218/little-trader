@@ -101,13 +101,19 @@
     if (!chapterCache[name]) chapterCache[name] = renderChapter(name).catch(e => { delete chapterCache[name]; throw e; });
     return chapterCache[name];
   }
+  const textCache = {};   // 章節原始文字(Markdown)，閒置時先全部下載
+  function fetchText(name) {
+    if (!textCache[name]) textCache[name] = fetch(MD_DIR + name + '.md', { cache: 'no-cache' })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.text(); })
+      .catch(e => { delete textCache[name]; throw e; });
+    return textCache[name];
+  }
   async function renderChapter(name) {
-    const r = await fetch(MD_DIR + name + '.md', { cache: 'no-cache' });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const raw = await fetchText(name);
     // 先把程式碼收起來(R 的 birthwt$bwt 不是公式)，再把公式換成佔位符，避免被 Markdown 改寫
     const code = [], math = [], vennRows = [];
     const inlineTex = s => s.replace(/\$([^$]+)\$/g, (_, t) => katex.renderToString(t, { throwOnError: false }));
-    let src = (await r.text()).replace(/<!--[\s\S]*?-->/g, '')
+    let src = raw.replace(/<!--[\s\S]*?-->/g, '')
       .replace(/```[\s\S]*?```|`[^`\n]+`/g, m => `%%CODE${code.push(m) - 1}%%`)
       // 文氏圖：[[venn 種類|標題|說明]]，種類 = inter / union / comp / diff / disjoint；連續多行排成一列
       .replace(/(?:^\[\[venn .+\]\][ \t]*(?:\r?\n|$))+/gm, block => {
@@ -430,6 +436,8 @@
   function prefetch(idx) {
     [idx + 1, idx - 1].filter(i => i >= 0 && i < CHAPTERS.length && CHAPTERS[i].md)
       .forEach((i, k) => idle(() => loadChapter(CHAPTERS[i].md).catch(() => {}), { timeout: 2000 + k * 1000 }));
+    // 其他章節只先下載文字(全部約 140KB)，點下去時只剩排版
+    idle(() => CHAPTERS.forEach(c => { if (c.md) fetchText(c.md).catch(() => {}); }), { timeout: 5000 });
   }
 
   LT.register({
