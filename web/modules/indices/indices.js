@@ -497,7 +497,10 @@ function ensureComputed(key){
   }
   const regimes = getRegimes(key);
   if (state.theme==='crash' && state.mode==='crash' && !state.events[key]) state.events[key] = computeEvents(rows, state.params[key], state.ma[key], regimes);
-  if (state.theme==='crash' && state.mode==='myth' && !state.myth[key]) state.myth[key] = computeMyth(rows, state.ma[key], state.mythParams);
+  if (state.theme==='crash' && state.mode==='myth' && !state.myth[key]){
+    state.myth[key] = computeMyth(rows, state.ma[key], state.mythParams);
+    state.myth[key].may20 = computeMay20(rows, key);
+  }
   if (state.theme==='crash' && state.mode==='cycle' && !state.cycle[key]) state.cycle[key] = computeCycle(rows, key, state.cycleParams);
   if (state.theme==='candle' && !state.candlePatterns[key]) state.candlePatterns[key] = detectCandlePatterns(rows, state.ma[key], state.candleParams[key], regimes);
 }
@@ -785,7 +788,7 @@ document.addEventListener('keydown', (ev)=>{
   else if (ev.key==='Escape'){ state.cursor[key] = null; drawChart(key); updateOhlcInfo(); }
 });
 
-/* ============================== 常見迷思：均線的支撐與壓力 ==============================
+/* ============================== 常見迷思：均線的支撐與壓力、520 行情 ==============================
    跌破：前一日收盤在均線上、當日收盤在均線下；突破反之。
    初次跌破(突破)：之前已連續 settleDays 日以上站在均線上(下)；否則為後續(反覆)跌破(突破)。
    有支撐：跌破後 confirmDays 日內收盤又站回均線(假跌破)；有壓力：突破後 confirmDays 日內又跌回均線(假突破)。 */
@@ -833,6 +836,78 @@ function mythSummary(list){
     win5:win('ret5'), win10:win('ret10'), win20:win('ret20'), win60:win('ret60'),
     avg5:avg('ret5'), avg10:avg('ret10'), avg20:avg('ret20'), avg60:avg('ret60'),
     last: list.length ? list[list.length-1].date : null };
+}
+/* 520 行情(台股)：5 月 20 日是總統就職日(1996 年起每 4 年一次)，市場常說「就職前有行情、就職後利多出盡」。
+   每年以 5/20 當天或之前最後一個交易日的收盤為基準日，算就職前後的漲跌，並與「任意一天」的同天期報酬比較。 */
+const MAY20_INAUG = ['2000','2004','2008','2012','2016','2020','2024','2028'];
+function computeMay20(rows, key){
+  if (key!=='TAIEX') return null;
+  const n = rows.length, c = rows.map(r=>r.close);
+  const ret = (a,b)=> a>=0 && b>=0 && a<n && b<n ? c[b]/c[a]-1 : NaN;
+  const elec = (ELECTIONS.TW||{list:[]}).list;
+  const years = [];
+  const y0 = +rows[0].date.slice(0,4), y1 = +rows[n-1].date.slice(0,4);
+  for (let y=y0; y<=y1; y++){
+    const day = `${y}-05-20`;
+    let base = -1;
+    for (let i=0;i<n && rows[i].date<=day;i++) base = i;
+    if (base<20 || rows[base].date.slice(0,4)!==String(y)) continue;   // 資料不足或還沒到 5/20
+    const inaug = MAY20_INAUG.includes(String(y));
+    let fromElec = NaN, elecDate = null;
+    if (inaug){
+      const e = elec.find(x=>x.d.slice(0,4)===String(y));
+      if (e){ let eb=-1; for (let i=0;i<n && rows[i].date<=e.d;i++) eb=i; if (eb>=0){ fromElec = ret(eb, base); elecDate = e.d; } }
+    }
+    years.push({ y, inaug, base, date:rows[base].date, elecDate, fromElec,
+      pre20:ret(base-20,base), pre5:ret(base-5,base), post5:ret(base,base+5), post20:ret(base,base+20), post60:ret(base,base+60) });
+  }
+  // 基準：任意一天往前(後) k 個交易日的報酬，用來判斷 520 前後是否特別
+  const base = k=>{ const v=[]; for (let i=0;i+k<n;i++) v.push(c[i+k]/c[i]-1); return {avg:v.reduce((a,b)=>a+b,0)/v.length, win:v.filter(x=>x>0).length/v.length}; };
+  return { years, baseline:{ d5:base(5), d20:base(20), d60:base(60) } };
+}
+function may20Summary(list, f){
+  const v = list.map(x=>x[f]).filter(x=>!Number.isNaN(x));
+  return { count:v.length, avg: v.length ? v.reduce((a,b)=>a+b,0)/v.length : NaN, win: v.length ? v.filter(x=>x>0).length/v.length : NaN };
+}
+function renderMay20(res, key){
+  if (!res) return `<div class="panel"><h3>520 行情</h3><div class="note" style="margin-top:0;">520 行情是台股的說法(5 月 20 日總統就職)，請切換到<b>台灣加權</b>查看。</div></div>`;
+  const pct = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v)}</td>`;
+  const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
+  const F = ['pre20','pre5','post5','post20','post60'];
+  const inaug = res.years.filter(x=>x.inaug), other = res.years.filter(x=>!x.inaug), B = res.baseline;
+  const sumRow = (label, list, cls)=>{
+    const ss = F.map(f=>may20Summary(list,f)), fe = may20Summary(list,'fromElec');
+    return `<tr class="${cls}"><td colspan="2">${label}平均(${list.length} 年)</td>${list===inaug?pct(fe.avg):'<td class="na">—</td>'}${ss.map(x=>pct(x.avg)).join('')}</tr>
+      <tr class="${cls}"><td colspan="2">${label}上漲機率</td>${list===inaug?win(fe.win):'<td class="na">—</td>'}${ss.map(x=>win(x.win)).join('')}</tr>`;
+  };
+  const baseRow = `<tr><td colspan="2">任意一天(基準)平均</td><td class="na">—</td>${pct(B.d20.avg)}${pct(B.d5.avg)}${pct(B.d5.avg)}${pct(B.d20.avg)}${pct(B.d60.avg)}</tr>
+    <tr><td colspan="2">任意一天(基準)上漲機率</td><td class="na">—</td>${win(B.d20.win)}${win(B.d5.win)}${win(B.d5.win)}${win(B.d20.win)}${win(B.d60.win)}</tr>`;
+  // 自動結論：就職年 vs 基準
+  const p = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
+  const iPre = may20Summary(inaug,'pre20'), iPost = may20Summary(inaug,'post20'), iPost60 = may20Summary(inaug,'post60'), oPre = may20Summary(other,'pre20'), iElec = may20Summary(inaug,'fromElec');
+  const cmp = (a, b)=> Number.isNaN(a) ? '' : Math.abs(a-b) < 0.08 ? '與平常差不多' : a > b ? '高於平常' : '低於平常';
+  const insight = `
+    <li><b>就職前有行情？</b>就職年 520 前 20 個交易日上漲機率 ${p(iPre.win)}、平均 ${Number.isNaN(iPre.avg)?'—':fmtPct(iPre.avg)}；任意 20 日上漲機率 ${p(B.d20.win)}、平均 ${fmtPct(B.d20.avg)}，${cmp(iPre.win, B.d20.win)}。非就職年同期上漲機率 ${p(oPre.win)}。</li>
+    <li><b>選後到就職</b>：從選前收盤到 520，${inaug.filter(x=>!Number.isNaN(x.fromElec)).length} 次中上漲機率 ${p(iElec.win)}、平均 ${Number.isNaN(iElec.avg)?'—':fmtPct(iElec.avg)}。</li>
+    <li><b>就職後利多出盡？</b>就職年 520 後 20 個交易日上漲機率 ${p(iPost.win)}、平均 ${Number.isNaN(iPost.avg)?'—':fmtPct(iPost.avg)}；後 60 日上漲機率 ${p(iPost60.win)}，與任意 60 日的 ${p(B.d60.win)} 相比${cmp(iPost60.win, B.d60.win)}。</li>`;
+  return `
+    <div class="panel">
+      <h3>520 行情：總統就職前後的漲跌</h3>
+      <div class="tablewrap"><table class="stattable cycle">
+        <thead>
+          <tr><th rowspan="2">年度</th><th rowspan="2">基準日<br>(5/20 前收盤)</th><th rowspan="2">選後至就職<br>(選前收盤→520)</th><th colspan="2">520 前</th><th colspan="3">520 後(以基準日收盤計)</th></tr>
+          <tr><th>20 日</th><th>5 日</th><th>+5 日</th><th>+20 日</th><th>+60 日</th></tr>
+        </thead>
+        <tbody>
+          ${res.years.map(x=>`<tr class="click ${x.inaug?'inaug':''}" onclick="focusDate('${key}',${x.base})"><td>${x.y}${x.inaug?' <span class="tag elec">就職</span>':''}</td><td>${x.date}</td>${x.inaug?pct(x.fromElec):'<td class="na">—</td>'}${F.map(f=>pct(x[f])).join('')}</tr>`).join('')}
+          ${sumRow('就職年', inaug, 'allrow')}
+          ${sumRow('非就職年', other, '')}
+          ${baseRow}
+        </tbody>
+      </table></div>
+      <ul class="insight">${insight}</ul>
+      <div class="note">520 是總統就職日(1996 年起每 4 年一次，本表資料自 ${res.years.length?res.years[0].y:'—'} 年起)。基準日＝5/20 當天或之前最後一個交易日的收盤；「520 前 20 日／5 日」＝基準日相對 20／5 個交易日前的漲跌，「520 後」皆以基準日收盤為基準；「選後至就職」＝總統大選投票日前收盤到基準日的漲跌。「任意一天(基準)」是所有交易日同天期報酬的平均與上漲機率，用來判斷 520 前後是否真的特別。點選列可在K線圖上定位。就職年只有 ${inaug.length} 次，樣本很少，僅供參考。</div>
+    </div>`;
 }
 function setMythParam(field, value){
   state.mythParams[field] = value;
@@ -933,7 +1008,8 @@ function renderMyth(){
       ${candleTable(res.up, false)}
       <ul class="insight">${candleInsight(res.up, false)}</ul>
       <div class="note">常見說法如「跌破季線就該出場」「突破年線就會大漲」，可對照上表的勝率與報酬檢驗是否成立。紅K／黑K分析合併初次與後續穿越的所有事件，以穿越當天的K棒顏色分組(收盤＞開盤為紅K)。歷史統計不代表未來，樣本數少時僅供參考。</div>
-    </div>`;
+    </div>
+    ${renderMay20(res.may20, state.active)}`;
 }
 
 /* ============================== 週期性分析 ==============================
@@ -1272,7 +1348,7 @@ const THEMES = [
 ];
 const MODES = [
   {key:'crash', name:'跌深反彈', desc:'急跌事件的底部、反彈報酬與量能結構'},
-  {key:'myth', name:'常見迷思', desc:'跌破均線有沒有支撐、突破均線有沒有壓力'},
+  {key:'myth', name:'常見迷思', desc:'均線的支撐與壓力、520 行情'},
   {key:'cycle', name:'週期性分析', desc:'月初/月中/月底、週一~週五漲跌與總統選舉'},
   {key:'m4', name:'模式四', desc:'建置中'},
 ];
