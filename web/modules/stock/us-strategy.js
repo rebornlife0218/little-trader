@@ -46,15 +46,42 @@
     return { ret: cagr, vol, sharpe: (cagr - rf) / vol, mdd, mult: nav[nav.length - 1] };
   }
 
+  // 最上方的策略選擇：新增策略時加一筆，尚未完成的設 soon: true(顯示「努力建置中」)
+  const FAMILIES = [
+    { key: 'sp500', name: 'S&P500 季度換股', desc: '每季依上一季的表現，從當時的 S&P500 成分股挑選股票持有一季' },
+    { key: 'more', name: '其他策略', desc: '更多美股策略', soon: true },
+  ];
+  const FAMILY_KEY = 'lt.usFamily';
+
   LT.register({
     section: 'stock', group: '美股', key: 'us-strategy', name: '策略',
     async mount(el, ctx) {
+      let fam = 'sp500';
+      try { const v = localStorage.getItem(FAMILY_KEY); if (FAMILIES.some(f => f.key === v)) fam = v; } catch (e) { /* 無法使用 localStorage */ }
       el.innerHTML = `
         <header class="top"><div>
-          <h1>美股策略：S&amp;P500 季度換股</h1>
-          <p>每季依上一季的表現，從<b>當時</b>的 S&amp;P500 成分股挑選股票持有一季，與買進持有 SPY 比較報酬與風險</p>
+          <h1>美股策略</h1>
+          <p>選擇要看的策略，與買進持有 SPY 比較報酬與風險</p>
         </div></header>
-        <div id="usBody"><div class="panel"><p class="mute">載入回測資料中…</p></div></div>`;
+        <div class="panel"><div class="mode-tabs us-family">${FAMILIES.map(f => `<button class="mode-tab" data-f="${f.key}"><b>${esc(f.name)}</b><small>${f.soon ? '努力建置中' : esc(f.desc)}</small></button>`).join('')}</div></div>
+        <div id="usFam"></div>`;
+      const famEl = el.querySelector('#usFam');
+      let seq = 0;   // 每次切換策略加 1：還在載入的舊策略結果不會蓋掉新選的
+      const showFam = f => {
+        fam = f;
+        try { localStorage.setItem(FAMILY_KEY, f); } catch (e) { /* 無法使用 localStorage */ }
+        el.querySelectorAll('.us-family .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+        if (FAMILIES.find(x => x.key === f).soon) famEl.innerHTML = LT.UNDER_CONSTRUCTION;
+        else { const my = ++seq; sp500(famEl, { alive: () => ctx.alive() && seq === my }); }
+      };
+      el.querySelector('.us-family').onclick = e => { const b = e.target.closest('[data-f]'); if (b && b.dataset.f !== fam) showFam(b.dataset.f); };
+      showFam(fam);
+    },
+  });
+
+  /* ---------- S&P500 季度換股 ---------- */
+  async function sp500(el, ctx) {
+      el.innerHTML = `<div id="usBody"><div class="panel"><div class="page-loading"><span class="spinner"></span>載入中…</div></div></div>`;
       let B;
       try { B = (await LT.loadJSON('sp500', 'backtest.json')).data; }
       catch (e) { if (ctx.alive()) el.querySelector('#usBody').innerHTML = `<div class="panel"><p class="mute">回測資料尚未產生：${esc(e.message)}</p></div>`; return; }
@@ -260,6 +287,5 @@
       $('.us-tabs').onclick = e => { const b = e.target.closest('[data-k]'); if (b) setView(b.dataset.k); };
       $('#usFrom').onchange = draw; $('#usCost').oninput = draw; $('#usScale').onchange = draw;
       draw();
-    },
-  });
+  }
 })();

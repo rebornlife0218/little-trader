@@ -86,14 +86,9 @@ const LT = (() => {
     });
     return out;
   }
-  // 建置中頁面
-  function mountPlaceholder(page, el) {
-    el.innerHTML = `<div class="panel"><div class="empty">
-      <h3 style="margin:0;">${page.name}</h3>
-      ${page.desc ? `<p>${page.desc}</p>` : ''}
-      <p class="mute">此研究內容建置中，敬請期待。</p>
-    </div></div>`;
-  }
+  // 建置中頁面：只顯示「努力建置中」(desc 留在程式裡當作規劃備忘，不顯示)
+  const UNDER_CONSTRUCTION = '<div class="panel"><div class="empty"><p>努力建置中</p></div></div>';
+  function mountPlaceholder(page, el) { el.innerHTML = UNDER_CONSTRUCTION; }
   function route() {
     let { section, key } = parseHash();
     if (!section && home) { showHome(); return; }
@@ -120,7 +115,7 @@ const LT = (() => {
       routeSeq++;
       renderSidebar({ section: sec.key });
       document.title = `${sec.name} · Little Trader`;
-      main.innerHTML = `<div class="panel"><div class="empty"><h3 style="margin:0;">${sec.name}</h3><p>此區塊研究內容建置中，敬請期待。</p></div></div>`;
+      main.innerHTML = UNDER_CONSTRUCTION;
     }
     document.body.classList.remove('nav-open');
   }
@@ -262,5 +257,5 @@ const LT = (() => {
     route();
   }
 
-  return { register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();
