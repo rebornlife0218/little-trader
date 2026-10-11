@@ -21,7 +21,7 @@ web/                                網站(部署時整個資料夾就是網站�
     etf/etf.js                      ETF：即將發行ETF
     stock/tw.js                     股票 · 台股：處置股、隔日沖、波段(建置中)
     stock/earnings.js               股票 · 美股：財報行事曆
-    stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(圖檔在 content/stock/sp500/)
+    stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(資料集 sp500；圖表由回測資料即時繪製)
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
     option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
@@ -42,6 +42,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
   etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
+  sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
 
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
@@ -62,13 +63,20 @@ pipeline/                           資料抓取，一個資料集一個資料�
 
 | 資料集 | 來源 | 排程(台北) | 主要檔案 |
 |---|---|---|---|
-| indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列) |
+| indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給 ETF大禮包的長期回測) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
 | etf_compare | 勞動基金運用局、Yahoo Finance、臺灣證券交易所(除權除息計算結果表) | 週一~五 09:00 | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；台股 ETF 的配息用證交所官方資料，Yahoo 缺 2013 年以前的配息) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
+| sp500 | fja05680/sp500 歷史成分股、Yahoo Finance、Tiingo | 週六 09:00 | `backtest.json`(四種策略、全部成分股等權重、SPY、RSP 的每日淨值(未扣成本)；每季的成分股數、可取得股價數、換手率、無風險利率、持股；只用 Yahoo 時的對照結果) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
+
+sp500 的特殊處理：
+- 已下市、被併購公司的股價 Yahoo 沒有，改用 Tiingo(需要 API 金鑰：本機放在 `~/.tiingo_key`，GitHub Actions 用 Secret `TIINGO_API_KEY`；`data-sp500.yml` 要 `secrets: inherit`)。Tiingo 的原始股價只快取在本機 `~/.cache/little-trader/tiingo/`，**不發佈**(授權不允許轉載)，data 分支只放回測結果。
+- 完整重算(從 2000 年)只在本機執行：`python pipeline/sp500/update.py --full`(加 `--offline` 只用快取)；免費方案每小時 50 次請求，第一次下載約 3～4 小時。
+- 每週的增量更新讀回已發佈的結果，從倒數第 3 季重算並接上，最近的成分股 Yahoo 幾乎都有，偶爾才需向 Tiingo 查幾檔。
+- Yahoo 的代號可能已被別家公司沿用(例如 EP 原為 El Paso，現在是 Empire Petroleum)：成分股期間每日成交金額中位數低於 200 萬美元就視為沿用，改找 Tiingo。
 
 ## 新增頁面
 

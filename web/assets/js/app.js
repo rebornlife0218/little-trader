@@ -20,6 +20,7 @@ const LT = (() => {
     { key: 'etf_compare', name: '0050 vs 勞退基金' },
     { key: 'options', name: '選擇權與台指期' },
     { key: 'earnings', name: '美股財報' },
+    { key: 'sp500', name: 'S&P500 策略回測' },
   ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
   // 加上 group(例如 '台股')，側欄與首頁會在區塊內再分小組，同組頁面請連續註冊

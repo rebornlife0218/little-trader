@@ -1,0 +1,21 @@
+name: 資料 · S&P500 策略回測
+
+# 資料集 sp500：pipeline/sp500/update.py → data 分支的 sp500/
+# 每週增量重算最近幾季；完整重算(含已下市公司)需在本機執行 python pipeline/sp500/update.py --full
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '0 1 * * 6'       # 台北 週六 09:00(美股週五收盤後)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    uses: ./.github/workflows/_dataset.yml
+    with:
+      dataset: sp500
+    secrets: inherit
