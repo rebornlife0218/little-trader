@@ -1,4 +1,5 @@
-/* 選擇權 · Black-Scholes 計算器：理論價格、Greeks、敏感度熱力圖、Greeks 曲線，並與市場結算價比較
+/* 選擇權 · Black-Scholes 計算器(元件)：理論價格、Greeks、敏感度熱力圖、Greeks 曲線，並與市場結算價比較
+   不是獨立頁面：由「選擇權市場概況」的分頁呼叫 LTOpt.calculator(el, D) 顯示(D = LTOpt.load() 的結果)
    預設值取自最新資料：現貨 = 加權指數收盤、到期日 = TXO 各到期契約、波動率 = 該契約價平 IV */
 (() => {
   const { fmt, pct, esc, codeName, MULT, price, greeks, impliedVol } = LTOpt;
@@ -10,25 +11,15 @@
     ['rho', 'Rho', '利率上升 1%，選擇權價格變動幾點'],
   ];
 
-  LT.register({
-    section: 'option', key: 'calculator', name: 'Black-Scholes 計算器',
-    async mount(el, ctx) {
-      el.innerHTML = `<div class="panel"><div class="empty"><p>正在載入選擇權資料…</p></div></div>`;
-      let D;
-      try { D = await LTOpt.load(); } catch (err) { if (ctx.alive()) el.innerHTML = LTOpt.errorPanel(err.message); return; }
-      if (!ctx.alive()) return;
-      const { meta, chain, spot } = D;
+  LTOpt.calculator = (el, D) => {
+      const { chain, spot } = D;
       const exps = chain.expiries.filter(e => e.days > 0);
       const near = exps.find(e => !e.code[6]) || exps[0];
       const S0 = spot ? spot.close : near.fwd;
       el.innerHTML = `
-        <header class="top"><div>
-          <h1>Black-Scholes 計算器</h1>
-          <p>輸入條件，計算歐式選擇權的理論價格與風險指標(Greeks)，並與臺指選擇權的市場結算價比較</p>
-          ${LT.sourceLine(meta)}
-        </div></header>
         <div class="panel">
           <h3>輸入條件</h3>
+          <p class="note" style="margin-top:0;">輸入條件，計算歐式選擇權的理論價格與風險指標(Greeks)，並與臺指選擇權的市場結算價比較。</p>
           <div class="paramgrid opt-form">
             <div class="paramitem"><label for="bsS">現貨價格 S</label><input id="bsS" type="number" step="10" value="${Math.round(S0)}"></div>
             <div class="paramitem"><label for="bsK">履約價 K</label><input id="bsK" type="number" step="50" value="${Math.ceil(S0 / 100) * 100}"></div>
@@ -117,6 +108,5 @@
         });
       }
       calc();
-    },
-  });
+  };
 })();

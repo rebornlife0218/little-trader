@@ -19,7 +19,8 @@ import requests
 QUOTE_URL = 'https://www.taifex.com.tw/cht/3/dlFutDataDown'
 INST_URL = 'https://www.taifex.com.tw/cht/3/futContractsDateDown'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (little-trader data bot)'}
-KEYS = ['d', 'code', 'o', 'h', 'l', 'c', 's', 'vol', 'oi', 'fi', 'it', 'dl']
+# code2/c2：次月契約與收盤；v1/v2、oi1/oi2：近月、次月的成交量與未平倉(看轉倉時部位從近月移到次月)
+KEYS = ['d', 'code', 'o', 'h', 'l', 'c', 's', 'vol', 'oi', 'fi', 'it', 'dl', 'code2', 'c2', 'v1', 'v2', 'oi1', 'oi2']
 INST = {'外資及陸資': 'fi', '投信': 'it', '自營商': 'dl'}
 
 
@@ -103,13 +104,19 @@ def summarize(q, inst):
         if live.empty:
             continue
         n = live.iloc[0]
+        n2 = live.iloc[1] if len(live) > 1 else None
+        vol = g.groupby('到期月份(週別)')['vol'].sum()
+        num = lambda v: float(v) if pd.notna(v) else None  # noqa: E731
         r = {'d': d.isoformat(), 'code': n['到期月份(週別)'],
+             'code2': n2['到期月份(週別)'] if n2 is not None else None,
+             'c2': (num(n2['c']) if num(n2['c']) is not None else num(n2['s'])) if n2 is not None else None,
+             'v1': int(vol.get(n['到期月份(週別)'], 0)), 'v2': int(vol.get(n2['到期月份(週別)'], 0)) if n2 is not None else None,
+             'oi1': int(n['oi']) if pd.notna(n['oi']) else None, 'oi2': int(n2['oi']) if n2 is not None and pd.notna(n2['oi']) else None,
              **{k: (float(n[k]) if pd.notna(n[k]) else None) for k in ['o', 'h', 'l', 'c', 's']},
              'vol': int(g['vol'].sum()),
              'oi': int(reg[reg['到期月份(週別)'].map(_expiry) != d]['oi'].fillna(0).sum()),
              **{k: net.get(d, {}).get(k) for k in INST.values()}}
         rows[r['d']] = r
-        vol = g.groupby('到期月份(週別)')['vol'].sum()
         curve = {'date': d.isoformat(), 'contracts': [
             {'code': x['到期月份(週別)'], 'expiry': _expiry(x['到期月份(週別)']).isoformat(),
              'c': x['c'] if pd.notna(x['c']) else None, 's': x['s'] if pd.notna(x['s']) else None,
@@ -122,6 +129,8 @@ def summarize(q, inst):
 def update(cache, today, backfill_days):
     """cache 為上次發佈的 futures.json(或 None)，回傳新的 futures.json 內容。"""
     old = cache or {'series': {k: [] for k in KEYS}, 'curve': None}
+    if any(k not in old['series'] for k in KEYS):   # 欄位有新增時整段重新回補
+        old = {'series': {k: [] for k in KEYS}, 'curve': old.get('curve')}
     ser = old['series']
     rows = {d: {k: ser[k][i] for k in KEYS} for i, d in enumerate(ser['d'])}
     start = (date.fromisoformat(ser['d'][-1]) - timedelta(days=7)) if ser['d'] else today - timedelta(days=backfill_days)

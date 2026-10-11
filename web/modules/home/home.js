@@ -1,4 +1,4 @@
-/* 首頁：網站介紹、各區塊入口、各資料集更新狀態(點 LOGO 回到這裡) */
+/* 首頁：網站介紹、各區塊入口(點 LOGO 回到這裡)；各資料集更新狀態列在頁尾(app.js) */
 LT.setHome({
   name: '首頁',
   async mount(el, ctx) {
@@ -23,14 +23,6 @@ LT.setHome({
             <div class="home-links">${LT.groupPages(list).map(([g, ps]) => (g ? `<span class="home-sub">${g}</span>` : '') + ps.map(link).join('')).join('') || '<span class="mute">建置中</span>'}</div>
           </div>`;
         }).join('')}
-      </div>
-      <div class="panel">
-        <h3>資料更新狀態</h3>
-        <div id="homeData" class="mute">載入中…</div>
       </div>`;
-    const rows = await Promise.all(LT.DATASETS.map(({ key, name: n }) => LT.dataset(key).then(m => ({ n, m })).catch(() => ({ n, m: null }))));
-    if (!ctx.alive()) return;
-    document.getElementById('homeData').innerHTML = rows.map(({ n, m }) =>
-      `<div class="home-data"><b>${n}</b>${m ? LT.sourceLine(m) : '<div class="updated">尚無資料</div>'}</div>`).join('');
   },
 });
