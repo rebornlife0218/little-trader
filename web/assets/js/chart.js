@@ -3,7 +3,8 @@
      LTChart.line(el, { x, series:[{ name, y, color, dash, width, fill }], ... })
      LTChart.bars(el, { x, series:[{ name, y, color }], ... })
    共通選項：height、xFmt(x)、yFmt(y)、xType:'date'|'num'、refY:[{ y, label, color }]、
-            refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt
+            refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt、
+            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)
    顏色請用 CSS 變數(例如 'var(--amber)')，切換主題時不必重畫。
    ========================================================================== */
 const LTChart = (() => {
@@ -45,8 +46,9 @@ const LTChart = (() => {
     if (o.yMin == null) yLo -= padY;
     if (o.yMax == null) yHi += padY;
     if (kind === 'bars' && o.yMin == null) yLo = Math.min(0, yLo);
-    const yt = ticks(yLo, yHi);
-    yLo = Math.min(yLo, yt[0]); yHi = Math.max(yHi, yt[yt.length - 1]);
+    // yTicks(lo, hi)：自訂刻度(例如對數座標)，只保留範圍內的刻度
+    const yt = o.yTicks ? o.yTicks(yLo, yHi).filter(v => v >= yLo && v <= yHi) : ticks(yLo, yHi);
+    if (!o.yTicks) { yLo = Math.min(yLo, yt[0]); yHi = Math.max(yHi, yt[yt.length - 1]); }
     const iw = W - PAD.l - PAD.r, ih = H - PAD.t - PAD.b;
     const xLo = Math.min(...xs), xHi = Math.max(...xs);
     const band = kind === 'bars' ? iw / xs.length : 0;
