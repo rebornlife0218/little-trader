@@ -48,8 +48,10 @@
     for (let k = 0; k < 100; k++) { const mid = (lo + hi) / 2; if (npv(lo) * npv(mid) <= 0) hi = mid; else lo = mid; }
     return (lo + hi) / 2;
   }
-  // 單筆投入(高點、低點、年初) vs 定期定額：每年投入相同金額，用還原股價(配息再投入)
-  function timingStudy(dd, startYear, perYear) {
+  // 單筆投入(高點、低點、年初) vs 定期定額：每年投入相同金額
+  // reinvest = true：配息再投入(用還原股價 a 計算)；false：配息領現金(用收盤價 c 買進，配息存成現金，不計利息)
+  // 買點(每年最高/最低點)一律依收盤價判斷，兩種模式買在同一天
+  function timingStudy(dd, startYear, perYear, reinvest = true) {
     const years = [...new Set(dd.d.map(d => +d.slice(0, 4)))];
     const lastYear = years[years.length - 1];
     const full = years.filter(y => y >= startYear && y < lastYear && dd.d.find(d => d.startsWith(String(y))).slice(5, 7) === '01');
@@ -57,20 +59,22 @@
     const S = { best: [], worst: [], jan: [], dca: [] };   // 每筆投入 {i: 日期索引, v: 金額}
     full.forEach(y => {
       const idx = idxOfYear(y);
-      const minI = idx.reduce((a, i) => dd.a[i] < dd.a[a] ? i : a, idx[0]), maxI = idx.reduce((a, i) => dd.a[i] > dd.a[a] ? i : a, idx[0]);
+      const minI = idx.reduce((a, i) => dd.c[i] < dd.c[a] ? i : a, idx[0]), maxI = idx.reduce((a, i) => dd.c[i] > dd.c[a] ? i : a, idx[0]);
       S.best.push({ i: minI, v: perYear }); S.worst.push({ i: maxI, v: perYear }); S.jan.push({ i: idx[0], v: perYear });
       const months = [...new Set(idx.map(i => dd.d[i].slice(0, 7)))];
       months.forEach(m => { const i = idx.find(k => dd.d[k].startsWith(m)); S.dca.push({ i, v: perYear / months.length }); });
     });
-    const last = dd.d.length - 1, mo = monthly(dd);
+    const last = dd.d.length - 1, mo = monthly(dd), P = reinvest ? dd.a : dd.c;
+    // 除息日索引與每股配息(配息領現金模式用)
+    const divs = reinvest ? [] : (dd.div || []).map(([d, amt]) => ({ i: dd.d.indexOf(d), amt })).filter(x => x.i > 0);
     const res = {};
     Object.entries(S).forEach(([k, buys]) => {
-      const shares = buys.reduce((a, b) => a + b.v / dd.a[b.i], 0);
-      const value = shares * dd.a[last], invested = buys.reduce((a, b) => a + b.v, 0);
+      const sharesAt = i => buys.filter(b => b.i <= i).reduce((a, b) => a + b.v / P[b.i], 0);
+      const cashAt = i => divs.filter(x => x.i <= i).reduce((a, x) => a + sharesAt(x.i - 1) * x.amt, 0);   // 除息前一天持有才領得到
+      const value = sharesAt(last) * P[last] + cashAt(last), invested = buys.reduce((a, b) => a + b.v, 0);
       const flows = buys.map(b => ({ t: dd.d[b.i], v: -b.v })).concat([{ t: dd.d[last], v: value }]);
-      // 每月底的帳戶價值(圖用)
-      const series = mo.i.map(mi => { const sh = buys.filter(b => b.i <= mi).reduce((a, b) => a + b.v / dd.a[b.i], 0); return sh * dd.a[mi]; });
-      res[k] = { value, invested, irr: xirr(flows), series, buys };
+      const series = mo.i.map(mi => sharesAt(mi) * P[mi] + cashAt(mi));   // 每月底的帳戶價值(圖用)
+      res[k] = { value, invested, irr: xirr(flows), series, buys, cash: cashAt(last) };
     });
     const investedSeries = mo.i.map(mi => S.jan.filter(b => b.i <= mi).reduce((a, b) => a + b.v, 0));
     return { years: full, res, months: mo.m, invested: investedSeries, asOf: dd.d[last] };
@@ -120,6 +124,52 @@
                 <tr><td>槓桿／反向</td><td>台灣50正2、台灣50反1</td><td style="text-align:left">追蹤指數單日漲跌的 2 倍或反向，適合短線操作</td><td style="text-align:left">每日重新平衡，長期持有的報酬不等於指數的 2 倍或 −1 倍，盤整時會耗損</td></tr>
               </tbody>
             </table></div>
+          </div>
+          <div class="panel">
+            <h3>台股 ETF 的分類</h3>
+            <div class="doc">
+              <p>台股 ETF 可以從三個角度分類：<b>管理方式</b>(被動或主動)、<b>投資標的</b>(股票、債券、期貨、槓桿反向、股債平衡)、<b>成分證券在國內或國外</b>。證券代號的第六碼(尾碼)就能看出前兩項：</p>
+            </div>
+            <div class="tablewrap"><table class="stattable pk-kind">
+              <thead><tr><th>管理方式</th><th>類型</th><th>代號尾碼(台幣 / 外幣)</th><th>例子</th></tr></thead>
+              <tbody>
+                <tr><td rowspan="6">被動式<br><small class="mute">追蹤指數</small></td><td>股票型</td><td>全數字 / K</td><td style="text-align:left">0050、0056、00878；00625K</td></tr>
+                <tr><td>債券型</td><td>B / C</td><td style="text-align:left">00679B；00687C</td></tr>
+                <tr><td>槓桿型</td><td>L / M</td><td style="text-align:left">00631L</td></tr>
+                <tr><td>反向型</td><td>R / S</td><td style="text-align:left">00632R</td></tr>
+                <tr><td>期貨型</td><td>U / V</td><td style="text-align:left">00635U</td></tr>
+                <tr><td>平衡型(股債多資產)</td><td>T</td><td style="text-align:left">00980T</td></tr>
+                <tr><td rowspan="2">主動式<br><small class="mute">經理人選股</small></td><td>股票型</td><td>A</td><td style="text-align:left">00981A</td></tr>
+                <tr><td>債券型</td><td>D</td><td style="text-align:left">00980D</td></tr>
+              </tbody>
+            </table></div>
+            <div class="doc" style="margin-top:12px;">
+              <ul>
+                <li><b>被動式 vs 主動式</b>：被動式 ETF 依指數規則持股，費用較低；主動式 ETF 由經理人選股、目標是打敗指數，費用通常較高，持股也會揭露但可能隨時調整。</li>
+                <li><b>國內成分 vs 國外成分</b>：尾碼看不出來，要看追蹤的指數或投資範圍。國外成分 ETF(例如美國股票、美國公債)多了<b>匯率風險</b>與時差，淨值以國外收盤計算，台股盤中的價格比較容易出現折溢價。</li>
+                <li><b>股票型再細分</b>(依指數的選股策略)：市值型、高股息、ESG、產業/主題(半導體、AI)、因子(低波動、品質)等。</li>
+                <li><b>風險由低到高</b>(證交所投資人教育的排列)：一般台股 ETF → 海外股債 ETF(跨市場、匯率) → 期貨 ETF(期現貨價差、轉倉風險) → 槓桿/反向 ETF(長期報酬偏離倍數，限制較多)。期貨與槓反 ETF 屬於需要簽署風險預告書的商品。</li>
+              </ul>
+              <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.twse.com.tw/zh/products/securities/etf/products/li.html" target="_blank" rel="noopener">臺灣證券交易所 · 槓桿型及反向型ETF</a>；尾碼分類整理自<a href="https://tw.stock.yahoo.com/news/00980a%E3%80%8100980d%E3%80%8100980t%E4%B8%8D%E4%B8%80%E6%A8%A3%EF%BC%9F%E7%9C%8B%E6%87%8213%E7%A8%AEetf%E5%B0%BE%E7%A2%BC-%E5%BF%AB%E9%80%9F%E8%BE%A8%E8%AD%98%E6%8A%95%E8%B3%87%E9%A1%9E%E5%9E%8B-034928443.html" target="_blank" rel="noopener">Yahoo股市(2025-08-07，依證交所分類)</a>。新類型持續推出，以證交所公告為準。</p>
+            </div>
+          </div>
+          <div class="panel doc">
+            <h3>被動型 ETF 怎麼追蹤指數</h3>
+            <p>被動型 ETF 的目標是讓報酬盡量貼近指數，常見的做法有三種：</p>
+            <div class="tablewrap"><table class="stattable pk-kind">
+              <thead><tr><th>方法</th><th>做法</th><th>適用</th><th>優缺點</th></tr></thead>
+              <tbody>
+                <tr><td>完全複製法</td><td style="text-align:left">依指數權重買進<b>全部</b>成分股</td><td style="text-align:left">成分股少、流動性好的指數，例如 0050 追蹤的臺灣 50 指數</td><td style="text-align:left">追蹤誤差最小、最透明；成分股很多或流動性差時成本高</td></tr>
+                <tr><td>抽樣(最佳化)複製法</td><td style="text-align:left">只買具代表性的<b>部分</b>成分，讓產業、市值、存續期間等特徵與指數相近</td><td style="text-align:left">成分數量很多的指數，例如全球股票、債券指數</td><td style="text-align:left">交易成本較低；與指數的差距較大</td></tr>
+                <tr><td>合成複製法</td><td style="text-align:left">用<b>期貨</b>或交換契約取得指數報酬，不直接持有成分</td><td style="text-align:left">期貨 ETF(商品、指數期貨)、槓桿與反向 ETF</td><td style="text-align:left">可以做到槓桿、反向或投資商品；有期貨轉倉成本、交易對手風險，期貨價格與現貨會有價差</td></tr>
+              </tbody>
+            </table></div>
+            <ul>
+              <li><b>指數怎麼決定權重</b>：市值加權(最常見，大公司權重高，例如臺灣 50 指數)、等權重、股利率加權(高股息指數常用)、因子或規則加權(低波動、品質)，並常設單一成分股的權重上限。ETF 的特性其實是由它追蹤的<b>指數規則</b>決定的。</li>
+              <li><b>定期調整</b>：指數會定期審核成分股(例如每季或每半年)，ETF 跟著換股；換股頻率越高、週轉率越大，交易成本越高。</li>
+              <li><b>追蹤誤差與追蹤差距</b>：追蹤差距是一段期間 ETF 報酬與指數報酬的差(主要來自費用)；追蹤誤差是兩者每日報酬差異的標準差(衡量貼得穩不穩)。</li>
+              <li><b>實物申購買回</b>：參與券商可以用一籃子成分股向投信換 ETF，或反過來，市價偏離淨值時就有套利空間，所以大型 ETF 的折溢價通常很小。</li>
+            </ul>
           </div>
           <div class="panel doc">
             <h3>持有 ETF 的成本</h3>
@@ -181,7 +231,7 @@
             <div id="pkEtfChart"></div>
             <div id="pkEtfLegend"></div>
             <div class="tablewrap" style="margin-top:10px;"><table class="stattable" id="pkEtfTable"></table></div>
-            <p class="note">共同期間：從勾選的 ETF 中最晚上市的那一檔開始比較，期間越短越容易受單一年度行情影響，可以取消勾選上市較晚的 ETF 拉長比較期間。<b>配息貢獻</b> = 年化總報酬 − 年化價格報酬。資料為 Yahoo Finance 的收盤價與還原股價。</p>
+            <p class="note">共同期間：從勾選的 ETF 中最晚上市的那一檔開始比較，期間越短越容易受單一年度行情影響，可以取消勾選上市較晚的 ETF 拉長比較期間。<b>配息貢獻</b> = 年化總報酬 − 年化價格報酬。收盤價取自 Yahoo Finance；總報酬用臺灣證券交易所的除息資料自行計算(股利在除息日以收盤價再投入)。Yahoo 的還原股價缺少 2013 年以前的配息，會低估 0050、006208、0056 的長期總報酬。</p>
             <div class="tablewrap" style="margin-top:6px;"><table class="stattable" id="pkSince"></table></div>
           </div>
 
@@ -213,12 +263,13 @@
               <div class="paramitem"><label for="tsEtf">ETF</label><select id="tsEtf">${twList.map(x => `<option value="${x.code}">${x.code} ${esc(x.name)}</option>`).join('')}</select></div>
               <div class="paramitem"><label for="tsStart">開始年度</label><select id="tsStart"></select></div>
               <div class="paramitem"><label for="tsAmt">每年投入(元)</label><input id="tsAmt" type="number" min="1000" step="10000" value="120000"></div>
+              <div class="paramitem"><label for="tsDiv">配息處理</label><select id="tsDiv"><option value="1">股息再投入</option><option value="0">配息領現金(不再投入)</option></select></div>
             </div>
             <div class="statgrid" id="tsStats" style="margin:14px 0;"></div>
             <div id="tsChart"></div>
             ${LTChart.legend([{ name: '最佳時機(每年最低點)', color: 'var(--up)' }, { name: '年初單筆', color: 'var(--amber)' }, { name: '定期定額(每月)', color: 'var(--blue)' }, { name: '最差時機(每年最高點)', color: 'var(--down)' }, { name: '累計投入本金', color: 'var(--dim)' }])}
             <ul class="insight" id="tsInsight"></ul>
-            <p class="note">每年投入相同金額：<b>最佳時機</b>每年都剛好在當年最低點買進(事後才知道，現實做不到)、<b>最差時機</b>每年都在最高點買進、<b>年初單筆</b>每年第一個交易日一次投入、<b>定期定額</b>每月第一個交易日投入 1/12。以還原股價計算(配息再投入)，不計手續費；帳戶價值算到最新一個交易日，年化報酬為內部報酬率(IRR)。只計入完整的年度。</p>
+            <p class="note">每年投入相同金額：<b>最佳時機</b>每年都剛好在當年最低點買進(事後才知道，現實做不到)、<b>最差時機</b>每年都在最高點買進、<b>年初單筆</b>每年第一個交易日一次投入、<b>定期定額</b>每月第一個交易日投入 1/12。最高點、最低點依收盤價判斷。<b>股息再投入</b>：除息時把配息以收盤價買回同一檔 ETF(用還原股價計算)；<b>配息領現金</b>：配息存成現金、不計利息。台股 ETF 的配息取自臺灣證券交易所「除權除息計算結果表」，不計手續費與稅；帳戶價值算到最新一個交易日，年化報酬為內部報酬率(IRR)，只計入完整的年度。本回測已另以 Python 獨立程式重算驗證。</p>
           </div>` : failed}
         </div>`;
 
@@ -308,7 +359,8 @@
       };
       const drawTiming = () => {
         const code = $('#tsEtf').value, dd = E.daily[code], amt = Math.max(1000, +$('#tsAmt').value || 120000);
-        const R = timingStudy(dd, +$('#tsStart').value, amt);
+        const reinvest = $('#tsDiv').value === '1', R = timingStudy(dd, +$('#tsStart').value, amt, reinvest);
+        const Rother = timingStudy(dd, +$('#tsStart').value, amt, !reinvest);
         if (!R.years.length) { $('#tsStats').innerHTML = '<p class="mute">完整年度不足</p>'; return; }
         const K = [['best', '最佳時機(每年最低點)', 'var(--up)'], ['jan', '年初單筆', 'var(--amber)'], ['dca', '定期定額(每月)', 'var(--blue)'], ['worst', '最差時機(每年最高點)', 'var(--down)']];
         const inv = R.res.jan.invested;
@@ -323,11 +375,13 @@
         $('#tsInsight').innerHTML = `
           <li>每年都在<b>最高點</b>買進(最差時機)，到 ${R.asOf} 帳戶有 ${money(w.value)} 元(本金 ${money(w.invested)} 元)，年化 ${pctf(w.irr)}；與每年都買在<b>最低點</b>的 ${money(b.value)} 元(年化 ${pctf(b.irr)})相比，差距是年化 ${((b.irr - w.irr) * 100).toFixed(1)} 個百分點。</li>
           <li><b>年初單筆</b>帳戶 ${money(j.value)} 元、<b>定期定額</b> ${money(d.value)} 元：年初單筆的錢平均比定期定額早半年進場，留在市場的時間較長，在長期上漲的市場裡金額${j.value > d.value ? '較多' : '反而較少(這段期間年初之後常有下跌)'}；換算成年化報酬(IRR)分別是 ${pctf(j.irr)} 與 ${pctf(d.irr)}，差距很小。定期定額不需要判斷時機，也避免一次在高點投入全部資金的風險。</li>
+          <li><b>股息再投入的差別</b>：以定期定額為例，股息再投入 ${money((reinvest ? R : Rother).res.dca.value)} 元(年化 ${pctf((reinvest ? R : Rother).res.dca.irr)})，配息領現金 ${money((reinvest ? Rother : R).res.dca.value)} 元(其中現金股利 ${money((reinvest ? Rother : R).res.dca.cash)} 元，年化 ${pctf((reinvest ? Rother : R).res.dca.irr)})。配息拿出來不再投入，就少了複利的效果。</li>
           <li>擇時能多賺的有限，而且最佳時機在現實中幾乎不可能做到；<b>持續投入、留在市場裡</b>比找進場點重要。</li>`;
       };
       $('#tsEtf').onchange = () => { fillStart(); drawTiming(); };
       $('#tsStart').onchange = drawTiming;
       $('#tsAmt').oninput = drawTiming;
+      $('#tsDiv').onchange = drawTiming;
       fillStart(); drawTiming();
     },
   });

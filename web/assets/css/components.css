@@ -432,3 +432,16 @@
   details.pk-more{margin-top:10px;}
   details.pk-more summary{cursor:pointer;color:var(--amber);font-size:13px;font-weight:600;}
   table.pk-kind td:first-child{white-space:nowrap;}
+  /* 機率模型關係圖(modules/stats/demos.js 的 dist-map) */
+  .dm-wrap{overflow-x:auto;}
+  .dm-svg{width:100%;min-width:720px;height:auto;display:block;}
+  .dm-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;color:var(--dim);margin:6px 0;}
+  .dm-legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dm-l{display:inline-block;width:22px;height:0;border-top:2px solid var(--blue);}
+  .dm-l.lim{border-top:2px dotted var(--amber);} .dm-l.ana{border-top:2px dashed var(--dim);}
+  .dm-n{display:inline-block;width:18px;height:12px;border:1.5px solid var(--border-strong);border-radius:2px;}
+  .dm-n.c{border-color:var(--blue);border-radius:7px;}
+  .dm-info{font-size:13px;line-height:1.8;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 12px;}
+  .dm-info ul{margin:4px 0 0;}
+  /* 讓公式隱藏的 MathML(絕對定位)留在可捲動的表格裡，不撐寬頁面 */
+  .tablewrap, .katex-display{position:relative;}
