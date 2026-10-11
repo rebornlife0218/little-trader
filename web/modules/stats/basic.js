@@ -10,6 +10,7 @@
     ['Moore, McCabe & Craig', '《Introduction to the Practice of Statistics》', '大學統計課最常用的教科書之一，資料分析與推論並重'],
     ['Anderson, Sweeney & Williams', '《Statistics for Business and Economics》', '商管學院常用，例題多與企業、經濟、財務相關'],
     ['林惠玲、陳正倉', '《統計學：方法與應用》', '國內大學常用的中文教材，觀念與計算練習完整'],
+    ['管中閔', '《統計學：觀念與方法》(二版，2004)', '觀念講解深入，第 6 章「多大才算大樣本」參考此書'],
   ];
 
   /* ---------- 小工具 ---------- */
