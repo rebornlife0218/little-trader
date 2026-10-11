@@ -158,7 +158,7 @@
       title: '概論及敘述統計學', md: 'ch01', live: 'describe',
     },
     {
-      title: '機率', md: 'ch02', st: ['basic-probability', 'Basic Probability'], demo: ['dice', 'coin'],
+      title: '機率', md: 'ch02', st: ['basic-probability', 'Basic Probability'],   // 擲骰子、擲錢幣模擬內嵌在 ch02.md 的 [[demo dice]]、[[demo coin]]
     },
     {
       title: '隨機變數', md: 'ch03', st: ['probability-distributions', 'Probability Distributions'],
@@ -463,9 +463,16 @@
           const html = await loadChapter(ch.md);
           if (!ctx.alive()) return;
           box.innerHTML = html;
+          // [[demo 名稱]]：先找 demos.js 的動畫，再找本檔的互動模擬 DEMOS(dice、coin、clt)
           box.querySelectorAll('.md-demo').forEach(d => {
-            const fn = window.LTStatDemos && LTStatDemos[d.dataset.demo];
-            if (fn) fn(d); else d.textContent = `找不到互動動畫：${d.dataset.demo}`;
+            const name = d.dataset.demo, fn = window.LTStatDemos && LTStatDemos[name];
+            if (fn) fn(d);
+            else if (DEMOS[name]) {
+              d.innerHTML = DEMOS[name].html;
+              if (name === 'dice') diceRolls = [];
+              if (name === 'coin') coinFlips = [];
+              if (name === 'clt') { cltMeans = []; window.LTStat.clt(0); }
+            } else d.textContent = `找不到互動動畫：${name}`;
           });
         } catch (err) {
           if (!ctx.alive()) return;

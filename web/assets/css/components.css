@@ -366,3 +366,4 @@
   .ie-legend span{display:inline-flex;align-items:center;gap:5px;}
   .ie-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;opacity:.7;}
   .ie-legend i.ie-miss{background:var(--up);opacity:.25;}
+  .md-demo{margin:14px 0 18px;}
