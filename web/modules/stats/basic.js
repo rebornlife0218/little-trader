@@ -1,17 +1,10 @@
 /* 統計學 · 初級統計學
-   給第一次修統計學的學生：13 章架構參考大碩補習班張翔老師的統計學課程(編排略有調整)，
+   給第一次修統計學的學生：13 章架構參考張翔《提綱挈領學統計》(編排略有調整)，
    並用本站的台股加權指數資料做「市場實例」，部分章節附互動模擬。
    網址：#/stats/basic/<章節編號>
    章節內容可寫在 content/stats/basic/*.md(設定 md 欄位)，編輯方式見 docs/CONTENT.md */
 (() => {
   const ST = 'https://seeing-theory.brown.edu/';
-  const BOOKS = [
-    ['Freedman, Pisani & Purves', '《Statistics》', '觀念導向、少公式，最適合第一次接觸統計的入門經典'],
-    ['Moore, McCabe & Craig', '《Introduction to the Practice of Statistics》', '大學統計課最常用的教科書之一，資料分析與推論並重'],
-    ['Anderson, Sweeney & Williams', '《Statistics for Business and Economics》', '商管學院常用，例題多與企業、經濟、財務相關'],
-    ['林惠玲、陳正倉', '《統計學：方法與應用》', '國內大學常用的中文教材，觀念與計算練習完整'],
-    ['管中閔', '《統計學：觀念與方法》(二版，2004)', '觀念講解深入，第 6 章「多大才算大樣本」參考此書'],
-  ];
 
   /* ---------- 小工具 ---------- */
   const fmt = (v, d = 2) => Number.isFinite(v) ? v.toFixed(d) : '—';
@@ -50,9 +43,12 @@
   const tTwoSided = (t, df) => betaI(df / 2, 0.5, df / (df + t * t));
   const pv = p => p < 0.0001 ? '&lt; 0.0001' : fmt(p, 4);
   const returns = rows => rows.slice(1).map((r, i) => r.close / rows[i].close - 1);
-  async function loadIndex(key) {
-    const { data } = await LT.loadJSON('indices', key + '.json');
-    return data.d.map((d, i) => ({ date: d, close: data.c[i] }));
+  const indexCache = {};   // 同一份指數資料只下載、解析一次
+  function loadIndex(key) {
+    if (!indexCache[key]) indexCache[key] = LT.loadJSON('indices', key + '.json')
+      .then(({ data }) => data.d.map((d, i) => ({ date: d, close: data.c[i] })))
+      .catch(e => { delete indexCache[key]; throw e; });
+    return indexCache[key];
   }
   const formula = s => `<div class="formula">${s}</div>`;
   // 文氏圖：kind = inter 交集 / union 聯集 / comp 補集 / diff 差集 / disjoint 互斥，著色部分為該事件
@@ -99,7 +95,13 @@
      $...$ 行內公式、$$...$$ 獨立公式(KaTeX)；> 引言顯示為提示框；單獨一行的圖片會加上圖說；
      [[venn 種類|標題|說明]] 文氏圖；[[demo 名稱]] 互動動畫(demos.js) */
   const MD_DIR = 'content/stats/basic/';
-  async function loadChapter(name) {
+  // 排版好的章節放在記憶體：再次點同一章不用重新下載與排版；閒置時也會先排好前後章
+  const chapterCache = {};
+  function loadChapter(name) {
+    if (!chapterCache[name]) chapterCache[name] = renderChapter(name).catch(e => { delete chapterCache[name]; throw e; });
+    return chapterCache[name];
+  }
+  async function renderChapter(name) {
     const r = await fetch(MD_DIR + name + '.md', { cache: 'no-cache' });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     // 先把程式碼收起來(R 的 birthwt$bwt 不是公式)，再把公式換成佔位符，避免被 Markdown 改寫
@@ -422,6 +424,14 @@
   };
 
   /* ---------- 頁面 ---------- */
+  const liveCache = {};
+  // 瀏覽器閒置時先排好下一章、上一章(使用者最常點的)，切換時就能直接顯示
+  const idle = window.requestIdleCallback || (fn => setTimeout(fn, 200));
+  function prefetch(idx) {
+    [idx + 1, idx - 1].filter(i => i >= 0 && i < CHAPTERS.length && CHAPTERS[i].md)
+      .forEach((i, k) => idle(() => loadChapter(CHAPTERS[i].md).catch(() => {}), { timeout: 2000 + k * 1000 }));
+  }
+
   LT.register({
     section: 'stats', key: 'basic', name: '初級統計學',
     async mount(el, ctx) {
@@ -443,16 +453,14 @@
             <h2>第 ${idx + 1} 章　${ch.title}</h2>
             ${ch.st ? `<div class="chap-st">搭配互動教材：${stLink(ch.st[0], ch.st[1])}</div>` : ''}
           </div>
-          <div id="chapBody">${ch.md ? '<span class="mute">載入章節內容…</span>' : ch.body()}</div>
+          <div id="chapBody">${ch.md ? '<div class="page-loading chap-loading"><span class="spinner"></span>載入中…</div>' : ch.body()}</div>
           ${[].concat(ch.demo || []).map(d => `<div class="demo-box">${DEMOS[d].html}</div>`).join('')}
           ${ch.live ? `<div class="live-box" id="liveBox"><span class="mute">正在用台股資料計算市場實例…</span></div>` : ''}
           <div class="chap-foot">${nav(idx - 1, '← 上一章')}${nav(idx + 1, '下一章 →')}</div>
         </article>
         <div class="panel doc">
           <h3>參考教材</h3>
-          <ul>${BOOKS.map(b => `<li><b>${b[0]}</b> ${b[1]}：${b[2]}</li>`).join('')}
-            <li><b>Seeing Theory</b>(布朗大學)：<a href="${ST}" target="_blank" rel="noopener">${ST} ↗</a> 互動視覺化教材，第 ${CHAPTERS.map((c, i) => c.st ? i + 1 : 0).filter(Boolean).join("、")} 章可搭配使用</li>
-            <li>章節架構參考<b>大碩補習班 張翔老師</b>的統計學課程，編排略有調整</li></ul>
+          <ul><li><b>張翔</b>《提綱挈領學統計》</li></ul>
         </div>`;
       const demos = [].concat(ch.demo || []);
       if (demos.includes('dice')) diceRolls = [];
@@ -464,6 +472,7 @@
           const html = await loadChapter(ch.md);
           if (!ctx.alive()) return;
           box.innerHTML = html;
+          prefetch(idx);
           // [[demo 名稱]]：先找 demos.js 的動畫，再找本檔的互動模擬 DEMOS(dice、coin、clt)
           box.querySelectorAll('.md-demo').forEach(d => {
             const name = d.dataset.demo, fn = window.LTStatDemos && LTStatDemos[name];
@@ -482,7 +491,8 @@
       }
       if (ch.live) {
         try {
-          const html = await LIVE[ch.live]();
+          if (!liveCache[ch.live]) liveCache[ch.live] = LIVE[ch.live]().catch(e => { delete liveCache[ch.live]; throw e; });
+          const html = await liveCache[ch.live];
           if (!ctx.alive()) return;
           document.getElementById('liveBox').innerHTML = html;
         } catch (err) {

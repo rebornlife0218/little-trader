@@ -36,35 +36,35 @@
     <div class="side-foot"><button class="theme-toggle"></button></div>
   </aside>
   <div class="main">
-    <main id="content"></main>
+    <main id="content"><div class="page-loading"><span class="spinner"></span>載入中…</div></main>
     <footer class="copy">COPYRIGHT © <span id="copyYear"></span> Little Trader. All rights reserved.<br>內容僅供研究參考，不構成投資建議。<div id="pageSources" class="page-sources"></div></footer>
   </div>
 </div>
 
-<!-- 網站框架 -->
-<script src="assets/js/app.js"></script>
-<script src="assets/js/chart.js"></script>
-<script src="modules/home/home.js"></script>
+<!-- 網站框架(defer：平行下載、依順序在頁面解析完後執行) -->
+<script defer src="assets/js/app.js"></script>
+<script defer src="assets/js/chart.js"></script>
+<script defer src="modules/home/home.js"></script>
 <!-- 第三方套件(放在本站，符合資安設定)：Markdown 解析、數學公式排版 -->
-<script src="assets/vendor/marked/marked.js"></script>
-<script src="assets/vendor/katex/katex.min.js"></script>
+<script defer src="assets/vendor/marked/marked.js"></script>
+<script defer src="assets/vendor/katex/katex.min.js"></script>
 <!-- 研究模組：新增研究內容時在此加入 -->
-<script src="modules/indices/indices.js"></script>
-<script src="modules/etf/pack.js"></script>
-<script src="modules/etf/etf.js"></script>
-<script src="modules/stock/disposition.js"></script>
-<script src="modules/stock/tw.js"></script>
-<script src="modules/stock/earnings.js"></script>
-<script src="modules/stock/us-strategy.js"></script>
-<script src="modules/option/lib.js"></script>
-<script src="modules/option/calculator.js"></script>
-<script src="modules/option/market.js"></script>
-<script src="modules/indices/futures.js"></script>   <!-- 台指期貨：屬於指數區塊，但用到 option/lib.js -->
-<script src="modules/option/strategy.js"></script>
-<script src="modules/stats/demos.js"></script>
-<script src="modules/stats/basic.js"></script>
-<script src="modules/stats/stats.js"></script>
-<script src="modules/other/other.js"></script>
-<script>LT.start();</script>
+<script defer src="modules/indices/indices.js"></script>
+<script defer src="modules/etf/pack.js"></script>
+<script defer src="modules/etf/etf.js"></script>
+<script defer src="modules/stock/disposition.js"></script>
+<script defer src="modules/stock/tw.js"></script>
+<script defer src="modules/stock/earnings.js"></script>
+<script defer src="modules/stock/us-strategy.js"></script>
+<script defer src="modules/option/lib.js"></script>
+<script defer src="modules/option/calculator.js"></script>
+<script defer src="modules/option/market.js"></script>
+<script defer src="modules/indices/futures.js"></script>   <!-- 台指期貨：屬於指數區塊，但用到 option/lib.js -->
+<script defer src="modules/option/strategy.js"></script>
+<script defer src="modules/stats/demos.js"></script>
+<script defer src="modules/stats/basic.js"></script>
+<script defer src="modules/stats/stats.js"></script>
+<script defer src="modules/other/other.js"></script>
+<script>document.addEventListener('DOMContentLoaded', () => LT.start());</script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 
 ```
 web/                                網站(部署時整個資料夾就是網站根目錄)
-  index.html                        外框，在此依序載入框架與各模組的 <script>
+  index.html                        外框，在此依序載入框架與各模組的 <script defer>(平行下載、依序執行)
   assets/
     js/app.js                       框架：側欄區塊 SECTIONS、資料集清單 DATASETS、頁面註冊、路由、資料載入
     js/chart.js                     共用 SVG 圖表 LTChart.line / LTChart.bars(跟隨主題與寬度、滑鼠提示)
@@ -83,7 +83,7 @@ sp500 的特殊處理：
 
 ## 新增頁面
 
-在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script>`：
+在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)：
 
 ```js
 LT.register({ section: 'etf', key: 'x', name: '外部網站', href: 'https://...' });       // 側欄直接開新分頁
