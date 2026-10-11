@@ -446,3 +446,12 @@
   .dm-info ul{margin:4px 0 0;}
   /* 讓公式隱藏的 MathML(絕對定位)留在可捲動的表格裡，不撐寬頁面 */
   .tablewrap, .katex-display{position:relative;}
+
+  /* 載入中(頁面、統計學章節) */
+  .page-loading{display:flex;align-items:center;gap:10px;color:var(--mute);padding:40px 4px;font-size:14px;}
+  .chap-loading{padding:24px 0;}
+  .spinner{width:16px;height:16px;border-radius:50%;border:2px solid var(--border-strong);border-top-color:var(--amber);animation:lt-spin .8s linear infinite;flex:none;}
+  @keyframes lt-spin{to{transform:rotate(360deg);}}
+  @media (prefers-reduced-motion: reduce){ .spinner{animation:none;} }
+  /* 統計學章節很長(數百個公式)：畫面外的段落先不排版，捲動到附近才排，切換章節更快 */
+  .chapter #chapBody > *{content-visibility:auto;contain-intrinsic-size:auto 60px;}
