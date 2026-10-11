@@ -230,6 +230,8 @@
   .home-links{display:flex;flex-direction:column;gap:6px;}
   .home-links a{color:var(--text);text-decoration:none;font-size:13.5px;padding:6px 10px;border-radius:7px;background:var(--panel2);border:1px solid var(--border);}
   .home-links a:hover{border-color:var(--amber);}
+  .home-sub{font-size:11.5px;font-weight:600;color:var(--mute);margin-top:4px;}
+  .home-sub:first-child{margin-top:0;}
   .home-links .soon-tag{font-size:10.5px;color:var(--mute);font-style:italic;}
   .home-data{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--grid);}
   .home-data:last-child{border-bottom:none;}
@@ -378,3 +380,33 @@
   .pt-calc p{margin:6px 0;font-size:13px;line-height:1.9;}
   .bd-slider{max-width:420px;}
   .part-svg{width:100%;max-width:560px;height:auto;display:block;margin:0 auto;}
+
+  /* ---------- 美股財報(modules/stock/earnings.js) ---------- */
+  .er-ctrl{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;}
+  .er-weeks{margin:0;flex:1 1 420px;grid-template-columns:repeat(3,1fr);}
+  .er-filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .er-filters select, .er-filters input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'Inter',sans-serif;font-size:13px;}
+  .er-filters input{min-width:180px;}
+  .er-filters input:focus, .er-filters select:focus{outline:none;border-color:var(--amber);}
+  .er-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;align-items:start;}
+  @media (max-width:1100px){ .er-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));} }
+  .er-day{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:8px;min-width:0;}
+  .er-day.today{border-color:var(--amber);}
+  .er-day-h{display:flex;justify-content:space-between;align-items:baseline;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:14px;padding:2px 4px 8px;}
+  .er-day-h span{font-family:'Inter',sans-serif;font-weight:400;font-size:11.5px;color:var(--mute);}
+  .er-slot{margin-bottom:8px;}
+  .er-slot-h{font-size:12px;font-weight:600;color:var(--amber);padding:2px 4px 4px;display:flex;flex-direction:column;}
+  .er-slot-h small{font-weight:400;font-size:10.5px;color:var(--mute);}
+  .er-card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:7px 8px;margin-bottom:5px;}
+  .er-top-row{display:flex;align-items:baseline;gap:6px;}
+  .er-top-row b{font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .er-cap{font-size:11px;color:var(--dim);font-family:'IBM Plex Mono',monospace;}
+  .er-links{margin-left:auto;display:flex;gap:4px;}
+  .er-links a{font-size:10px;font-weight:700;color:var(--mute);text-decoration:none;border:1px solid var(--border);border-radius:4px;padding:0 4px;}
+  .er-links a:hover{color:var(--amber);border-color:var(--amber);}
+  .er-name{font-size:11.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:1px 0 3px;}
+  .er-eps{font-size:11.5px;color:var(--dim);line-height:1.5;}
+  .er-eps b{color:var(--text);font-family:'IBM Plex Mono',monospace;font-weight:600;}
+  .er-eps b.up{color:var(--up);} .er-eps b.down{color:var(--down);}
+  .er-empty{font-size:12px;padding:6px 4px;}
+  table.er-top td a{color:var(--amber);text-decoration:none;font-weight:600;}

@@ -1,0 +1,20 @@
+name: 資料 · 美股財報
+
+# 資料集 earnings：pipeline/earnings/update.py → data 分支的 earnings/
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '30 23 * * 0-5'   # 台北 每天 07:30(美股收盤、盤後財報公布後)
+    - cron: '0 12 * * 1-5'    # 台北 週一~週五 20:00(盤前財報公布前更新行事曆)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    uses: ./.github/workflows/_dataset.yml
+    with:
+      dataset: earnings

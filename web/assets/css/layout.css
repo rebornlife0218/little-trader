@@ -24,6 +24,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-se
 .side-count{margin-left:auto;font-size:11px;color:var(--mute);font-family:'IBM Plex Mono',monospace;}
 .side-chev{font-size:11px;color:var(--mute);transition:transform .15s;}
 .side-group.open .side-chev{transform:rotate(90deg);color:var(--amber);}
+.side-sub{padding:8px 10px 3px;font-size:11px;font-weight:600;letter-spacing:.5px;color:var(--mute);}
+.side-sub:first-child{padding-top:2px;}
 .side-link .soon-tag{margin-left:8px;font-size:10.5px;color:var(--mute);font-style:italic;}
 .side-link{display:block;padding:7px 10px;margin:1px 0;border-radius:7px;color:var(--dim);text-decoration:none;font-size:13px;border-left:2px solid transparent;white-space:nowrap;}
 .side-link:hover{color:var(--text);background:var(--panel2);}

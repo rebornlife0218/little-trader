@@ -20,7 +20,7 @@ LT.setHome({
           return `<div class="panel home-card">
             <h2>${sec.name}</h2>
             <p class="mute">${sec.desc || ''}</p>
-            <div class="home-links">${list.map(link).join('') || '<span class="mute">建置中</span>'}</div>
+            <div class="home-links">${LT.groupPages(list).map(([g, ps]) => (g ? `<span class="home-sub">${g}</span>` : '') + ps.map(link).join('')).join('') || '<span class="mute">建置中</span>'}</div>
           </div>`;
         }).join('')}
       </div>
