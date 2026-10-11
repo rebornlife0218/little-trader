@@ -205,7 +205,7 @@ window.LTStatDemos = (() => {
       <div class="paramitem bd-slider"><label for="bdN">班上人數 n <b id="bdNv">23</b></label><input id="bdN" type="range" min="2" max="${N}" value="23"></div>
       <div class="statgrid" id="bdStats" style="margin:12px 0;"></div>
       <div id="bdChart"></div>
-      <div class="btnrow-l" style="margin-top:10px;"><button data-a="one">模擬一個班級</button><button data-a="many">模擬 1000 個班級</button></div>
+      <div class="btnrow-l" style="margin-top:10px;"><button data-a="one">模擬一個班級</button></div>
       <div id="bdOut" class="note" style="margin-top:8px;">按下按鈕，隨機產生 n 個人的生日。</div>`;
     const $ = s => el.querySelector(s);
     function draw() {
@@ -231,10 +231,6 @@ window.LTStatDemos = (() => {
         const dup = Object.entries(cnt).filter(([, c]) => c > 1);
         $('#bdOut').innerHTML = `${n} 人的生日：${days.slice().sort((x, y) => x - y).map(d => cnt[d] > 1 ? `<b style="color:var(--amber)">${md(d)}</b>` : md(d)).join('、')}<br>
           ${dup.length ? `有 <b>${dup.length}</b> 組同一天生日：${dup.map(([d, c]) => `${md(+d)}(${c} 人)`).join('、')}` : '這一班沒有人同一天生日。'}`;
-      } else {
-        let hit = 0;
-        for (let t = 0; t < 1000; t++) { const s = new Set(randomClass(n)); if (s.size < n) hit++; }
-        $('#bdOut').innerHTML = `模擬 1000 個 ${n} 人的班級，有 <b>${hit}</b> 班出現同一天生日，比例 <b>${pct(hit / 1000, 1)}</b>(理論值 ${pct(sameBirthday(n), 1)})。`;
       }
     };
     $('#bdN').oninput = draw;
