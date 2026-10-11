@@ -80,6 +80,31 @@
     return { years: full, res, months: mo.m, invested: investedSeries, asOf: dd.d[last] };
   }
 
+  /* 單筆投入(LSI) vs 定期定額(DCA) vs 逢低買入(BTD)：仿 PWL Capital 的滾動期間比較
+     P：月底的總報酬指數(或價格指數)；H：持有年數；dcaN：定期定額分幾個月投入；dip：逢低買入的跌幅門檻
+     cash：等待投入的現金每月利率；每個起點 t 都比較 t ～ t + 12H 的年化報酬 */
+  function rollingStudy(P, H, dcaN, dips, cashYear) {
+    const n = P.length, m = H * 12, r = (1 + cashYear) ** (1 / 12) - 1;
+    const ath = []; P.forEach((v, i) => ath.push(Math.max(v, i ? ath[i - 1] : v)));   // 歷史高點(到當月為止)
+    const out = [];
+    for (let t = 0; t + m < n; t++) {
+      const end = t + m, ann = v => v ** (1 / H) - 1;
+      const lsi = ann(P[end] / P[t]);
+      // 定期定額：每月投入 1/dcaN，還沒投入的錢放現金賺利息
+      let dcaV = 0;
+      for (let k = 0; k < dcaN; k++) dcaV += (1 / dcaN) * (1 + r) ** k * P[end] / P[t + k];
+      const btd = dips.map(d => {
+        let buy = -1;
+        for (let k = t; k <= end; k++) if (P[k] <= (1 - d) * ath[k]) { buy = k; break; }
+        return buy < 0 ? ann((1 + r) ** m) : ann((1 + r) ** (buy - t) * P[end] / P[buy]);   // 沒跌到門檻就一直拿著現金
+      });
+      const btdNow = dips.map(d => P[t] <= (1 - d) * ath[t]);   // 起點當月已經跌超過門檻：立刻進場，和單筆相同
+      out.push({ t, lsi, dca: ann(dcaV), btd, btdNow });
+    }
+    return out;
+  }
+  const pctl = (arr, q) => { const a = [...arr].sort((x, y) => x - y), i = (a.length - 1) * q, lo = Math.floor(i); return a[lo] + (a[Math.min(lo + 1, a.length - 1)] - a[lo]) * (i - lo); };
+
   LT.register({
     section: 'etf', key: 'pack', name: 'ETF大禮包',
     async mount(el, ctx) {
@@ -87,6 +112,7 @@
       let C = null, E = null, loadErr = '';
       try {
         [C, E] = await Promise.all([LT.loadJSON('etf_compare', 'compare.json').then(r => r.data), LT.loadJSON('etf_compare', 'etfs.json').then(r => r.data)]);
+        try { const tx = await LT.loadJSON('indices', 'TAIEX.json'); E.taiex = tx.data; } catch (e) { /* 沒有加權指數時只能選 ETF */ }
       } catch (err) { loadErr = err.message; }
       if (!ctx.alive()) return;
       const failed = `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>${esc(loadErr)}</p></div></div>`;
@@ -269,7 +295,53 @@
             <div id="tsChart"></div>
             ${LTChart.legend([{ name: '最佳時機(每年最低點)', color: 'var(--up)' }, { name: '年初單筆', color: 'var(--amber)' }, { name: '定期定額(每月)', color: 'var(--blue)' }, { name: '最差時機(每年最高點)', color: 'var(--down)' }, { name: '累計投入本金', color: 'var(--dim)' }])}
             <ul class="insight" id="tsInsight"></ul>
-            <p class="note">每年投入相同金額：<b>最佳時機</b>每年都剛好在當年最低點買進(事後才知道，現實做不到)、<b>最差時機</b>每年都在最高點買進、<b>年初單筆</b>每年第一個交易日一次投入、<b>定期定額</b>每月第一個交易日投入 1/12。最高點、最低點依收盤價判斷。<b>股息再投入</b>：除息時把配息以收盤價買回同一檔 ETF(用還原股價計算)；<b>配息領現金</b>：配息存成現金、不計利息。台股 ETF 的配息取自臺灣證券交易所「除權除息計算結果表」，不計手續費與稅；帳戶價值算到最新一個交易日，年化報酬為內部報酬率(IRR)，只計入完整的年度。本回測已另以 Python 獨立程式重算驗證。</p>
+            <p class="note" data-anchor="ts-note">每年投入相同金額：<b>最佳時機</b>每年都剛好在當年最低點買進(事後才知道，現實做不到)、<b>最差時機</b>每年都在最高點買進、<b>年初單筆</b>每年第一個交易日一次投入、<b>定期定額</b>每月第一個交易日投入 1/12。最高點、最低點依收盤價判斷。<b>股息再投入</b>：除息時把配息以收盤價買回同一檔 ETF(用還原股價計算)；<b>配息領現金</b>：配息存成現金、不計利息。台股 ETF 的配息取自臺灣證券交易所「除權除息計算結果表」，不計手續費與稅；帳戶價值算到最新一個交易日，年化報酬為內部報酬率(IRR)，只計入完整的年度。本回測已另以 Python 獨立程式重算驗證。</p>
+          </div>
+
+          <div class="panel">
+            <h3>五、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)</h3>
+            <div class="doc">
+              <ul>
+                <li><b>單筆投入</b>(Lump Sum Investing，LSI)：手上有一筆錢，一次全部投入。</li>
+                <li><b>定期定額</b>(Dollar-Cost Averaging，DCA)：把同一筆錢分成幾份(例如 12 個月)分批投入，沒投入的錢先放現金。</li>
+                <li><b>逢低買入</b>(Buy the Dip，BTD)：拿著現金等市場從高點下跌一定幅度(例如 10%、20%)再一次投入，帶有擇時的意味。</li>
+              </ul>
+              <p>注意：這裡比較的是「<b>已經有一筆錢</b>，要怎麼進場」；每個月薪水入帳就投入的定期定額，其實是有錢就馬上投入，等同單筆投入。</p>
+            </div>
+            <h4>研究怎麼說</h4>
+            <div class="doc">
+              <p>PWL Capital 的 Ben Felix(2020)用 6 個國家的股市，比較每個月起點的<b>滾動 10 年</b>結果：定期定額分 12 個月投入、等待中的現金賺一個月國庫券利息。</p>
+            </div>
+            <div class="tablewrap"><table class="stattable">
+              <thead><tr><th>市場</th><th>美國</th><th>英國</th><th>加拿大</th><th>德國</th><th>澳洲</th><th>日本</th><th>六國平均</th></tr></thead>
+              <tbody><tr><td>單筆贏過定期定額的比例</td><td>70.59%</td><td>68.18%</td><td>66.10%</td><td>64.95%</td><td>61.86%</td><td>57.53%</td><td><b>64.89%</b></td></tr></tbody>
+            </table></div>
+            <div class="doc" style="margin-top:10px;">
+              <ul>
+                <li><b>單筆約 2/3 的時間贏過定期定額</b>，年化報酬平均多 0.38%。Vanguard(2012)在美國、英國、澳洲的研究也得到約 2/3 的結果。</li>
+                <li><b>為什麼</b>：股市長期的預期報酬(風險溢酬)為正，大部分月份是上漲的，錢越晚進場，錯過的報酬越多；定期定額等於前幾個月有一部分資金沒有參與市場。</li>
+                <li><b>熊市、股市高檔時也一樣</b>：研究也檢驗了熊市與席勒本益比(CAPE)處於高檔的時期，單筆的勝率仍然較高——大跌後的反彈常常比下跌更猛，創新高之後也傾向繼續上漲，分批進場不一定能攤平成本。</li>
+                <li><b>逢低買入</b>：Felix 與 Warwick(2021)以總報酬指數下跌 10%、20% 為進場訊號比較，逢低買入的平均年化報酬明顯落後單筆投入，門檻越深落後越多；它確實改善了最差的情況，但那是因為平均持有大量現金(風險較低)換來的。</li>
+                <li><b>行為面</b>：很多人仍偏好定期定額，因為「行動後虧損」的後悔比「沒行動錯過」更痛苦，分批投入可以降低心理壓力。研究的建議是：如果怕一次投入的波動，代表目前的股票比重太高，與其分批進場，不如<b>選一個承受得了的資產配置(例如股債比例)後一次投入</b>——分批進場投完後，承擔的風險還是一樣。</li>
+              </ul>
+              <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.pwlcapital.com/resources/dollar-cost-averaging-vs-lump-sum-investing/" target="_blank" rel="noopener">PWL Capital · Dollar-Cost Averaging vs Lump Sum Investing(Ben Felix，2020)</a>；<a href="https://pwlcapital.com/buy-the-dip/" target="_blank" rel="noopener">PWL Capital · Buy the Dip(Felix &amp; Warwick，2021)</a>；<a href="https://www.betashares.com.au/insights/lump-sum-investment/" target="_blank" rel="noopener">Betashares 整理</a>。</p>
+            </div>
+            <h4>用台股自己驗證</h4>
+            <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
+              <div class="paramitem"><label for="rsSeries">標的</label><select id="rsSeries">${E && E.taiex ? '<option value="taiex">加權指數(1999 起，不含股息)</option>' : ''}${twList.map(x => `<option value="${x.code}" ${x.code === '0050' && !(E && E.taiex) ? 'selected' : ''}>${x.code} ${esc(x.name)}(含股息)</option>`).join('')}</select></div>
+              <div class="paramitem"><label for="rsH">持有期間</label><select id="rsH"><option value="5">5 年</option><option value="10" selected>10 年</option></select></div>
+              <div class="paramitem"><label for="rsN">定期定額分幾個月</label><select id="rsN"><option value="6">6 個月</option><option value="12" selected>12 個月</option><option value="24">24 個月</option></select></div>
+              <div class="paramitem"><label for="rsCash">現金年利率(%)</label><input id="rsCash" type="number" min="0" max="10" step="0.1" value="1.5"></div>
+            </div>
+            <div class="statgrid" id="rsStats" style="margin:14px 0;"></div>
+            <div class="tablewrap"><table class="stattable" id="rsTable"></table></div>
+            <h4>每個起點的年化報酬差(單筆 − 定期定額)</h4>
+            <div id="rsHist"></div>
+            <h4>依起點月份的年化報酬</h4>
+            <div id="rsLine"></div>
+            ${LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }])}
+            <ul class="insight" id="rsInsight"></ul>
+            <p class="note">以月底資料計算：每個月都當成一個起點，比較持有到期間結束的年化報酬(滾動期間)。定期定額每月投入 1/N；逢低買入在指數從歷史高點(資料起點以來)下跌達門檻的那個月一次投入，起點時已經跌超過門檻就立刻進場(和單筆相同，不計輸贏)，期間內沒跌到門檻就一直拿著現金；等待中的現金依設定的年利率計息。加權指數為價格指數(不含股息)，ETF 為股息再投入的總報酬，不計手續費與稅。</p>
           </div>` : failed}
         </div>`;
 
@@ -383,6 +455,52 @@
       $('#tsAmt').oninput = drawTiming;
       $('#tsDiv').onchange = drawTiming;
       fillStart(); drawTiming();
+
+      /* ---------- 五、LSI vs DCA vs BTD ---------- */
+      const seriesOf = key => {
+        if (key === 'taiex') {   // 加權指數：日資料 → 月底
+          const tx = E.taiex, mo = monthly({ d: tx.d, c: tx.c, a: tx.c });
+          return { m: mo.m, v: mo.a };
+        }
+        const mo = MO[key]; return { m: mo.m, v: mo.a };
+      };
+      const drawRolling = () => {
+        const S = seriesOf($('#rsSeries').value), H = +$('#rsH').value, N = +$('#rsN').value, cash = Math.max(0, +$('#rsCash').value || 0) / 100;
+        // 最後一個月可能還沒結束，只用完整月份
+        const full = S.m[S.m.length - 1] === new Date().toISOString().slice(0, 7) ? S.m.length - 1 : S.m.length;
+        const P = S.v.slice(0, full), M = S.m.slice(0, full);
+        const R = rollingStudy(P, H, N, [0.10, 0.20], cash);
+        if (R.length < 12) { $('#rsStats').innerHTML = `<p class="mute">資料不足：持有 ${H} 年需要至少 ${H} 年以上的資料，請改選較短的持有期間或歷史較長的標的。</p>`; $('#rsTable').innerHTML = ''; $('#rsHist').innerHTML = ''; $('#rsLine').innerHTML = ''; $('#rsInsight').innerHTML = ''; return; }
+        const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
+        const strat = [['lsi', '單筆投入', x => x.lsi], ['dca', `定期定額(${N} 個月)`, x => x.dca], ['b10', '逢低買入(跌 10%)', x => x.btd[0]], ['b20', '逢低買入(跌 20%)', x => x.btd[1]]];
+        const diff = f => R.map(x => x.lsi - f(x));
+        const EPS = 1e-9;   // 兩者相同(例如起點就已經跌超過門檻，逢低買入立刻進場)不算輸贏
+        const tally = f => { const w = R.filter(x => x.lsi - f(x) > EPS).length, l = R.filter(x => f(x) - x.lsi > EPS).length; return { w, l, tie: R.length - w - l }; };
+        const win = f => { const t = tally(f); return t.w + t.l ? t.w / (t.w + t.l) : NaN; };
+        const tieTxt = f => { const t = tally(f); return t.tie ? `(另有 ${(t.tie / R.length * 100).toFixed(0)}% 結果相同)` : ''; };
+        $('#rsStats').innerHTML = `<div class="stat"><div class="v" style="font-size:16px;">${ym(M[R[0].t])}～${ym(M[R[R.length - 1].t])}</div><div class="l">${R.length} 個起點 · 每個持有 ${H} 年</div></div>` +
+          strat.slice(1).map(([k, n, f]) => `<div class="stat"><div class="v">${Number.isFinite(win(f)) ? (win(f) * 100).toFixed(0) + '%' : '—'}</div><div class="l">單筆贏過${n}的比例${tieTxt(f)} · 年化平均多 ${pctf(mean(diff(f)), 2)}</div></div>`).join('');
+        $('#rsTable').innerHTML = `<thead><tr><th>策略</th><th>平均年化</th><th>中位數</th><th>最差 10%(10th)</th><th>最好 10%(90th)</th><th>最差</th></tr></thead><tbody>
+          ${strat.map(([k, n, f]) => { const v = R.map(f); return `<tr><td>${n}</td><td class="${cls(mean(v))}">${pctf(mean(v), 2)}</td><td>${pctf(pctl(v, 0.5), 2)}</td><td>${pctf(pctl(v, 0.1), 2)}</td><td>${pctf(pctl(v, 0.9), 2)}</td><td class="down">${pctf(Math.min(...v), 2)}</td></tr>`; }).join('')}</tbody>`;
+        // 年化報酬差的分布
+        const d = diff(x => x.dca), lo = Math.floor(Math.min(...d) * 200) / 200, hi = Math.ceil(Math.max(...d) * 200) / 200, step = Math.max(0.0025, (hi - lo) / 30);
+        const bins = []; for (let x = lo; x < hi + 1e-9; x += step) bins.push({ x, n: 0 });
+        d.forEach(v => { const i = Math.min(bins.length - 1, Math.floor((v - lo) / step)); bins[i].n++; });
+        LTChart.bars($('#rsHist'), { x: bins.map(b => b.x + step / 2), label: '年化報酬差分布', height: 200, xFmt: v => (v * 100).toFixed(1) + '%', yFmt: v => Math.round(v), tipFmt: (s, v, i) => `${v} 個起點`,
+          series: [{ name: '起點數', y: bins.map(b => b.n), color: 'var(--amber)' }], refX: [{ x: 0, label: '0：兩者相同', color: 'var(--dim)' }] });
+        LTChart.line($('#rsLine'), { x: R.map(x => M[x.t]), xType: 'date', label: '依起點的年化報酬', height: 260, xFmt: (m, tip) => tip ? `${ym(m)} 起` : m.slice(2).replace('-', '/'),
+          yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => pctf(v, 2), refY: [{ y: 0 }],
+          series: [{ name: '單筆投入', y: R.map(x => x.lsi), color: 'var(--amber)' }, { name: '定期定額', y: R.map(x => x.dca), color: 'var(--blue)' }, { name: '逢低買入(10%)', y: R.map(x => x.btd[0]), color: 'var(--up)', width: 1.3 }, { name: '逢低買入(20%)', y: R.map(x => x.btd[1]), color: 'var(--down)', width: 1.3 }] });
+        const w = win(x => x.dca), worst = R.slice().sort((a, b) => a.lsi - b.lsi).slice(0, Math.max(1, Math.round(R.length * 0.1)));
+        $('#rsInsight').innerHTML = `
+          <li>單筆投入在 ${(w * 100).toFixed(0)}% 的起點贏過定期定額，年化報酬平均${mean(d) >= 0 ? '多' : '少'} ${pctf(Math.abs(mean(d)), 2).replace('+', '')}；${w > 0.5 && mean(d) >= 0 ? '勝率與平均都和 PWL 研究的方向一致' : w > 0.5 ? '單筆較常勝出，但定期定額贏的時候贏比較多(例如起點剛好在大跌之前)，平均下來差不多' : '這段期間定期定額較常勝出，與 PWL 研究的多數國家不同'}。</li>
+          <li>在單筆投入表現最差的 10% 起點裡，定期定額贏的比例是 ${(worst.filter(x => x.dca > x.lsi).length / worst.length * 100).toFixed(0)}%。</li>
+          <li>逢低買入：等跌 10% 才進場，單筆贏的比例 ${(win(x => x.btd[0]) * 100).toFixed(0)}%${tieTxt(x => x.btd[0])}、年化平均多 ${pctf(mean(diff(x => x.btd[0])), 2)}；等跌 20%，單筆贏的比例 ${(win(x => x.btd[1]) * 100).toFixed(0)}%${tieTxt(x => x.btd[1])}、年化平均多 ${pctf(mean(diff(x => x.btd[1])), 2)}。${mean(diff(x => x.btd[0])) < 0 ? "這段期間「跌 10% 才買」平均反而略勝：台股 10% 的回檔很常見、等待時間短，常能買到較低的價格；但「跌 20% 才買」常常要等好幾年，錯過的漲幅遠大於買低的好處。" : "門檻越深，拿著現金的時間越長，錯過的漲幅越多。"}</li>
+          ${$('#rsSeries').value === 'taiex' ? '<li>加權指數 2000 年的高點直到 2017 年才站回，這段期間指數大多已比高點低 10% 以上，所以「跌 10% 才買」多半在起點就立刻進場、結果和單筆相同；加權指數也不含股息，含股息時越早進場越有利。</li>' : ''}`;
+      };
+      ['#rsSeries', '#rsH', '#rsN'].forEach(id => { $(id).onchange = drawRolling; });
+      $('#rsCash').oninput = drawRolling;
+      drawRolling();
     },
   });
 })();
