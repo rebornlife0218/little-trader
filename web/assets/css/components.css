@@ -347,3 +347,22 @@
 
   /* 統計學章節文末的台股市場實例：表格在手機上可左右捲動，不撐寬整頁 */
   .live-box{overflow-x:auto;}
+
+  /* 統計學互動動畫：排容原理(modules/stats/demos.js) */
+  .ie-ctrl button.active{border-color:var(--amber);color:var(--amber);}
+  .ie-ctrl button:disabled{opacity:.4;cursor:default;}
+  .ie-wrap{display:grid;grid-template-columns:minmax(240px,340px) 1fr;gap:18px;align-items:start;margin-top:12px;}
+  @media (max-width:700px){ .ie-wrap{grid-template-columns:1fr;} }
+  .ie-svg{width:100%;height:auto;display:block;}
+  .ie-flash{fill-opacity:0;animation:ieFlash 1.2s ease-in-out 1;}
+  @keyframes ieFlash{0%{fill-opacity:0}35%{fill-opacity:.45}100%{fill-opacity:0}}
+  .ie-formula{line-height:2.2;font-size:13px;overflow-x:auto;}
+  .ie-term{opacity:.3;transition:opacity .3s;padding:2px;border-radius:4px;}
+  .ie-term.on{opacity:1;}
+  .ie-term.cur{background:var(--amber-soft);outline:1px solid var(--amber);}
+  .ie-text p{margin:10px 0 8px;}
+  .ie-example{font-size:12.5px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;line-height:1.8;}
+  .ie-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;color:var(--dim);margin-top:8px;}
+  .ie-legend span{display:inline-flex;align-items:center;gap:5px;}
+  .ie-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;opacity:.7;}
+  .ie-legend i.ie-miss{background:var(--up);opacity:.25;}
