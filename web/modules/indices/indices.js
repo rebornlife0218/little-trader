@@ -938,7 +938,7 @@ function renderMyth(){
 
 /* ============================== 週期性分析 ==============================
    每日漲跌(收盤 ÷ 前一交易日收盤 − 1)依「月初/月中/月底」「週一~週五」分組；月份效應用月報酬。
-   有總統直選的地區另外標註選舉日，統計選前選後漲跌與「選舉週期」各年度報酬。 */
+   有總統直選的地區另外標註選舉日，統計選前選後的漲跌。 */
 // 投票日(多日投票取最後一輪)；w＝當選人。基準日＝投票日當天或之前最後一個交易日(結果揭曉前的收盤)
 const ELECTIONS = {
   TW: {region:'台灣', title:'總統大選', list:[
@@ -1001,7 +1001,7 @@ function computeCycle(rows, key, prm){
   }
   return { from, part, wd, months, election: computeElection(rows, key) };
 }
-// 選舉：選前/選後報酬(不受統計期間影響，選舉次數本來就少)與選舉週期年度報酬
+// 選舉：選前/選後報酬(不受統計期間影響，選舉次數本來就少)
 function computeElection(rows, key){
   const E = electionOf(key); if (!E) return null;
   const n = rows.length, c = rows.map(r=>r.close);
@@ -1015,19 +1015,7 @@ function computeElection(rows, key){
       pre20:ret(base-20,base), pre5:ret(base-5,base), day1:ret(base,base+1),
       post5:ret(base,base+5), post20:ret(base,base+20), post60:ret(base,base+60)});
   });
-  // 選舉週期：每個完整年度的年報酬，依「距上次選舉第幾年」分組
-  const yearEnd = {};
-  rows.forEach((r,i)=>{ yearEnd[r.date.slice(0,4)] = i; });
-  const years = Object.keys(yearEnd).sort(), curYear = rows[n-1].date.slice(0,4);
-  const eYears = E.list.map(e=>+e.d.slice(0,4));
-  const cycle = {};
-  for (let j=1;j<years.length;j++){
-    const y = +years[j];
-    const prev = eYears.filter(v=>v<=y); if (!prev.length) continue;
-    const k = y-Math.max(...prev);
-    (cycle[k] = cycle[k]||[]).push({y, r:c[yearEnd[years[j]]]/c[yearEnd[years[j-1]]]-1, ytd: years[j]===curYear});
-  }
-  return { E, events, cycle };
+  return { E, events };
 }
 function cycleSummary(list){
   const v = list.filter(x=>!Number.isNaN(x)); const m = v.length;
@@ -1123,8 +1111,6 @@ function renderElection(el, key){
   const F = ['pre20','pre5','day1','post5','post20','post60'];
   const sums = F.map(f=>cycleSummary(el.events.map(e=>e[f])));
   const skipped = E.list.filter(e=>!el.events.find(x=>x.d===e.d));
-  const cycleKeys = Object.keys(el.cycle).map(Number).sort((a,b)=>a-b);
-  const cname = k=> k===0 ? '選舉年' : `選後第${k}年`;
   return `
     <div class="panel election">
       <h3><span class="tag elec">選</span> ${E.region}${E.title}前後的漲跌</h3>
@@ -1141,16 +1127,6 @@ function renderElection(el, key){
       </table></div>
       <div class="note">基準日＝投票日當天或之前最後一個交易日的收盤(開票結果出爐前)。「選前20日／5日」＝基準日相對20／5個交易日前的漲跌；「選後」皆以基準日收盤為基準。點選列可在K線圖上定位到選後第一個交易日。${E.note?' '+E.note:''}${skipped.length?` ${skipped.map(e=>e.d.slice(0,4)).join('、')} 年的選舉不在資料範圍內。`:''}樣本只有幾次，僅供參考。</div>
 
-      <h4 class="subhead">選舉週期：距上次選舉第幾年的年報酬</h4>
-      <div class="tablewrap"><table class="stattable cycle">
-        <thead><tr><th>年度</th><th>年數</th><th>上漲機率</th><th>平均年報酬</th><th>中位數</th><th>各年度</th></tr></thead>
-        <tbody>${cycleKeys.map(k=>{
-          const list = el.cycle[k], done = list.filter(x=>!x.ytd), s = cycleSummary(done.map(x=>x.r));
-          return `<tr><td>${cname(k)}</td><td>${s.count}</td>${win(s.win)}${pct(s.avg)}${pct(s.med)}
-            <td class="years">${list.map(x=>`<span class="${x.r>=0?'up':'down'}">${x.y}${x.ytd?'(今年迄今)':''} ${fmtPct(x.r,0)}</span>`).join('')}</td></tr>`;
-        }).join('')}</tbody>
-      </table></div>
-      <div class="note">年報酬＝年底收盤 ÷ 前一年底收盤 − 1；今年尚未結束，只列出不計入統計。任期中提前改選時，年數從最近一次選舉重新起算。</div>
     </div>`;
 }
 // 定位到某一天(前後各約60個交易日)
