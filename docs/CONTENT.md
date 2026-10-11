@@ -40,7 +40,7 @@ web/content/stats/basic/
 ### 方式 B：在電腦上改，再推送
 
 ```bash
-cd C:\Users\User\little-trader
+cd C:\Users\User\Projects\little-trader
 git pull                          # 先同步最新版本
 # 用 VS Code 等編輯器修改 web/content/stats/basic/ch01.md
 git add web/content
@@ -51,7 +51,7 @@ git push
 ### 方式 C：推送前先在本機預覽
 
 ```bash
-cd C:\Users\User\little-trader
+cd C:\Users\User\Projects\little-trader
 python -m http.server 8000 -d web
 ```
 
@@ -134,7 +134,7 @@ $$
 ## 更新 R 圖片
 
 ```bash
-cd C:\Users\User\little-trader
+cd C:\Users\User\Projects\little-trader
 "C:\Program Files\R\R-4.4.1\bin\Rscript.exe" web/content/stats/basic/r/ch01-figures.R web/content/stats/basic/img
 ```
 
