@@ -1,13 +1,12 @@
 /* ETF · ETF大禮包：兩個分頁
    · ETF介紹：ETF 是什麼、種類、成本、配息與總報酬、折溢價
-   · 怎麼存ETF：0050 vs 勞退基金、常存 ETF 績效比較、ARKK 研究(追高的代價)、單筆投入(高點/低點) vs 定期定額
+   · 怎麼存ETF：0050 vs 勞退基金、常存 ETF 績效比較、ARKK 研究(追高的代價)、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)
    資料集：data/etf_compare/(compare.json、etfs.json；pipeline/etf_compare/update.py) */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pctf = (v, d = 1) => Number.isFinite(v) ? (v > 0 ? '+' : '') + (v * 100).toFixed(d) + '%' : '—';
   const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
   const ym = m => m.replace('-', '/');
-  const money = v => Number.isFinite(v) ? Math.round(v).toLocaleString() : '—';
   const PREMIUM_REFS = [
     { name: '臺灣證券交易所 · ETF 盤中預估淨值與折溢價', desc: '各檔國內 ETF 的市價、預估淨值與折溢價率，盤中即時揭露',
       url: 'https://mis.twse.com.tw/stock/various-areas/etf-price/indicator-disclosure-etf?lang=zhHant' },
@@ -38,46 +37,6 @@
       else { out.m.push(k); out.c.push(dd.c[i]); out.a.push(dd.a[i]); out.i.push(i); }
     });
     return out;
-  }
-  // 年化內部報酬率(XIRR)：flows = [{t: 日期字串, v: 金額(投入為負)}]
-  function xirr(flows) {
-    const t0 = Date.parse(flows[0].t), yrs = f => (Date.parse(f.t) - t0) / (365.25 * 864e5);
-    const npv = r => flows.reduce((a, f) => a + f.v / (1 + r) ** yrs(f), 0);
-    let lo = -0.99, hi = 5;
-    if (npv(lo) * npv(hi) > 0) return NaN;
-    for (let k = 0; k < 100; k++) { const mid = (lo + hi) / 2; if (npv(lo) * npv(mid) <= 0) hi = mid; else lo = mid; }
-    return (lo + hi) / 2;
-  }
-  // 單筆投入(高點、低點、年初) vs 定期定額：每年投入相同金額
-  // reinvest = true：配息再投入(用還原股價 a 計算)；false：配息領現金(用收盤價 c 買進，配息存成現金，不計利息)
-  // 買點(每年最高/最低點)一律依收盤價判斷，兩種模式買在同一天
-  function timingStudy(dd, startYear, perYear, reinvest = true) {
-    const years = [...new Set(dd.d.map(d => +d.slice(0, 4)))];
-    const lastYear = years[years.length - 1];
-    const full = years.filter(y => y >= startYear && y < lastYear && dd.d.find(d => d.startsWith(String(y))).slice(5, 7) === '01');
-    const idxOfYear = y => dd.d.map((d, i) => d.startsWith(String(y)) ? i : -1).filter(i => i >= 0);
-    const S = { best: [], worst: [], jan: [], dca: [] };   // 每筆投入 {i: 日期索引, v: 金額}
-    full.forEach(y => {
-      const idx = idxOfYear(y);
-      const minI = idx.reduce((a, i) => dd.c[i] < dd.c[a] ? i : a, idx[0]), maxI = idx.reduce((a, i) => dd.c[i] > dd.c[a] ? i : a, idx[0]);
-      S.best.push({ i: minI, v: perYear }); S.worst.push({ i: maxI, v: perYear }); S.jan.push({ i: idx[0], v: perYear });
-      const months = [...new Set(idx.map(i => dd.d[i].slice(0, 7)))];
-      months.forEach(m => { const i = idx.find(k => dd.d[k].startsWith(m)); S.dca.push({ i, v: perYear / months.length }); });
-    });
-    const last = dd.d.length - 1, mo = monthly(dd), P = reinvest ? dd.a : dd.c;
-    // 除息日索引與每股配息(配息領現金模式用)
-    const divs = reinvest ? [] : (dd.div || []).map(([d, amt]) => ({ i: dd.d.indexOf(d), amt })).filter(x => x.i > 0);
-    const res = {};
-    Object.entries(S).forEach(([k, buys]) => {
-      const sharesAt = i => buys.filter(b => b.i <= i).reduce((a, b) => a + b.v / P[b.i], 0);
-      const cashAt = i => divs.filter(x => x.i <= i).reduce((a, x) => a + sharesAt(x.i - 1) * x.amt, 0);   // 除息前一天持有才領得到
-      const value = sharesAt(last) * P[last] + cashAt(last), invested = buys.reduce((a, b) => a + b.v, 0);
-      const flows = buys.map(b => ({ t: dd.d[b.i], v: -b.v })).concat([{ t: dd.d[last], v: value }]);
-      const series = mo.i.map(mi => sharesAt(mi) * P[mi] + cashAt(mi));   // 每月底的帳戶價值(圖用)
-      res[k] = { value, invested, irr: xirr(flows), series, buys, cash: cashAt(last) };
-    });
-    const investedSeries = mo.i.map(mi => S.jan.filter(b => b.i <= mi).reduce((a, b) => a + b.v, 0));
-    return { years: full, res, months: mo.m, invested: investedSeries, asOf: dd.d[last] };
   }
 
   /* 單筆投入(LSI) vs 定期定額(DCA) vs 逢低買入(BTD)：仿 PWL Capital 的滾動期間比較
@@ -284,22 +243,7 @@
           </div>
 
           <div class="panel">
-            <h3>四、單筆投入(高點、低點) vs 定期定額</h3>
-            <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));">
-              <div class="paramitem"><label for="tsEtf">ETF</label><select id="tsEtf">${twList.map(x => `<option value="${x.code}">${x.code} ${esc(x.name)}</option>`).join('')}</select></div>
-              <div class="paramitem"><label for="tsStart">開始年度</label><select id="tsStart"></select></div>
-              <div class="paramitem"><label for="tsAmt">每年投入(元)</label><input id="tsAmt" type="number" min="1000" step="10000" value="120000"></div>
-              <div class="paramitem"><label for="tsDiv">配息處理</label><select id="tsDiv"><option value="1">股息再投入</option><option value="0">配息領現金(不再投入)</option></select></div>
-            </div>
-            <div class="statgrid" id="tsStats" style="margin:14px 0;"></div>
-            <div id="tsChart"></div>
-            ${LTChart.legend([{ name: '最佳時機(每年最低點)', color: 'var(--up)' }, { name: '年初單筆', color: 'var(--amber)' }, { name: '定期定額(每月)', color: 'var(--blue)' }, { name: '最差時機(每年最高點)', color: 'var(--down)' }, { name: '累計投入本金', color: 'var(--dim)' }])}
-            <ul class="insight" id="tsInsight"></ul>
-            <p class="note" data-anchor="ts-note">每年投入相同金額：<b>最佳時機</b>每年都剛好在當年最低點買進(事後才知道，現實做不到)、<b>最差時機</b>每年都在最高點買進、<b>年初單筆</b>每年第一個交易日一次投入、<b>定期定額</b>每月第一個交易日投入 1/12。最高點、最低點依收盤價判斷。<b>股息再投入</b>：除息時把配息以收盤價買回同一檔 ETF(用還原股價計算)；<b>配息領現金</b>：配息存成現金、不計利息。台股 ETF 的配息取自臺灣證券交易所「除權除息計算結果表」，不計手續費與稅；帳戶價值算到最新一個交易日，年化報酬為內部報酬率(IRR)，只計入完整的年度。本回測已另以 Python 獨立程式重算驗證。</p>
-          </div>
-
-          <div class="panel">
-            <h3>五、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)</h3>
+            <h3>四、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)</h3>
             <div class="doc">
               <ul>
                 <li><b>單筆投入</b>(Lump Sum Investing，LSI)：手上有一筆錢，一次全部投入。</li>
@@ -423,40 +367,7 @@
         $('#pkArkkNote').innerHTML = `ARKK 還原股價(美元，月底)：上市以來年化 ${pctf(sAll.cagr)}；${ym(ak.m[peakI])} 的高點到 ${ym(ak.m[last])}，${pctf(ak.a[last] / ak.a[peakI] - 1, 0)}；期間最大回撤 ${pctf(sAll.mdd, 0)}。`;
       }
 
-      /* ---------- 四、單筆 vs 定期定額 ---------- */
-      const fillStart = () => {
-        const dd = E.daily[$('#tsEtf').value], ys = [...new Set(dd.d.map(d => +d.slice(0, 4)))];
-        const okYears = ys.filter(y => y < ys[ys.length - 1] && dd.d.find(d => d.startsWith(String(y))).slice(5, 7) === '01');
-        $('#tsStart').innerHTML = okYears.map(y => `<option value="${y}">${y}</option>`).join('');
-      };
-      const drawTiming = () => {
-        const code = $('#tsEtf').value, dd = E.daily[code], amt = Math.max(1000, +$('#tsAmt').value || 120000);
-        const reinvest = $('#tsDiv').value === '1', R = timingStudy(dd, +$('#tsStart').value, amt, reinvest);
-        const Rother = timingStudy(dd, +$('#tsStart').value, amt, !reinvest);
-        if (!R.years.length) { $('#tsStats').innerHTML = '<p class="mute">完整年度不足</p>'; return; }
-        const K = [['best', '最佳時機(每年最低點)', 'var(--up)'], ['jan', '年初單筆', 'var(--amber)'], ['dca', '定期定額(每月)', 'var(--blue)'], ['worst', '最差時機(每年最高點)', 'var(--down)']];
-        const inv = R.res.jan.invested;
-        $('#tsStats').innerHTML = `<div class="stat"><div class="v" style="font-size:16px;">${R.years[0]}～${R.years[R.years.length - 1]}</div><div class="l">投入 ${R.years.length} 年 · 本金 ${money(inv)} 元 · 算到 ${R.asOf}</div></div>` +
-          K.map(([k, n, c]) => { const r = R.res[k]; return `<div class="stat"><div class="v" style="color:${c}">${money(r.value)}</div><div class="l">${n} · 年化 ${pctf(r.irr)} · 報酬 ${pctf(r.value / r.invested - 1, 0)}</div></div>`; }).join('');
-        const mi = R.months.findIndex(m => m >= `${R.years[0]}-01`);
-        const sl = a => a.slice(mi);
-        LTChart.line($('#tsChart'), { x: sl(R.months), xType: 'date', label: '單筆 vs 定期定額', height: 300, xFmt: (m, tip) => tip ? ym(m) : m.slice(2).replace('-', '/'),
-          yFmt: v => v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : Math.round(v / 1e3) + 'K', tipFmt: (s, v) => money(v) + ' 元',
-          series: [...K.map(([k, n, c]) => ({ name: n, y: sl(R.res[k].series), color: c })), { name: '累計投入本金', y: sl(R.invested), color: 'var(--dim)', dash: '4 4', width: 1.4 }] });
-        const b = R.res.best, w = R.res.worst, j = R.res.jan, d = R.res.dca;
-        $('#tsInsight').innerHTML = `
-          <li>每年都在<b>最高點</b>買進(最差時機)，到 ${R.asOf} 帳戶有 ${money(w.value)} 元(本金 ${money(w.invested)} 元)，年化 ${pctf(w.irr)}；與每年都買在<b>最低點</b>的 ${money(b.value)} 元(年化 ${pctf(b.irr)})相比，差距是年化 ${((b.irr - w.irr) * 100).toFixed(1)} 個百分點。</li>
-          <li><b>年初單筆</b>帳戶 ${money(j.value)} 元、<b>定期定額</b> ${money(d.value)} 元：年初單筆的錢平均比定期定額早半年進場，留在市場的時間較長，在長期上漲的市場裡金額${j.value > d.value ? '較多' : '反而較少(這段期間年初之後常有下跌)'}；換算成年化報酬(IRR)分別是 ${pctf(j.irr)} 與 ${pctf(d.irr)}，差距很小。定期定額不需要判斷時機，也避免一次在高點投入全部資金的風險。</li>
-          <li><b>股息再投入的差別</b>：以定期定額為例，股息再投入 ${money((reinvest ? R : Rother).res.dca.value)} 元(年化 ${pctf((reinvest ? R : Rother).res.dca.irr)})，配息領現金 ${money((reinvest ? Rother : R).res.dca.value)} 元(其中現金股利 ${money((reinvest ? Rother : R).res.dca.cash)} 元，年化 ${pctf((reinvest ? Rother : R).res.dca.irr)})。配息拿出來不再投入，就少了複利的效果。</li>
-          <li>擇時能多賺的有限，而且最佳時機在現實中幾乎不可能做到；<b>持續投入、留在市場裡</b>比找進場點重要。</li>`;
-      };
-      $('#tsEtf').onchange = () => { fillStart(); drawTiming(); };
-      $('#tsStart').onchange = drawTiming;
-      $('#tsAmt').oninput = drawTiming;
-      $('#tsDiv').onchange = drawTiming;
-      fillStart(); drawTiming();
-
-      /* ---------- 五、LSI vs DCA vs BTD ---------- */
+      /* ---------- 四、LSI vs DCA vs BTD ---------- */
       const seriesOf = key => {
         if (key === 'taiex') {   // 加權指數：日資料 → 月底
           const tx = E.taiex, mo = monthly({ d: tx.d, c: tx.c, a: tx.c });
