@@ -256,5 +256,82 @@ window.LTStatDemos = (() => {
       <div class="note" style="text-align:center;margin-top:4px;">A₁～A₄ 互不重疊、合起來剛好是 S；事件 B(橘色)因此被切成互斥的四塊 B∩A₁、…、B∩A₄。</div>`;
   }
 
-  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition };
+  /* ---------- 機率模型關係圖：點選分配，看它和其他分配的連結 ---------- */
+  const DIST_NODES = {
+    bern:   { x: 90,  y: 70,  name: '伯努利', kind: 'd', desc: '一次試驗，成功記 1、失敗記 0。所有「成功次數」類分配的基本單位。' },
+    binom:  { x: 280, y: 70,  name: '二項', kind: 'd', desc: 'n 次獨立伯努利試驗的成功次數。' },
+    hyper:  { x: 280, y: 180, name: '超幾何', kind: 'd', desc: '不放回抽樣的成功次數；母體很大時接近二項。' },
+    geom:   { x: 90,  y: 230, name: '幾何', kind: 'd', desc: '第一次成功發生在第幾次；離散分配中唯一有無記憶性的。' },
+    nbin:   { x: 90,  y: 380, name: '負二項', kind: 'd', desc: '第 r 次成功發生在第幾次 = r 個獨立幾何分配相加。' },
+    pois:   { x: 450, y: 180, name: '卜瓦松', kind: 'd', desc: '單位時間(空間)內事件發生的次數；稀有事件的二項分配極限。' },
+    unif:   { x: 280, y: 330, name: '均勻', kind: 'c', desc: '區間內每個值機會相同；電腦產生隨機數的起點，可轉換成其他分配。' },
+    expo:   { x: 450, y: 330, name: '指數', kind: 'c', desc: '卜瓦松過程中兩次事件的間隔時間；連續分配中唯一有無記憶性的。' },
+    sexp:   { x: 450, y: 470, name: '平移指數', kind: 'c', desc: '指數分配往右平移 θ：至少要等 θ，超過 θ 之後才是指數分配。' },
+    lap:    { x: 650, y: 470, name: '雙指數', kind: 'c', desc: '以 μ 為中心、左右各一個指數分配(Laplace)；峰尖尾厚，比常態更像日報酬。' },
+    gamma:  { x: 650, y: 330, name: '伽瑪', kind: 'c', desc: '第 α 個事件發生的等待時間 = α 個獨立指數分配相加。' },
+    chi2:   { x: 850, y: 330, name: '卡方', kind: 'c', desc: 'k 個獨立標準常態的平方和；是伽瑪分配的特例，用於變異數推論(第 6 章)。' },
+    norm:   { x: 650, y: 70,  name: '常態', kind: 'c', desc: '大量獨立因素相加的結果(中央極限定理)；許多分配的極限。' },
+    snorm:  { x: 850, y: 70,  name: '標準常態', kind: 'c', desc: '平均 0、標準差 1 的常態；任何常態標準化後都是它，查表只需要這一張。' },
+    lnorm:  { x: 760, y: 200, name: '對數常態', kind: 'c', desc: '取對數後是常態；恆為正、右偏，常用來描述股價、所得。' },
+  };
+  // [起點, 終點, 說明, 類型]：rel 關係(變換、特例、相加)、lim 極限近似、ana 類比
+  const DIST_EDGES = [
+    ['bern', 'binom', 'n 個獨立相加', 'rel'], ['bern', 'geom', '第一次成功的次數', 'rel'], ['geom', 'nbin', 'r 個獨立相加', 'rel'],
+    ['hyper', 'binom', 'N 很大(n/N 小)', 'lim'], ['binom', 'pois', 'n→∞、p→0、np=λ', 'lim'], ['binom', 'norm', 'n 大(中央極限定理)', 'lim'],
+    ['pois', 'norm', 'λ 大', 'lim'], ['pois', 'expo', '事件間隔時間', 'rel'], ['geom', 'expo', '連續版本(無記憶性)', 'ana'],
+    ['unif', 'expo', '−ln(U) ÷ λ', 'rel'], ['expo', 'gamma', 'α 個獨立相加', 'rel'], ['gamma', 'chi2', 'λ = ½、α = k/2', 'rel'],
+    ['snorm', 'chi2', 'k 個平方相加', 'rel'], ['norm', 'snorm', '標準化 (X−μ)/σ', 'rel'], ['norm', 'lnorm', '取指數 eˣ', 'rel'],
+    ['expo', 'sexp', '加上常數 θ', 'rel'], ['expo', 'lap', '兩個獨立指數相減', 'rel'],
+  ];
+  function distMap(el) {
+    const W = 940, H = 530, BW = 92, BH = 34;
+    let sel = null;
+    el.innerHTML = `
+      <h3>互動圖 · 機率模型之間的連結</h3>
+      <p class="note" style="margin-top:0;">點選任一個分配，會標出它和哪些分配有關係；再點一次或點空白處取消。</p>
+      <div class="dm-wrap"><svg class="dm-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="機率模型關係圖"></svg></div>
+      <div class="dm-legend"><span><i class="dm-l rel"></i>變換、特例或相加</span><span><i class="dm-l lim"></i>極限(近似)</span><span><i class="dm-l ana"></i>類比</span><span><i class="dm-n d"></i>離散</span><span><i class="dm-n c"></i>連續</span></div>
+      <div class="dm-info"></div>`;
+    const svg = el.querySelector('.dm-svg'), info = el.querySelector('.dm-info');
+    // 從方塊邊緣出發的線段端點
+    const edgePt = (a, b) => {
+      const dx = b.x - a.x, dy = b.y - a.y, sx = (BW / 2 + 4) / Math.abs(dx || 1e-9), sy = (BH / 2 + 4) / Math.abs(dy || 1e-9), s = Math.min(sx, sy);
+      return [a.x + dx * s, a.y + dy * s];
+    };
+    function draw() {
+      const related = new Set(sel ? [sel] : []);
+      DIST_EDGES.forEach(([a, b]) => { if (a === sel) related.add(b); if (b === sel) related.add(a); });
+      const lines = DIST_EDGES.map(([a, b, label, type]) => {
+        const A = DIST_NODES[a], B = DIST_NODES[b], [x1, y1] = edgePt(A, B), [x2, y2] = edgePt(B, A);
+        const on = !sel || a === sel || b === sel, horiz = Math.abs(y2 - y1) < 8;
+        const mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - (horiz ? 12 : 0);   // 水平線的說明放在線的上方，不蓋住箭頭
+        const color = type === 'lim' ? 'var(--amber)' : type === 'ana' ? 'var(--dim)' : 'var(--blue)';
+        return `<g class="dm-edge" opacity="${on ? 1 : 0.12}">
+          <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${sel && on ? 2.4 : 1.6}" ${type === 'ana' ? 'stroke-dasharray="5 4"' : type === 'lim' ? 'stroke-dasharray="2 3"' : ''} marker-end="url(#dm-arrow-${type})"/>
+          <rect x="${mx - label.length * 6.2 - 4}" y="${my - 9}" width="${label.length * 12.4 + 8}" height="18" rx="4" fill="var(--panel)" opacity=".92"/>
+          <text x="${mx}" y="${my + 4}" font-size="11.5" text-anchor="middle" fill="${color}">${label}</text></g>`;
+      }).join('');
+      const nodes = Object.entries(DIST_NODES).map(([k, n]) => {
+        const on = !sel || related.has(k);
+        return `<g class="dm-node" data-k="${k}" opacity="${on ? 1 : 0.25}" style="cursor:pointer">
+          <rect x="${n.x - BW / 2}" y="${n.y - BH / 2}" width="${BW}" height="${BH}" rx="${n.kind === 'd' ? 4 : 17}" fill="${k === sel ? 'var(--amber-soft)' : 'var(--panel2)'}" stroke="${k === sel ? 'var(--amber)' : n.kind === 'd' ? 'var(--border-strong)' : 'var(--blue)'}" stroke-width="${k === sel ? 2.4 : 1.4}"/>
+          <text x="${n.x}" y="${n.y + 5}" font-size="14" font-weight="700" text-anchor="middle" fill="var(--text)">${n.name}</text></g>`;
+      }).join('');
+      const arrow = (id, c) => `<marker id="dm-arrow-${id}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="${c}"/></marker>`;
+      svg.innerHTML = `<defs>${arrow('rel', 'var(--blue)')}${arrow('lim', 'var(--amber)')}${arrow('ana', 'var(--dim)')}</defs>
+        <text x="20" y="${H - 14}" font-size="12" fill="var(--mute)">方角 = 離散　圓角 = 連續　箭頭：從 A 得到 B</text>${lines}${nodes}`;
+      if (!sel) { info.innerHTML = '<span class="mute">尚未選取分配。</span>'; return; }
+      const n = DIST_NODES[sel];
+      const rel = DIST_EDGES.filter(([a, b]) => a === sel || b === sel).map(([a, b, label]) => `<li>${a === sel ? `${n.name} → <b>${DIST_NODES[b].name}</b>` : `<b>${DIST_NODES[a].name}</b> → ${n.name}`}：${label}</li>`).join('');
+      info.innerHTML = `<b>${n.name}分配</b>(${n.kind === 'd' ? '離散' : '連續'})：${n.desc}<ul>${rel}</ul>`;
+    }
+    svg.addEventListener('click', e => {
+      const g = e.target.closest('.dm-node');
+      sel = g ? (g.dataset.k === sel ? null : g.dataset.k) : null;
+      draw();
+    });
+    draw();
+  }
+
+  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, 'dist-map': distMap };
 })();

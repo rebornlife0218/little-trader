@@ -1,7 +1,8 @@
 """
 資料集 etf_compare：「怎麼存 ETF」用的資料 → web/data/etf_compare/
   compare.json：0050 與勞退基金(新制)的每月報酬
-  etfs.json：常存 ETF(與 ARKK)的每日價格與還原股價，供績效比較、單筆 vs 定期定額回測
+  etfs.json：常存 ETF(與 ARKK)的每日收盤、股利再投入的還原股價、每股配息，供績效比較、單筆 vs 定期定額回測
+    台股 ETF 的配息用臺灣證券交易所「除權除息計算結果表」(Yahoo 的配息資料不完整)
   - 勞退基金：勞動基金運用局公告的「最近月份收益率」(當年度截至該月的累計收益率，每年 1 月重新起算)
     換成每月報酬：1 月 = 當月數字；其他月 = (1 + 本月累計) ÷ (1 + 上月累計) − 1
   - 0050：Yahoo Finance 月底收盤(價格報酬)與還原股價(Adj Close，股利再投入的總報酬)
@@ -102,6 +103,7 @@ ETFS = [
     ('00713', '00713.TW', '元大台灣高息低波', '高股息', 'TWD'),
     ('00919', '00919.TW', '群益台灣精選高息', '高股息', 'TWD'),
     ('00929', '00929.TW', '復華台灣科技優息', '高股息', 'TWD'),
+    ('00918', '00918.TW', '大華優利高填息30', '高股息', 'TWD'),
     ('ARKK', 'ARKK', 'ARK Innovation ETF', '主題型(美股)', 'USD'),
 ]
 
@@ -123,15 +125,68 @@ def download(ticker, **kw):
     return fix_unadjusted_splits(df[['Close', 'Adj Close']].dropna())
 
 
+TWT49U = 'https://www.twse.com.tw/rwd/zh/exRight/TWT49U'
+
+
+def fetch_exdiv(start='20080101'):
+    """臺灣證券交易所「除權除息計算結果表」：{代號: [(除息日, 除息前收盤價, 息值)]}。
+    Yahoo 的配息資料不完整(例如 0050 只有 2013 年以後，且分割前後單位不一致)，台股 ETF 改用證交所的官方資料。"""
+    today = pd.Timestamp.today().strftime('%Y%m%d')
+    for i in range(3):
+        try:
+            r = requests.get(TWT49U, params={'startDate': start, 'endDate': today, 'response': 'json'}, headers=HEADERS, timeout=120)
+            r.raise_for_status()
+            rows = r.json().get('data') or []
+            break
+        except Exception as e:  # noqa: BLE001
+            print(f'除權息資料下載失敗({i + 1}/3)：{e!r}', file=sys.stderr)
+            time.sleep(5 * (i + 1))
+    else:
+        raise RuntimeError('無法下載證交所除權息資料')
+    out = {}
+    for row in rows:
+        m = re.match(r'(\d+)年(\d+)月(\d+)日', row[0])
+        if not m or '息' not in row[6]:
+            continue
+        day = f'{int(m.group(1)) + 1911}-{int(m.group(2)):02d}-{int(m.group(3)):02d}'
+        out.setdefault(row[1].strip(), []).append((day, float(row[3].replace(',', '')), float(row[5].replace(',', ''))))
+    return out
+
+
+def total_return(df, events):
+    """用官方除息資料自己算「股利再投入」的還原股價：每個除息日起乘上 除息前收盤 ÷ (除息前收盤 − 息值)。
+    比例與價格單位無關，所以不受分割影響。另回傳換算成目前股數單位的每股配息 [(日期, 金額)]。"""
+    close = df['Close']
+    dates = close.index.strftime('%Y-%m-%d')
+    factor, divs = pd.Series(1.0, index=close.index), []
+    for day, prev, cash in sorted(events):
+        if day <= dates[0] or day > dates[-1] or prev <= cash:
+            continue
+        pos = dates.searchsorted(day)                   # 除息日(或之後第一個交易日)
+        factor.iloc[pos:] *= prev / (prev - cash)
+        divs.append((dates[pos], round(cash * float(close.iloc[pos - 1]) / prev, 6)))   # 換成 Yahoo 價格的單位
+    return close * factor, divs
+
+
 def fetch_etfs():
+    exdiv = fetch_exdiv()
     out = {'list': [], 'daily': {}}
     for code, ticker, name, kind, cur in ETFS:
         df = download(ticker, period='max')
-        out['list'].append({'code': code, 'name': name, 'kind': kind, 'currency': cur, 'start': df.index[0].strftime('%Y-%m-%d')})
-        # d：日期、c：收盤(價格報酬)、a：還原股價(股利再投入的總報酬)
+        if cur == 'TWD':
+            adj, divs = total_return(df, exdiv.get(code, []))
+            yahoo_tr = df['Adj Close'].iloc[-1] / df['Adj Close'].iloc[0] - 1
+            mine_tr = adj.iloc[-1] / adj.iloc[0] - 1
+            print(f'{code} 總報酬：官方除息資料 {mine_tr:.1%}、Yahoo 還原股價 {yahoo_tr:.1%}(配息 {len(divs)} 次)')
+        else:
+            adj, divs = df['Adj Close'], []
+        out['list'].append({'code': code, 'name': name, 'kind': kind, 'currency': cur, 'start': df.index[0].strftime('%Y-%m-%d'),
+                            'source': '臺灣證券交易所除權息資料' if cur == 'TWD' else 'Yahoo 還原股價'})
+        # d：日期、c：收盤(價格報酬)、a：股利再投入的還原股價(總報酬)、div：每股配息(換算成目前股數單位)
         out['daily'][code] = {'d': df.index.strftime('%Y-%m-%d').tolist(),
                               'c': [round(float(v), 4) for v in df['Close']],
-                              'a': [round(float(v), 4) for v in df['Adj Close']]}
+                              'a': [round(float(v), 4) for v in adj],
+                              'div': divs}
         print(f'{code} {name}：{len(df)} 天，{df.index[0].date()} 起')
         time.sleep(1)
     return out
@@ -161,7 +216,7 @@ def main():
         'etf_total': [round(etf[m][1], 6) for m in months],        # 0050 總報酬(股利再投入)
     })
     write_json(out / 'etfs.json', fetch_etfs())
-    write_meta(DATASET, '勞動基金運用局 勞退基金收益率、Yahoo Finance(ETF 股價)', LPF_URL,
+    write_meta(DATASET, '勞動基金運用局 勞退基金收益率、Yahoo Finance(ETF 股價)、臺灣證券交易所(除息資料)', LPF_URL,
                '每天 09:00(台北時間；勞退基金每月初公告前兩個月的收益率)', months=len(months))
 
 
