@@ -23,7 +23,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # 一律用 main 的最新程式：資料集更新是在較早的 commit 觸發的，若用觸發當下的版本，
+      # 部署完成時可能把期間推送的新程式蓋回舊版
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: 組合網站檔案
         run: |
