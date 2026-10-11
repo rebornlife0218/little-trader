@@ -7,3 +7,7 @@ LT.register({
   section: 'stock', group: '台股', key: 'swing', name: '波段',
   desc: '持有數天到數週的波段交易：趨勢與型態的進出場訊號、持有期間報酬與勝率統計。',
 });
+LT.register({
+  section: 'stock', group: '台股', key: 'tw-strategy', name: '策略',
+  desc: '台股的選股與進出場策略回測：最上方選擇策略，與大盤買進持有比較報酬與風險。',
+});
