@@ -12,7 +12,7 @@ import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common import dataset_dir, write_json, write_meta  # noqa: E402
-from twse import load_taiex  # noqa: E402
+from twse import TR_FILE, load_taiex, load_taiex_tr  # noqa: E402
 
 DATASET = 'indices'
 
@@ -62,6 +62,7 @@ def main():
 
     # 台灣加權改用證交所資料(要在清空輸出資料夾前讀回快取)
     taiex = load_taiex()
+    taiex_tr = load_taiex_tr()
 
     out_dir = dataset_dir(DATASET)
 
@@ -95,8 +96,14 @@ def main():
                             'source': '臺灣證券交易所' if name == 'TAIEX' else 'Yahoo Finance',
                             'volume': '成交金額(元)' if name == 'TAIEX' else '成交量'}
 
+    # 加權報酬指數(含股息)：不列入 indices(指數頁不顯示)，給 ETF大禮包的長期回測使用
+    extra = {}
+    if len(taiex_tr) >= 250:
+        tr_days = sorted(taiex_tr)
+        write_json(out_dir / TR_FILE, {'d': tr_days, 'c': [round(taiex_tr[d], 2) for d in tr_days]})
+        extra['TAIEX_TR'] = {'rows': len(tr_days), 'first': tr_days[0], 'last': tr_days[-1], 'source': '臺灣證券交易所 發行量加權股價報酬指數'}
     meta = write_meta(DATASET, 'Yahoo Finance、臺灣證券交易所(台灣加權)', 'https://finance.yahoo.com/',
-                      '每個工作日 05:30、15:30', indices=index_meta)
+                      '每個工作日 05:30、15:30', indices=index_meta, extra=extra)
     print(f"已更新 {len(index_meta)} 個指數，更新時間 {meta['updated_at']}")
     for k, m in index_meta.items():
         print(f"  {k:8s} {m['rows']:5d} 筆  {m['first']} ~ {m['last']}")

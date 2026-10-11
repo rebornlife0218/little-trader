@@ -3,6 +3,9 @@
   - 開高低收：發行量加權股價指數歷史資料 MI_5MINS_HIST(證交所只提供 1999-01-05 起)
   - 成交量：每月市場成交資訊 FMTQIK 的「成交金額(元)」(台股習慣以成交值看大盤量)
 
+另外下載「發行量加權股價報酬指數」(含現金股利再投入，證交所 2003-01-02 起)，存成 TAIEX_TR.json {d, c}，
+給 ETF大禮包的長期回測使用(Yahoo 的 0050 只有 2009 年以後)。
+
 證交所一次只能查一個月，且頻繁查詢會被暫時封鎖，因此：
   - 已發佈到 data 分支的 TAIEX.json 就是快取；
   - 下次更新先讀回舊檔(本機 web/data/ 或 data 分支)，只補缺少的月份與最近 2 個月。
@@ -23,6 +26,9 @@ OHLC_API = 'https://www.twse.com.tw/rwd/zh/TAIEX/MI_5MINS_HIST'
 AMOUNT_API = 'https://www.twse.com.tw/rwd/zh/afterTrading/FMTQIK'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (little-trader data bot)'}
 SLEEP = 3  # 證交所建議每 5 秒不超過 3 次查詢
+TR_FILE = 'TAIEX_TR.json'
+TR_FIRST = '2003-01'
+TR_API = 'https://www.twse.com.tw/rwd/zh/TAIEX/MFI94U'
 
 
 def _months(today):
@@ -88,3 +94,28 @@ def load_taiex(today=None):
             time.sleep(SLEEP)
     return rows
 
+
+
+def load_taiex_tr(today=None):
+    """發行量加權股價報酬指數：回傳 {日期: 收盤}；同樣以已發佈的 TAIEX_TR.json 為快取，只補缺少的月份與最近 2 個月。"""
+    today = today or date.today()
+    cache = load_published('indices', TR_FILE) or {'d': [], 'c': []}
+    rows = dict(zip(cache['d'], cache['c']))
+    have = {d[:7] for d in rows}
+    y, m, months = int(TR_FIRST[:4]), int(TR_FIRST[5:]), []
+    while (y, m) <= (today.year, today.month):
+        months.append((y, m))
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+    recent = set(months[-2:])
+    todo = [(y, m) for y, m in months if f'{y}-{m:02d}' not in have or (y, m) in recent]
+    print(f'證交所報酬指數：快取 {len(rows)} 日，需下載 {len(todo)} 個月', flush=True)
+    for i, (y, m) in enumerate(todo):
+        try:
+            got = _get(TR_API, y, m)
+        except RuntimeError as e:
+            print(f'{e}，其餘月份下次再補', file=sys.stderr)
+            break
+        rows.update({d: v[0] for d, v in got.items() if v[0] > 0})
+        if i < len(todo) - 1:
+            time.sleep(SLEEP)
+    return rows
