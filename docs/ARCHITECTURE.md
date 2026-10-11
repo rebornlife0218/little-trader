@@ -17,7 +17,8 @@ web/                                網站(部署時整個資料夾就是網站�
     home/home.js                    首頁：各區塊入口、各資料集更新狀態
     indices/indices.js              指數：大盤漲跌分析、K棒型態
     etf/etf.js                      ETF：折溢價、即將發行ETF
-    stock/stock.js                  個股(建置中)
+    stock/tw.js                     股票 · 台股：處置股、隔日沖、波段(建置中)
+    stock/earnings.js               股票 · 美股：財報行事曆
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入
     option/market.js                選擇權市場概況
     option/futures.js               台指期貨
@@ -37,6 +38,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   etf_upcoming/update.py            即將發行 ETF(MoneyDJ)
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
+  earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
 
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
@@ -59,6 +61,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 |---|---|---|---|
 | indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
+| earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
@@ -88,6 +91,7 @@ LT.register({
 ```
 
 - **新增側欄區塊**：在 `app.js` 的 `SECTIONS` 加一筆(`desc` 會顯示在首頁)。
+- **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
 

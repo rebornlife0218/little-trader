@@ -8,7 +8,7 @@ const LT = (() => {
   const SECTIONS = [
     { key: 'index', name: '指數', desc: '全球主要指數的急跌反彈與K棒型態統計' },
     { key: 'etf', name: 'ETF', desc: 'ETF 折溢價與即將發行的新 ETF' },
-    { key: 'stock', name: '個股', desc: '處置股、隔日沖等個股主題研究' },
+    { key: 'stock', name: '股票', desc: '台股處置股、隔日沖、波段，美股財報行事曆' },
     { key: 'option', name: '選擇權', desc: '臺指選擇權與台指期：隱含波動率、籌碼、價差與策略損益' },
     { key: 'stats', name: '統計學', desc: '統計學與計量方法的學習資源' },
     { key: 'other', name: '其他', desc: '研究與交易時常用的網站推薦' },
@@ -18,8 +18,10 @@ const LT = (() => {
     { key: 'indices', name: '指數' },
     { key: 'etf_upcoming', name: '即將發行ETF' },
     { key: 'options', name: '選擇權與台指期' },
+    { key: 'earnings', name: '美股財報' },
   ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
+  // 加上 group(例如 '台股')，側欄與首頁會在區塊內再分小組，同組頁面請連續註冊
   const pages = [];
   let home = null; // 首頁 {name, mount}，由 modules/home/home.js 設定
   let current = null;
@@ -56,10 +58,11 @@ const LT = (() => {
     nav.innerHTML = SECTIONS.map(sec => {
       const list = pages.filter(p => p.section === sec.key);
       const isActive = p => active && active.section === sec.key && active.key === p.key;
+      const link = p => p.href
+        ? `<a href="${p.href}" target="_blank" rel="noopener" class="side-link ext" title="在新分頁開啟外部網站">${p.name}<span class="ext-ico">↗</span></a>`
+        : `<a href="#/${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`;
       const items = list.length
-        ? list.map(p => p.href
-            ? `<a href="${p.href}" target="_blank" rel="noopener" class="side-link ext" title="在新分頁開啟外部網站">${p.name}<span class="ext-ico">↗</span></a>`
-            : `<a href="#/${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`).join('')
+        ? groupPages(list).map(([g, ps]) => (g ? `<div class="side-sub">${g}</div>` : '') + ps.map(link).join('')).join('')
         : `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
       const here = active && active.section === sec.key;
       const open = here || openSections.has(sec.key);
@@ -70,6 +73,15 @@ const LT = (() => {
         <div class="side-items">${items}</div>
       </div>`;
     }).join('');
+  }
+  // 依 group 分組(保留註冊順序)：[[組名或 '', [頁面…]], …]
+  function groupPages(list) {
+    const out = [];
+    list.forEach(p => {
+      const g = p.group || '', last = out[out.length - 1];
+      if (last && last[0] === g) last[1].push(p); else out.push([g, [p]]);
+    });
+    return out;
   }
   // 建置中頁面
   function mountPlaceholder(page, el) {
@@ -201,5 +213,5 @@ const LT = (() => {
     route();
   }
 
-  return { register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, dataset, dataUrl, loadJSON, sourceLine };
+  return { register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();
