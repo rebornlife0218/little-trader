@@ -16,13 +16,13 @@ web/                                網站(部署時整個資料夾就是網站�
   modules/
     home/home.js                    首頁：各區塊入口、各資料集更新狀態
     indices/indices.js              指數：大盤漲跌分析、K棒型態
+    indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
     etf/etf.js                      ETF：折溢價、即將發行ETF
     stock/tw.js                     股票 · 台股：處置股、隔日沖、波段(建置中)
     stock/earnings.js               股票 · 美股：財報行事曆
-    option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入
-    option/market.js                選擇權市場概況
-    option/futures.js               台指期貨
-    option/calculator.js            Black-Scholes 計算器
+    option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
+    option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
+    option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
     option/strategy.js              策略損益圖
     stats/basic.js                  初級統計學(章節設定、互動模擬、台股實例；內容在 content/)
     stats/stats.js                  計量(建置中)、Seeing Theory
@@ -53,7 +53,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
 4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → GitHub Pages。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
-網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取；`LT.sourceLine(meta)` 在頁面上方顯示「資料來源 · 更新時間 · 排程」。
+網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。每頁用到的資料集會自動列在頁尾 COPYRIGHT 下方(「資料來源 · 更新時間 · 排程」，換頁時更新；首頁列出全部資料集)，頁面不用自己顯示。
 
 ## 資料集
 
@@ -81,7 +81,7 @@ LT.register({
   async mount(el, ctx) {       // el 是內容區；ctx.alive() 為 false 代表使用者已切到別頁
     const { meta, data } = await LT.loadJSON('my_dataset', 'items.json');
     if (!ctx.alive()) return;
-    el.innerHTML = `<header class="top"><div><h1>我的研究</h1>${LT.sourceLine(meta)}</div></header>
+    el.innerHTML = `<header class="top"><div><h1>我的研究</h1></div></header>
       <div class="panel"><div id="myChart"></div></div>`;
     LTChart.line(document.getElementById('myChart'), {
       x: data.d, xType: 'date', series: [{ name: '收盤', y: data.c, color: 'var(--amber)' }],
@@ -109,6 +109,8 @@ LT.register({
 - **30 天 IV**：各到期契約的價平 IV 換成總變異數 σ²T，在 30 天前後兩個到期日之間線性內插。
 - **Put/Call 比**：成交量含一般與盤後時段；未平倉量不含當日到期契約(與期交所公布的數字一致)。
 - **台指期近月**：到期日(第 3 個週三)在交易日之後、最早到期的月契約，到期當天換到下一個月份；成交量為全部月份(含盤後)，未平倉不含當日到期契約。
+- **轉倉**：另存次月契約的收盤(`code2`、`c2`)與近月/次月的成交量、未平倉(`v1`、`v2`、`oi1`、`oi2`)，網頁畫出轉倉價差(次月 − 近月)與未平倉從近月移到次月的過程；次月未平倉超過近月的那天標為主力換月日。
+- **結算日曆**：取自期交所的契約到期日(含假日順延)，選擇權有月選(第 3 個週三)與週選(每週三 W、週五 F)，月選與台指期同日結算。
 - **期現貨價差**：在網頁端用台指期近月收盤減去加權指數收盤(indices 資料集)。
 - **策略損益圖的標的部位**：以小台計(每點 50 元，與選擇權相同)，價格帶入與選擇權同月份的台指期收盤價。
 - **策略**：定義在 `web/modules/option/lib.js` 的 `STRATEGIES`，新增策略只要加一筆(腳的買賣方向、口數、使用第幾個履約價、預設履約價相對價平的檔數)。

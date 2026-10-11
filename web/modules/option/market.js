@@ -1,4 +1,7 @@
-/* 選擇權 · 市場概況：30 天隱含波動率 vs 歷史波動率、Put/Call 比、T 字報價、未平倉量分布、波動率微笑
+/* 選擇權 · 市場概況：三個分頁
+   · 市場指標：30 天隱含波動率 vs 歷史波動率、P/C ratio、結算日曆(週選、月選)
+   · T 字報價與未平倉：各到期契約(含週選)的報價、未平倉量分布、波動率微笑
+   · Black-Scholes 計算器(calculator.js 的 LTOpt.calculator)
    資料集：data/options/(pipeline/options/update.py，排程見 .github/workflows/data-options.yml) */
 (() => {
   const { fmt, pct, esc, codeName, MULT } = LTOpt;
@@ -31,7 +34,7 @@
       let D;
       try { D = await LTOpt.load(); } catch (err) { if (ctx.alive()) el.innerHTML = LTOpt.errorPanel(err.message); return; }
       if (!ctx.alive()) return;
-      const { meta, chain, hist, spot, futures } = D;
+      const { chain, hist, spot, futures } = D;
       const n = hist.d.length - 1;
       // 歷史波動率對齊選擇權資料的日期
       let hv = hist.d.map(() => null);
@@ -44,17 +47,22 @@
       el.innerHTML = `
         <header class="top"><div>
           <h1>選擇權市場概況</h1>
-          <p>臺指選擇權(TXO)：隱含波動率、Put/Call 比與各履約價的報價、未平倉量</p>
-          ${LT.sourceLine(meta)}
+          <p>臺指選擇權(TXO)：隱含波動率、P/C ratio、結算日曆、各履約價的報價與未平倉量，以及 Black-Scholes 計算器</p>
         </div></header>
+        <div class="mode-tabs mk-tabs">
+          <button class="mode-tab active" data-tab="metrics"><b>市場指標</b><small>IV、P/C ratio、結算日曆</small></button>
+          <button class="mode-tab" data-tab="chain"><b>T 字報價與未平倉</b><small>各到期契約(含週選)</small></button>
+          <button class="mode-tab" data-tab="calc"><b>Black-Scholes 計算器</b><small>理論價格與 Greeks</small></button>
+        </div>
+        <div class="mk-pane" data-pane="metrics">
         <div class="panel"><div class="statgrid">
           <div class="stat"><div class="v" style="font-size:18px;">${esc(chain.date)}</div><div class="l">最新交易日</div></div>
           <div class="stat"><div class="v">${spot ? fmt(spot.close, 0) : '—'}</div><div class="l">加權指數收盤${spot ? `(${esc(spot.date)})` : ''}</div></div>
-          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="#/option/futures">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
+          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="#/index/futures">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
           <div class="stat"><div class="v">${pct(hist.iv30[n])}</div><div class="l">30 天隱含波動率</div></div>
           <div class="stat"><div class="v">${pct(hv[n])}</div><div class="l">20 日歷史波動率</div></div>
-          <div class="stat"><div class="v">${fmt(hist.pcoi[n], 1)}%</div><div class="l">Put/Call 未平倉比</div></div>
-          <div class="stat"><div class="v">${fmt(hist.pcv[n], 1)}%</div><div class="l">Put/Call 成交量比</div></div>
+          <div class="stat"><div class="v">${fmt(hist.pcoi[n], 1)}%</div><div class="l">P/C ratio(未平倉)</div></div>
+          <div class="stat"><div class="v">${fmt(hist.pcv[n], 1)}%</div><div class="l">P/C ratio(成交量)</div></div>
         </div></div>
         <div class="panel">
           <h3>隱含波動率 vs 歷史波動率</h3>
@@ -62,10 +70,17 @@
           <p class="note">隱含波動率(IV)是選擇權價格反推的「市場預期未來波動」，歷史波動率(HV)是指數過去 20 個交易日實際的波動。IV 明顯高於 HV 代表市場願意花較多錢買保護(恐慌或預期有大事)，選擇權偏貴；IV 低於 HV 則偏便宜。</p>
         </div>
         <div class="panel">
-          <h3>Put/Call 比</h3>
+          <h3>P/C ratio</h3>
           <div id="pcChart"></div>
-          <p class="note">賣權 ÷ 買權。未平倉比常被當成籌碼指標：比值高代表賣權(看跌或避險)部位多，但台灣散戶與法人常「賣出」賣權收權利金，因此也可能代表市場認為下檔有支撐，解讀時要搭配三大法人的買賣方向。</p>
+          <p class="note">P/C ratio(Put/Call ratio) = 賣權 ÷ 買權。未平倉比常被當成籌碼指標：比值高代表賣權(看跌或避險)部位多，但台灣散戶與法人常「賣出」賣權收權利金，因此也可能代表市場認為下檔有支撐，解讀時要搭配三大法人的買賣方向。<b>注意週結算</b>：每週三、週五都有週選擇權結算，到期的部位從未平倉中消失，所以未平倉的 P/C ratio 在結算日前後常會跳動，看趨勢比看單日數字可靠。</p>
         </div>
+        <div class="panel">
+          <h3>結算日曆</h3>
+          ${LTOpt.settlementTable(LTOpt.settlements(D, 10))}
+          <p class="note">臺指選擇權有<b>月選擇權</b>(每月第 3 個週三結算，與台指期同一天)與<b>週選擇權</b>(每週三、週五結算)。週選擇權到期時間短、時間價值流失快(Theta 大)，結算前最後幾天價格對指數變動非常敏感。月結算時期貨部位需要轉倉，見<a href="#/index/futures">台指期貨</a>。</p>
+        </div>
+        </div>
+        <div class="mk-pane" data-pane="chain" hidden>
         <div class="panel">
           <div class="pickrow" style="justify-content:space-between;flex-wrap:wrap;gap:10px;">
             <h3 style="margin:0;">T 字報價與未平倉量</h3>
@@ -84,6 +99,8 @@
           <div class="btnrow-l" style="margin-bottom:8px;"><button id="tqToggle">顯示全部履約價</button></div>
           <div class="tablewrap"><table class="stattable tquote" id="tquote"></table></div>
         </div>
+        </div>
+        <div class="mk-pane" data-pane="calc" hidden></div>
         <div class="panel doc">
           <h3>指標說明</h3>
           <ul>
@@ -103,11 +120,11 @@
       });
       document.getElementById('ivChart').insertAdjacentHTML('afterend', LTChart.legend([{ name: '30 天隱含波動率', color: 'var(--amber)' }, { name: '20 日歷史波動率', color: 'var(--blue)' }]));
       LTChart.line(document.getElementById('pcChart'), {
-        x: hist.d, xType: 'date', label: 'Put/Call 比', yFmt: v => v.toFixed(0) + '%', tipFmt: (s, v) => fmt(v, 1) + '%', xFmt: (d, tip) => tip ? d : dfmt(d).slice(0, 5),
+        x: hist.d, xType: 'date', label: 'P/C ratio', yFmt: v => v.toFixed(0) + '%', tipFmt: (s, v) => fmt(v, 1) + '%', xFmt: (d, tip) => tip ? d : dfmt(d).slice(0, 5),
         refY: [{ y: 100, label: '100%' }],
-        series: [{ name: '未平倉比', y: hist.pcoi, color: 'var(--amber)' }, { name: '成交量比', y: hist.pcv, color: 'var(--dim)', width: 1.2 }],
+        series: [{ name: 'P/C ratio(未平倉)', y: hist.pcoi, color: 'var(--amber)' }, { name: 'P/C ratio(成交量)', y: hist.pcv, color: 'var(--dim)', width: 1.2 }],
       });
-      document.getElementById('pcChart').insertAdjacentHTML('afterend', LTChart.legend([{ name: '未平倉比', color: 'var(--amber)' }, { name: '成交量比', color: 'var(--dim)' }]));
+      document.getElementById('pcChart').insertAdjacentHTML('afterend', LTChart.legend([{ name: 'P/C ratio(未平倉)', color: 'var(--amber)' }, { name: 'P/C ratio(成交量)', color: 'var(--dim)' }]));
 
       let showAll = false;
       const pick = document.getElementById('expPick');
@@ -122,7 +139,7 @@
           <div class="stat"><div class="v">${int(callMax.k)}</div><div class="l">買權最大未平倉(壓力)</div></div>
           <div class="stat"><div class="v">${int(putMax.k)}</div><div class="l">賣權最大未平倉(支撐)</div></div>
           <div class="stat"><div class="v">${int(mp)}</div><div class="l">最大痛點</div></div>
-          <div class="stat"><div class="v">${fmt(sum('p', 2) / sum('c', 2) * 100, 1)}%</div><div class="l">本契約 P/C 未平倉比</div></div>`;
+          <div class="stat"><div class="v">${fmt(sum('p', 2) / sum('c', 2) * 100, 1)}%</div><div class="l">本契約 P/C ratio(未平倉)</div></div>`;
         // 未平倉量：只畫有部位的履約價範圍
         const live = S.filter(x => x.c[2] + x.p[2] > 0);
         const lo = live.length ? live[0].k : S[0].k, hi = live.length ? live[live.length - 1].k : S[S.length - 1].k;
@@ -154,6 +171,17 @@
           </tr>`).join('')}</tbody>`;
         document.getElementById('tqToggle').textContent = showAll ? '只顯示價平上下 15 檔' : '顯示全部履約價';
       }
+      // 分頁切換(記住上次的分頁)
+      let calcReady = false;
+      const showTab = t => {
+        el.querySelectorAll('.mk-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
+        el.querySelectorAll('.mk-pane').forEach(p => { p.hidden = p.dataset.pane !== t; });
+        if (t === 'calc' && !calcReady) { calcReady = true; LTOpt.calculator(el.querySelector('[data-pane=calc]'), D); }
+        try { localStorage.setItem('lt.optTab', t); } catch (e) {}
+      };
+      el.querySelector('.mk-tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
+      let saved = 'metrics'; try { saved = localStorage.getItem('lt.optTab') || 'metrics'; } catch (e) {}
+      showTab(['metrics', 'chain', 'calc'].includes(saved) ? saved : 'metrics');
       pick.onchange = drawExpiry;
       document.getElementById('tqToggle').onclick = () => { showAll = !showAll; drawExpiry(); };
       drawExpiry();

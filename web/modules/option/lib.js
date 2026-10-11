@@ -94,6 +94,26 @@ const LTOpt = (() => {
     const f = list.find(x => x.code === optCode.slice(0, 6)) || list[0];
     return f ? { code: f.code, price: f.c ?? f.s } : null;
   }
+  // 結算日曆：選擇權週選(週三 W、週五 F)、月選，與台指期月契約(與月選同一天結算)
+  // 日期取自期交所的契約到期日(含假日順延)，剩餘天數以資料日期起算
+  function settlements(D, n = 8) {
+    const base = new Date(D.chain.date + 'T00:00:00Z');
+    const days = d => Math.round((new Date(d + 'T00:00:00Z') - base) / 864e5);
+    const futByMonth = new Set(((D.futures && D.futures.curve) || { contracts: [] }).contracts.map(c => c.code));
+    return D.chain.expiries.map(e => {
+      const kind = e.code[6] === 'W' ? 'week-wed' : e.code[6] === 'F' ? 'week-fri' : 'month';
+      const shifted = new Date(e.expiry + 'T00:00:00Z').getUTCDay() !== (kind === 'week-fri' ? 5 : 3);   // 遇假日順延
+      return { date: e.expiry, days: days(e.expiry), code: e.code, kind,
+        label: kind === 'month' ? `${+e.code.slice(4, 6)} 月選擇權${futByMonth.has(e.code) ? '＋台指期' : ''}` : `週選擇權(${kind === 'week-wed' ? '週三' : '週五'}契約)`,
+        note: (kind === 'month' ? '月結算：近月期貨與月選同日結算，需轉倉' : '週結算：只有該週到期的選擇權結算') + (shifted ? '；原結算日遇假日順延' : '') };
+    }).filter(x => x.days >= 0).sort((a, b) => a.date.localeCompare(b.date)).slice(0, n);
+  }
+  function settlementTable(list) {
+    const wd = ['日', '一', '二', '三', '四', '五', '六'];
+    return `<div class="tablewrap"><table class="stattable settle-table"><thead><tr><th>結算日</th><th>剩餘天數</th><th>結算契約</th><th>說明</th></tr></thead><tbody>
+      ${list.map(x => `<tr class="${x.kind === 'month' ? 'settle-month' : ''}"><td>${x.date.slice(5).replace('-', '/')}(${wd[new Date(x.date + 'T00:00:00Z').getUTCDay()]})</td>
+        <td>${x.days === 0 ? '今天' : x.days + ' 天'}</td><td>${esc(x.label)}</td><td style="text-align:left">${esc(x.note)}</td></tr>`).join('')}</tbody></table></div>`;
+  }
   // 契約代碼 → 中文：202610 → 2026/10 月契約、202610W2 → 10 月第 2 週(三)、202610F2 → 10 月第 2 週(五)
   function codeName(code) {
     const m = +code.slice(4, 6), kind = code[6], n = code[7];
@@ -107,5 +127,5 @@ const LTOpt = (() => {
   const tex = s => window.katex ? katex.renderToString(s, { displayMode: true, throwOnError: false }) : esc(s);
   const errorPanel = msg => `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>${esc(msg)}</p></div></div>`;
 
-  return { MULT, R_DEFAULT, npdf, ncdf, price, greeks, impliedVol, STRATEGIES, legValue, pnl, load, futuresFor, codeName, fmt, pct, esc, tex, errorPanel };
+  return { MULT, R_DEFAULT, npdf, ncdf, price, greeks, impliedVol, STRATEGIES, legValue, pnl, load, futuresFor, settlements, settlementTable, codeName, fmt, pct, esc, tex, errorPanel };
 })();

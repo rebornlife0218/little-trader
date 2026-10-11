@@ -410,3 +410,8 @@
   .er-eps b.up{color:var(--up);} .er-eps b.down{color:var(--down);}
   .er-empty{font-size:12px;padding:6px 4px;}
   table.er-top td a{color:var(--amber);text-decoration:none;font-weight:600;}
+  /* 結算日曆、選擇權分頁 */
+  table.settle-table tr.settle-month td{background:var(--amber-soft);}
+  table.settle-table tr.settle-month td:nth-child(3){color:var(--amber);font-weight:600;}
+  .mk-tabs{grid-template-columns:repeat(3,minmax(0,1fr));}
+  @media (max-width:640px){ .mk-tabs{grid-template-columns:1fr;} }

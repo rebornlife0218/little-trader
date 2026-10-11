@@ -103,6 +103,7 @@ const LT = (() => {
     const main = document.getElementById('content');
     main.innerHTML = '';
     window.scrollTo(0, 0);
+    clearSources();
     if (page) {
       current = page;
       if (!openSections.has(page.section)) { openSections.add(page.section); saveOpenSections(); }
@@ -130,7 +131,10 @@ const LT = (() => {
     window.scrollTo(0, 0);
     renderSidebar(null);
     document.title = 'Little Trader 小交易員的研究室';
+    clearSources();
     home.mount(main, { alive: () => seq === routeSeq });
+    // 首頁頁尾列出所有資料集的更新狀態
+    DATASETS.forEach(d => dataset(d.key).then(m => { if (seq === routeSeq) addSource(m, d.name); }).catch(() => {}));
     document.body.classList.remove('nav-open');
   }
 
@@ -153,18 +157,34 @@ const LT = (() => {
     return `data/${name}/${file}${meta && meta.version ? '?v=' + meta.version : ''}`;
   }
   async function loadJSON(name, file) {
+    const seq = routeSeq;
     const meta = await dataset(name);
     const r = await fetch(dataUrl(name, file, meta));
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    if (seq === routeSeq) addSource(meta);   // 這一頁用到的資料集，自動列在頁尾
     return { meta, data: await r.json() };
   }
-  // 頁面上方的「資料來源 · 更新時間 · 排程」
-  function sourceLine(meta) {
-    if (!meta) return '';
-    const src = meta.source || {};
-    const link = src.url ? `<a href="${src.url}" target="_blank" rel="noopener">${src.name || src.url}</a>` : (src.name || '');
-    return `<div class="updated">資料來源：${link} · 更新：${meta.updated_at} (台北時間)${meta.schedule ? ' · 排程：' + meta.schedule : ''}</div>`;
+  /* ---------- 頁尾的「資料來源 · 更新時間 · 排程」 ----------
+     每頁載入的資料集會自動列在 COPYRIGHT 下方(loadJSON 時加入，換頁時清空)；首頁列出全部資料集。 */
+  let sources = new Map();
+  function clearSources() { sources = new Map(); renderSources(); }
+  function addSource(meta, label) {
+    if (!meta) return;
+    const key = meta.dataset || (meta.source || {}).name || meta.updated_at;
+    sources.set(key, { meta, label: label || (DATASETS.find(d => d.key === meta.dataset) || {}).name || '' });
+    renderSources();
   }
+  function renderSources() {
+    const el = document.getElementById('pageSources');
+    if (!el) return;
+    el.innerHTML = [...sources.values()].map(({ meta, label }) => {
+      const src = meta.source || {};
+      const link = src.url ? `<a href="${src.url}" target="_blank" rel="noopener">${src.name || src.url}</a>` : (src.name || '');
+      return `<div>${label ? `<b>${label}</b> · ` : ''}資料來源：${link} · 更新：${meta.updated_at}(台北時間)${meta.schedule ? ' · 排程：' + meta.schedule : ''}</div>`;
+    }).join('');
+  }
+  // 舊介面：頁面呼叫 LT.sourceLine(meta) 時改為登記到頁尾，頁面上方不再顯示
+  function sourceLine(meta) { addSource(meta); return ''; }
 
   // 暗色 / 淺色模式(記住使用者偏好；預設暗色)
   function theme() { return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; }
@@ -202,8 +222,34 @@ const LT = (() => {
     btn.setAttribute('aria-label', btn.title);
   }
 
+  // 右下角「回到頂部 / 底部」按鈕：頁面夠長才出現，已在頂部(底部)時隱藏對應的按鈕
+  function initScrollButtons() {
+    const box = document.createElement('div');
+    box.className = 'scroll-btns';
+    box.innerHTML = `<button type="button" data-to="top" title="回到頂部" aria-label="回到頂部">↑</button><button type="button" data-to="bottom" title="回到底部" aria-label="回到底部">↓</button>`;
+    document.body.appendChild(box);
+    const [up, down] = box.querySelectorAll('button');
+    box.onclick = e => {
+      const b = e.target.closest('button'); if (!b) return;
+      window.scrollTo({ top: b.dataset.to === 'top' ? 0 : document.documentElement.scrollHeight, behavior: 'smooth' });
+    };
+    let ticking = false;
+    const sync = () => {
+      ticking = false;
+      const doc = document.documentElement, y = window.scrollY, max = doc.scrollHeight - window.innerHeight;
+      up.classList.toggle('show', max > 200 && y > 200);
+      down.classList.toggle('show', max > 200 && y < max - 200);
+    };
+    const later = () => { if (!ticking) { ticking = true; requestAnimationFrame(sync); } };
+    window.addEventListener('scroll', later, { passive: true });
+    window.addEventListener('resize', later);
+    new ResizeObserver(later).observe(document.body);   // 頁面內容載入、展開時重新判斷
+    sync();
+  }
+
   function start() {
     document.getElementById('copyYear').textContent = new Date().getFullYear();
+    initScrollButtons();
     document.getElementById('navToggle').onclick = () => document.body.classList.toggle('nav-open');
     document.getElementById('sideCollapse').onclick = toggleSidebar;
     document.querySelectorAll('.theme-toggle').forEach(b => b.onclick = toggleTheme);
