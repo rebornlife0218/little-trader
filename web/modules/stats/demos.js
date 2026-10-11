@@ -124,5 +124,122 @@ window.LTStatDemos = (() => {
     draw();
   }
 
-  return { 'inclusion-exclusion': inclusionExclusion };
+  /* ---------- 機率樹：全機率定理與貝氏定理 ---------- */
+  const TREE_PRESETS = {
+    factory: { title: '工廠與不良品', a: ['甲廠', '乙廠', '丙廠'], b: '不良品', bc: '良品', pa: [0.5, 0.3, 0.2], pb: [0.01, 0.02, 0.03] },
+    medical: { title: '醫學檢驗(第 2 章例二)', a: ['有病', '沒病'], b: '陽性', bc: '陰性', pa: [0.01, 0.99], pb: [0.99, 0.01] },
+  };
+  const pct = (v, d = 2) => (v * 100).toFixed(d).replace(/\.?0+$/, '') + '%';
+  function probabilityTree(el) {
+    let preset = 'factory', S = JSON.parse(JSON.stringify(TREE_PRESETS.factory));
+    el.innerHTML = `
+      <h3>互動機率樹 · 全機率定理</h3>
+      <div class="btnrow-l pt-ctrl"><button data-p="factory">工廠與不良品</button><button data-p="medical">醫學檢驗</button></div>
+      <div class="pt-inputs"></div>
+      <svg class="pt-svg" role="img" aria-label="機率樹"></svg>
+      <div class="pt-calc"></div>`;
+    const inputs = el.querySelector('.pt-inputs'), svg = el.querySelector('.pt-svg'), calc = el.querySelector('.pt-calc');
+    function buildInputs() {
+      const k = S.a.length;
+      inputs.innerHTML = `<div class="paramgrid">${S.a.map((name, i) => `
+        <div class="paramitem"><label>P(${name}) ${i === k - 1 ? '<small class="mute">= 1 − 其他</small>' : ''}</label>
+          <input type="number" min="0" max="1" step="0.01" data-k="pa" data-i="${i}" value="${S.pa[i]}" ${i === k - 1 ? 'disabled' : ''}></div>
+        <div class="paramitem"><label>P(${S.b} | ${name})</label><input type="number" min="0" max="1" step="0.01" data-k="pb" data-i="${i}" value="${S.pb[i]}"></div>`).join('')}</div>`;
+      inputs.querySelectorAll('input').forEach(inp => inp.oninput = () => {
+        const v = Math.min(1, Math.max(0, +inp.value || 0));
+        S[inp.dataset.k][+inp.dataset.i] = v;
+        if (inp.dataset.k === 'pa') {   // 最後一個分支 = 1 − 其他，維持分割
+          const last = S.a.length - 1;
+          S.pa[last] = Math.max(0, +(1 - S.pa.slice(0, last).reduce((a, b) => a + b, 0)).toFixed(6));
+          inputs.querySelector(`[data-k=pa][data-i="${last}"]`).value = S.pa[last];
+        }
+        draw();
+      });
+    }
+    function draw() {
+      // 窄螢幕(手機)：縮短間距、只寫路徑機率，字才不會太小
+      const narrow = (el.clientWidth || 600) < 560;
+      const k = S.a.length, rowH = narrow ? 84 : 92, H = k * rowH + 16, W = narrow ? 300 : 560;
+      const x0 = narrow ? 12 : 24, x1 = narrow ? 104 : 200, x2 = narrow ? 186 : 330, x3 = narrow ? 238 : 400;
+      const y1 = i => 8 + rowH * (i + 0.5), y2 = (i, j) => y1(i) + (j ? 22 : -22);
+      const leaf = S.a.map((_, i) => [S.pa[i] * S.pb[i], S.pa[i] * (1 - S.pb[i])]);
+      const pB = leaf.reduce((a, l) => a + l[0], 0), yr = H / 2;
+      let g = '';
+      S.a.forEach((name, i) => {
+        g += `<line x1="${x0 + 8}" y1="${yr}" x2="${x1 - 30}" y2="${y1(i)}" stroke="var(--border-strong)" stroke-width="1.5"/>
+          <text x="${(x0 + x1) / 2 - 6}" y="${(yr + y1(i)) / 2 - 6}" font-size="13" text-anchor="middle" fill="var(--dim)">${pct(S.pa[i])}</text>
+          <text x="${x1 - 24}" y="${y1(i) + 5}" font-size="14" font-weight="700" fill="var(--text)">${name}</text>`;
+        [0, 1].forEach(j => {
+          const isB = j === 0, p = isB ? S.pb[i] : 1 - S.pb[i];
+          g += `<line x1="${x1 + 26}" y1="${y1(i)}" x2="${x2 - 6}" y2="${y2(i, j)}" stroke="${isB ? 'var(--amber)' : 'var(--border-strong)'}" stroke-width="${isB ? 2.2 : 1.5}"/>
+            <text x="${(x1 + x2) / 2 + 10}" y="${(y1(i) + y2(i, j)) / 2 + (j ? 14 : -5)}" font-size="12" text-anchor="middle" fill="var(--dim)">${pct(p)}</text>
+            <text x="${x2}" y="${y2(i, j) + 5}" font-size="13" font-weight="${isB ? 700 : 400}" fill="${isB ? 'var(--amber)' : 'var(--mute)'}">${isB ? S.b : S.bc}</text>
+            <text x="${x3 + 10}" y="${y2(i, j) + 5}" font-size="12.5" fill="${isB ? 'var(--amber)' : 'var(--mute)'}">${narrow ? '' : `${pct(S.pa[i])} × ${pct(p)} = `}<tspan font-weight="700">${pct(leaf[i][j], 3)}</tspan></text>`;
+        });
+      });
+      svg.setAttribute('viewBox', `0 0 ${W + (narrow ? 20 : 60)} ${H}`);
+      svg.innerHTML = `<circle cx="${x0}" cy="${yr}" r="6" fill="var(--text)"/>${g}`;
+      const post = leaf.map(l => pB > 0 ? l[0] / pB : NaN);
+      calc.innerHTML = `
+        <p><b>全機率定理</b>：把所有通往「${S.b}」的路徑(橘色)機率相加，
+          P(${S.b}) = ${S.a.map((n, i) => `${pct(leaf[i][0], 3)}`).join(' + ')} = <b>${pct(pB, 3)}</b></p>
+        <p><b>反推(貝氏定理)</b>：已知結果是「${S.b}」，來自各分支的機率 = 該路徑 ÷ 全部橘色路徑：
+          ${S.a.map((n, i) => `P(${n} | ${S.b}) = ${pct(leaf[i][0], 3)} ÷ ${pct(pB, 3)} = <b>${Number.isFinite(post[i]) ? pct(post[i], 1) : '—'}</b>`).join('；')}</p>`;
+      el.querySelectorAll('.pt-ctrl button').forEach(b => b.classList.toggle('active', b.dataset.p === preset));
+    }
+    el.querySelector('.pt-ctrl').onclick = ev => {
+      const p = ev.target.closest('button')?.dataset.p; if (!p) return;
+      preset = p; S = JSON.parse(JSON.stringify(TREE_PRESETS[p])); buildInputs(); draw();
+    };
+    buildInputs(); draw();
+    let lastNarrow = (el.clientWidth || 600) < 560;
+    new ResizeObserver(() => { const n = el.clientWidth < 560; if (n !== lastNarrow) { lastNarrow = n; draw(); } }).observe(el);
+  }
+
+  /* ---------- 生日問題 ---------- */
+  const sameBirthday = n => { let q = 1; for (let i = 0; i < n; i++) q *= (365 - i) / 365; return 1 - q; };
+  function birthday(el) {
+    const N = 80, xs = Array.from({ length: N }, (_, i) => i + 1);
+    el.innerHTML = `
+      <h3>互動模擬 · 生日問題</h3>
+      <div class="paramitem bd-slider"><label for="bdN">班上人數 n <b id="bdNv">23</b></label><input id="bdN" type="range" min="2" max="${N}" value="23"></div>
+      <div class="statgrid" id="bdStats" style="margin:12px 0;"></div>
+      <div id="bdChart"></div>
+      <div class="btnrow-l" style="margin-top:10px;"><button data-a="one">模擬一個班級</button><button data-a="many">模擬 1000 個班級</button></div>
+      <div id="bdOut" class="note" style="margin-top:8px;">按下按鈕，隨機產生 n 個人的生日。</div>`;
+    const $ = s => el.querySelector(s);
+    function draw() {
+      const n = +$('#bdN').value;
+      $('#bdNv').textContent = n;
+      $('#bdStats').innerHTML = `
+        <div class="stat"><div class="v">${pct(sameBirthday(n), 1)}</div><div class="l">至少兩人同一天生日</div></div>
+        <div class="stat"><div class="v">${(n * (n - 1) / 2).toLocaleString()}</div><div class="l">兩兩配對的組數 C(n, 2)</div></div>
+        <div class="stat"><div class="v">${pct(1 - (364 / 365) ** (n - 1), 1)}</div><div class="l">有人和「你」同一天生日</div></div>`;
+      LTChart.line($('#bdChart'), {
+        x: xs, height: 220, label: '生日問題機率', xFmt: v => v + ' 人', yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => pct(v, 1),
+        series: [{ name: '至少兩人同一天', y: xs.map(sameBirthday), color: 'var(--amber)' }, { name: '有人和你同一天', y: xs.map(m => 1 - (364 / 365) ** (m - 1)), color: 'var(--blue)', width: 1.5 }],
+        refY: [{ y: 0.5, label: '50%' }], points: [{ x: n, y: sameBirthday(n), color: 'var(--amber)', label: pct(sameBirthday(n), 1) }],
+      });
+    }
+    const randomClass = n => Array.from({ length: n }, () => Math.floor(Math.random() * 365));
+    const md = d => { const t = new Date(2025, 0, 1 + d); return `${t.getMonth() + 1}/${t.getDate()}`; };
+    el.querySelector('.btnrow-l').onclick = ev => {
+      const a = ev.target.closest('button')?.dataset.a, n = +$('#bdN').value; if (!a) return;
+      if (a === 'one') {
+        const days = randomClass(n), cnt = {};
+        days.forEach(d => { cnt[d] = (cnt[d] || 0) + 1; });
+        const dup = Object.entries(cnt).filter(([, c]) => c > 1);
+        $('#bdOut').innerHTML = `${n} 人的生日：${days.slice().sort((x, y) => x - y).map(d => cnt[d] > 1 ? `<b style="color:var(--amber)">${md(d)}</b>` : md(d)).join('、')}<br>
+          ${dup.length ? `有 <b>${dup.length}</b> 組同一天生日：${dup.map(([d, c]) => `${md(+d)}(${c} 人)`).join('、')}` : '這一班沒有人同一天生日。'}`;
+      } else {
+        let hit = 0;
+        for (let t = 0; t < 1000; t++) { const s = new Set(randomClass(n)); if (s.size < n) hit++; }
+        $('#bdOut').innerHTML = `模擬 1000 個 ${n} 人的班級，有 <b>${hit}</b> 班出現同一天生日，比例 <b>${pct(hit / 1000, 1)}</b>(理論值 ${pct(sameBirthday(n), 1)})。`;
+      }
+    };
+    $('#bdN').oninput = draw;
+    draw();
+  }
+
+  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday };
 })();
