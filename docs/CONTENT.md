@@ -74,6 +74,7 @@ python -m http.server 8000 -d web
 | 換行(表格內) | `<br>` |
 | 註解(不會顯示) | `<!-- 這是註解 -->` |
 | 文氏圖 | `[[venn 種類\|標題\|說明]]`(見下方) |
+| 互動動畫 | `[[demo inclusion-exclusion]]`(單獨一行；動畫程式在 `web/modules/stats/demos.js`) |
 
 **表格**：
 

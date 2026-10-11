@@ -95,7 +95,8 @@
   }
 
   /* ---------- Markdown 章節：content/stats/basic/<名稱>.md ----------
-     $...$ 行內公式、$$...$$ 獨立公式(KaTeX)；> 引言顯示為提示框；單獨一行的圖片會加上圖說 */
+     $...$ 行內公式、$$...$$ 獨立公式(KaTeX)；> 引言顯示為提示框；單獨一行的圖片會加上圖說；
+     [[venn 種類|標題|說明]] 文氏圖；[[demo 名稱]] 互動動畫(demos.js) */
   const MD_DIR = 'content/stats/basic/';
   async function loadChapter(name) {
     const r = await fetch(MD_DIR + name + '.md', { cache: 'no-cache' });
@@ -113,6 +114,8 @@
         });
         return `\n%%VENN${vennRows.push(`<div class="venn-row">${figs.join('')}</div>`) - 1}%%\n\n`;
       })
+      // 互動動畫：[[demo 名稱]]，名稱對應 demos.js 的 LTStatDemos
+      .replace(/^\[\[demo ([\w-]+)\]\][ \t]*$/gm, (_, name) => `\n%%VENN${vennRows.push(`<div class="demo-box md-demo" data-demo="${name}"></div>`) - 1}%%\n`)
       .replace(/\$\$([\s\S]+?)\$\$/g, (_, t) => `\n\n%%MATH${math.push([t, true]) - 1}%%\n\n`)
       .replace(/\\\$/g, '%%DOLLAR%%')
       .replace(/\$([^$\n]+?)\$/g, (_, t) => `%%MATH${math.push([t, false]) - 1}%%`)
@@ -460,6 +463,10 @@
           const html = await loadChapter(ch.md);
           if (!ctx.alive()) return;
           box.innerHTML = html;
+          box.querySelectorAll('.md-demo').forEach(d => {
+            const fn = window.LTStatDemos && LTStatDemos[d.dataset.demo];
+            if (fn) fn(d); else d.textContent = `找不到互動動畫：${d.dataset.demo}`;
+          });
         } catch (err) {
           if (!ctx.alive()) return;
           box.innerHTML = `<span class="mute">章節內容載入失敗：${err.message}</span>`;
