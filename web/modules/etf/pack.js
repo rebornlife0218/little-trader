@@ -41,13 +41,17 @@
 
   /* 單筆投入(LSI) vs 定期定額(DCA) vs 逢低買入(BTD)：仿 PWL Capital 的滾動期間比較
      P：月底的總報酬指數(或價格指數)；H：持有年數；dcaN：定期定額分幾個月投入；dip：逢低買入的跌幅門檻
-     cash：等待投入的現金每月利率；每個起點 t 都比較 t ～ t + 12H 的年化報酬 */
+     cash：等待投入的現金每月利率；每個起點 t 都比較 t ～ t + 12H 的年化報酬
+     H = 0 代表「持有至今」：每個起點都持有到最後一個月，持有期間各不相同(至少 MIN_NOW 個月) */
+  const MIN_NOW = 36;
   function rollingStudy(P, H, dcaN, dips, cashYear) {
-    const n = P.length, m = H * 12, r = (1 + cashYear) ** (1 / 12) - 1;
+    const n = P.length, r = (1 + cashYear) ** (1 / 12) - 1;
     const ath = []; P.forEach((v, i) => ath.push(Math.max(v, i ? ath[i - 1] : v)));   // 歷史高點(到當月為止)
     const out = [];
-    for (let t = 0; t + m < n; t++) {
-      const end = t + m, ann = v => v ** (1 / H) - 1;
+    for (let t = 0; t < n; t++) {
+      const m = H ? H * 12 : n - 1 - t;
+      if (H ? t + m >= n : m < Math.max(MIN_NOW, dcaN)) break;
+      const end = t + m, yrs = m / 12, ann = v => v ** (1 / yrs) - 1;
       const lsi = ann(P[end] / P[t]);
       // 定期定額：每月投入 1/dcaN，還沒投入的錢放現金賺利息
       let dcaV = 0;
@@ -71,7 +75,8 @@
       let C = null, E = null, loadErr = '';
       try {
         [C, E] = await Promise.all([LT.loadJSON('etf_compare', 'compare.json').then(r => r.data), LT.loadJSON('etf_compare', 'etfs.json').then(r => r.data)]);
-        try { const tx = await LT.loadJSON('indices', 'TAIEX.json'); E.taiex = tx.data; } catch (e) { /* 沒有加權指數時只能選 ETF */ }
+        // 長期回測用：加權報酬指數(含股息，2003 起)、加權指數(不含股息，1999 起)；沒有時只能選 ETF
+        await Promise.all([['taiex', 'TAIEX.json'], ['taiex_tr', 'TAIEX_TR.json']].map(([k, f]) => LT.loadJSON('indices', f).then(r => { E[k] = r.data; }).catch(() => {})));
       } catch (err) { loadErr = err.message; }
       if (!ctx.alive()) return;
       const failed = `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>${esc(loadErr)}</p></div></div>`;
@@ -272,8 +277,8 @@
             </div>
             <h4>用台股自己驗證</h4>
             <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
-              <div class="paramitem"><label for="rsSeries">標的</label><select id="rsSeries">${E && E.taiex ? '<option value="taiex">加權指數(1999 起，不含股息)</option>' : ''}${twList.map(x => `<option value="${x.code}" ${x.code === '0050' && !(E && E.taiex) ? 'selected' : ''}>${x.code} ${esc(x.name)}(含股息)</option>`).join('')}</select></div>
-              <div class="paramitem"><label for="rsH">持有期間</label><select id="rsH"><option value="5">5 年</option><option value="10" selected>10 年</option></select></div>
+              <div class="paramitem"><label for="rsSeries">標的</label><select id="rsSeries">${E && E.taiex_tr ? '<option value="taiex_tr">加權報酬指數(2003 起，含股息)</option>' : ''}${E && E.taiex ? '<option value="taiex">加權指數(1999 起，不含股息)</option>' : ''}${twList.map(x => `<option value="${x.code}" ${x.code === '0050' && !(E && (E.taiex || E.taiex_tr)) ? 'selected' : ''}>${x.code} ${esc(x.name)}(含股息)</option>`).join('')}</select></div>
+              <div class="paramitem"><label for="rsH">持有期間</label><select id="rsH"><option value="5">5 年</option><option value="10" selected>10 年</option><option value="20">20 年</option><option value="0">至今(持有到最新)</option></select></div>
               <div class="paramitem"><label for="rsN">定期定額分幾個月</label><select id="rsN"><option value="6">6 個月</option><option value="12" selected>12 個月</option><option value="24">24 個月</option></select></div>
               <div class="paramitem"><label for="rsCash">現金年利率(%)</label><input id="rsCash" type="number" min="0" max="10" step="0.1" value="1.5"></div>
             </div>
@@ -285,7 +290,7 @@
             <div id="rsLine"></div>
             ${LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }])}
             <ul class="insight" id="rsInsight"></ul>
-            <p class="note">以月底資料計算：每個月都當成一個起點，比較持有到期間結束的年化報酬(滾動期間)。定期定額每月投入 1/N；逢低買入在指數從歷史高點(資料起點以來)下跌達門檻的那個月一次投入，起點時已經跌超過門檻就立刻進場(和單筆相同，不計輸贏)，期間內沒跌到門檻就一直拿著現金；等待中的現金依設定的年利率計息。加權指數為價格指數(不含股息)，ETF 為股息再投入的總報酬，不計手續費與稅。</p>
+            <p class="note">以月底資料計算：每個月都當成一個起點，比較持有到期間結束的年化報酬(滾動期間)；選「至今」時每個起點都持有到最新一個完整月份，越晚的起點持有越短(至少 3 年)，年化報酬的波動也越大。定期定額每月投入 1/N；逢低買入在指數從歷史高點(資料起點以來)下跌達門檻的那個月一次投入，起點時已經跌超過門檻就立刻進場(和單筆相同，不計輸贏)，期間內沒跌到門檻就一直拿著現金；等待中的現金依設定的年利率計息。加權指數為價格指數(不含股息)；加權報酬指數(臺灣證券交易所編製)與 ETF 為股息再投入的總報酬，不計手續費與稅。</p>
           </div>` : failed}
         </div>`;
 
@@ -369,8 +374,8 @@
 
       /* ---------- 四、LSI vs DCA vs BTD ---------- */
       const seriesOf = key => {
-        if (key === 'taiex') {   // 加權指數：日資料 → 月底
-          const tx = E.taiex, mo = monthly({ d: tx.d, c: tx.c, a: tx.c });
+        if (key === 'taiex' || key === 'taiex_tr') {   // 加權指數 / 報酬指數：日資料 → 月底
+          const tx = E[key], mo = monthly({ d: tx.d, c: tx.c, a: tx.c });
           return { m: mo.m, v: mo.a };
         }
         const mo = MO[key]; return { m: mo.m, v: mo.a };
@@ -381,7 +386,7 @@
         const full = S.m[S.m.length - 1] === new Date().toISOString().slice(0, 7) ? S.m.length - 1 : S.m.length;
         const P = S.v.slice(0, full), M = S.m.slice(0, full);
         const R = rollingStudy(P, H, N, [0.10, 0.20], cash);
-        if (R.length < 12) { $('#rsStats').innerHTML = `<p class="mute">資料不足：持有 ${H} 年需要至少 ${H} 年以上的資料，請改選較短的持有期間或歷史較長的標的。</p>`; $('#rsTable').innerHTML = ''; $('#rsHist').innerHTML = ''; $('#rsLine').innerHTML = ''; $('#rsInsight').innerHTML = ''; return; }
+        if (R.length < 12) { $('#rsStats').innerHTML = `<p class="mute">資料不足：持有 ${H} 年需要比 ${H} 年多至少一年的資料，請改選較短的持有期間或歷史較長的標的。</p>`; $('#rsTable').innerHTML = ''; $('#rsHist').innerHTML = ''; $('#rsLine').innerHTML = ''; $('#rsInsight').innerHTML = ''; return; }
         const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
         const strat = [['lsi', '單筆投入', x => x.lsi], ['dca', `定期定額(${N} 個月)`, x => x.dca], ['b10', '逢低買入(跌 10%)', x => x.btd[0]], ['b20', '逢低買入(跌 20%)', x => x.btd[1]]];
         const diff = f => R.map(x => x.lsi - f(x));
@@ -389,7 +394,7 @@
         const tally = f => { const w = R.filter(x => x.lsi - f(x) > EPS).length, l = R.filter(x => f(x) - x.lsi > EPS).length; return { w, l, tie: R.length - w - l }; };
         const win = f => { const t = tally(f); return t.w + t.l ? t.w / (t.w + t.l) : NaN; };
         const tieTxt = f => { const t = tally(f); return t.tie ? `(另有 ${(t.tie / R.length * 100).toFixed(0)}% 結果相同)` : ''; };
-        $('#rsStats').innerHTML = `<div class="stat"><div class="v" style="font-size:16px;">${ym(M[R[0].t])}～${ym(M[R[R.length - 1].t])}</div><div class="l">${R.length} 個起點 · 每個持有 ${H} 年</div></div>` +
+        $('#rsStats').innerHTML = `<div class="stat"><div class="v" style="font-size:16px;">${ym(M[R[0].t])}～${ym(M[R[R.length - 1].t])}</div><div class="l">${R.length} 個起點 · ${H ? `每個持有 ${H} 年` : `都持有到 ${ym(M[M.length - 1])}(${(MIN_NOW / 12).toFixed(0)}～${((M.length - 1 - R[0].t) / 12).toFixed(0)} 年)`}</div></div>` +
           strat.slice(1).map(([k, n, f]) => `<div class="stat"><div class="v">${Number.isFinite(win(f)) ? (win(f) * 100).toFixed(0) + '%' : '—'}</div><div class="l">單筆贏過${n}的比例${tieTxt(f)} · 年化平均多 ${pctf(mean(diff(f)), 2)}</div></div>`).join('');
         $('#rsTable').innerHTML = `<thead><tr><th>策略</th><th>平均年化</th><th>中位數</th><th>最差 10%(10th)</th><th>最好 10%(90th)</th><th>最差</th></tr></thead><tbody>
           ${strat.map(([k, n, f]) => { const v = R.map(f); return `<tr><td>${n}</td><td class="${cls(mean(v))}">${pctf(mean(v), 2)}</td><td>${pctf(pctl(v, 0.5), 2)}</td><td>${pctf(pctl(v, 0.1), 2)}</td><td>${pctf(pctl(v, 0.9), 2)}</td><td class="down">${pctf(Math.min(...v), 2)}</td></tr>`; }).join('')}</tbody>`;
@@ -407,7 +412,8 @@
           <li>單筆投入在 ${(w * 100).toFixed(0)}% 的起點贏過定期定額，年化報酬平均${mean(d) >= 0 ? '多' : '少'} ${pctf(Math.abs(mean(d)), 2).replace('+', '')}；${w > 0.5 && mean(d) >= 0 ? '勝率與平均都和 PWL 研究的方向一致' : w > 0.5 ? '單筆較常勝出，但定期定額贏的時候贏比較多(例如起點剛好在大跌之前)，平均下來差不多' : '這段期間定期定額較常勝出，與 PWL 研究的多數國家不同'}。</li>
           <li>在單筆投入表現最差的 10% 起點裡，定期定額贏的比例是 ${(worst.filter(x => x.dca > x.lsi).length / worst.length * 100).toFixed(0)}%。</li>
           <li>逢低買入：等跌 10% 才進場，單筆贏的比例 ${(win(x => x.btd[0]) * 100).toFixed(0)}%${tieTxt(x => x.btd[0])}、年化平均多 ${pctf(mean(diff(x => x.btd[0])), 2)}；等跌 20%，單筆贏的比例 ${(win(x => x.btd[1]) * 100).toFixed(0)}%${tieTxt(x => x.btd[1])}、年化平均多 ${pctf(mean(diff(x => x.btd[1])), 2)}。${mean(diff(x => x.btd[0])) < 0 ? "這段期間「跌 10% 才買」平均反而略勝：台股 10% 的回檔很常見、等待時間短，常能買到較低的價格；但「跌 20% 才買」常常要等好幾年，錯過的漲幅遠大於買低的好處。" : "門檻越深，拿著現金的時間越長，錯過的漲幅越多。"}</li>
-          ${$('#rsSeries').value === 'taiex' ? '<li>加權指數 2000 年的高點直到 2017 年才站回，這段期間指數大多已比高點低 10% 以上，所以「跌 10% 才買」多半在起點就立刻進場、結果和單筆相同；加權指數也不含股息，含股息時越早進場越有利。</li>' : ''}`;
+          ${$('#rsSeries').value === 'taiex' ? '<li>加權指數 2000 年的高點直到 2017 年才站回，這段期間指數大多已比高點低 10% 以上，所以「跌 10% 才買」多半在起點就立刻進場、結果和單筆相同；加權指數也不含股息，含股息時越早進場越有利(可改選加權報酬指數比較)。</li>' : ''}
+          ${$('#rsSeries').value === 'taiex_tr' ? '<li>加權報酬指數把成分股的現金股利再投入，是 0050 這類市值型 ETF 追蹤的標的(未扣 ETF 費用)，比只看價格的加權指數更接近實際投資的結果。</li>' : ''}`;
       };
       ['#rsSeries', '#rsH', '#rsN'].forEach(id => { $(id).onchange = drawRolling; });
       $('#rsCash').oninput = drawRolling;
