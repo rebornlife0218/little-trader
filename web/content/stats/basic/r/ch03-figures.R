@@ -47,3 +47,19 @@ segments(m, 0, m, (g(x1) + g(x2)) / 2, lty = 3, col = "grey40")
 text(m + 0.08, g(m) - 0.4, "g(E[X])", adj = 0); text(m - 0.08, (g(x1) + g(x2)) / 2 + 0.5, "E[g(X)]", adj = 1, col = orange)
 text(c(x1, m, x2), 0.9, c("x1", "E[X]", "x2"), col = "grey30", pos = c(4, 4, 4))
 dev.off()
+
+# ---- 中位數、眾數、分位數：等公車時間 X ~ Exp(平均 10 分鐘) ----
+q <- function(p) -10 * log(1 - p)
+dev("ch03-quantile.png")
+par(mfrow = c(1, 2), mar = c(4.2, 4.2, 3, 1))
+plot(xs, dexp(xs, lam), type = "l", lwd = 2.5, col = blue, ylim = c(0, 0.1), main = "Mode < Median < Mean", xlab = "x (minutes)", ylab = "f(x)")
+abline(v = c(0, q(0.5), 10), col = c("grey30", orange, "firebrick"), lty = c(1, 2, 2), lwd = 2)
+text(c(18, 18, 18), c(0.09, 0.077, 0.064), c("mode = 0 (solid)", sprintf("median = %.2f (dashed)", q(0.5)), "mean = 10 (dashed)"), adj = 0, cex = 0.9,
+     col = c("grey30", orange, "firebrick"))
+plot(xs, pexp(xs, lam), type = "l", lwd = 2.5, col = blue, ylim = c(0, 1), main = "Quantile: x_p = F^(-1)(p)", xlab = "x (minutes)", ylab = "F(x)")
+for (p in c(0.25, 0.5, 0.75)) {
+  segments(0, p, q(p), p, lty = 2, col = orange); arrows(q(p), p, q(p), 0, length = 0.07, col = orange)
+  text(q(p) + 0.5, 0.04 + (p == 0.5) * 0.06, sprintf("%.2f", q(p)), adj = 0, cex = 0.85)
+}
+text(c(30, 30, 30), c(0.25, 0.5, 0.75) + 0.035, c("p = 0.25 (Q1)", "p = 0.5 (median)", "p = 0.75 (Q3)"), cex = 0.85)
+dev.off()
