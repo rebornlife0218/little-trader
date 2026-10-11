@@ -415,3 +415,4 @@
   table.settle-table tr.settle-month td:nth-child(3){color:var(--amber);font-weight:600;}
   .mk-tabs{grid-template-columns:repeat(3,minmax(0,1fr));}
   @media (max-width:640px){ .mk-tabs{grid-template-columns:1fr;} }
+  table.stattable tr.inaug td:first-child{color:var(--amber);}
