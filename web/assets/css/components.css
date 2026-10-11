@@ -421,6 +421,7 @@
   table.us-strat tr.click{cursor:pointer;}
   table.us-strat td.beat, .stat .v.beat, table.us-year td.beat{font-weight:700;text-decoration:underline;text-underline-offset:3px;}
   .us-tabs{grid-template-columns:repeat(auto-fit,minmax(160px,1fr));}
+  .us-family{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
   .pk-tabs{grid-template-columns:repeat(2,minmax(0,1fr));}
   @media (max-width:640px){ .pk-tabs{grid-template-columns:1fr;} }
   .pk-range button.active{border-color:var(--amber);color:var(--amber);}

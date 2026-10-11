@@ -6,7 +6,7 @@
 新制：2026-08-10 起處置期間由 10 個營業日縮短為 5 個營業日(當沖過熱 12 → 7)，撮合改為約每 2 分鐘一次。
 
 每個處置事件記錄：
-  rule  new(2026-08-10 以後開始)、old(新制前就結束)、mix(跨越新制實施日，依過渡規定縮短，不列入比較)
+  rule  new(2026-08-10 以後開始，網頁只統計這些)、old(新制前就結束)、mix(跨越新制實施日，依過渡規定縮短)
   d1    處置第一天的開盤、收盤與前一日收盤(判斷黑 K / 紅 K)
   pre5  處置前 5 個交易日的報酬(被處置前的漲幅)
   ret   處置期間報酬：處置前一日收盤 → 處置最後一天收盤
@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common import dataset_dir, write_json, write_meta  # noqa: E402
 
 NAME = 'disposition'
-START = date(2025, 1, 1)            # 新制前的事件也抓，作為對照
+START = date(2026, 7, 1)            # 新制(2026-08-10)前一個多月起，涵蓋跨越實施日的處置
 NEW_RULE = '2026-08-10'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (little-trader data bot)'}
 TWSE_API = 'https://www.twse.com.tw/rwd/zh/announcement/punish'
