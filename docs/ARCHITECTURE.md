@@ -17,9 +17,10 @@ web/                                網站(部署時整個資料夾就是網站�
     home/home.js                    首頁：各區塊入口、各資料集更新狀態
     indices/indices.js              指數：大盤漲跌分析、K棒型態
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
-    etf/etf.js                      ETF：折溢價、即將發行ETF
+    etf/etf.js                      ETF：ETF大禮包(0050 vs 勞退基金、折溢價)、即將發行ETF
     stock/tw.js                     股票 · 台股：處置股、隔日沖、波段(建置中)
     stock/earnings.js               股票 · 美股：財報行事曆
+    stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(圖檔在 content/stock/sp500/)
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
     option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
@@ -39,6 +40,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
+  etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
 
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
@@ -61,6 +63,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 |---|---|---|---|
 | indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
+| etf_compare | 勞動基金運用局、Yahoo Finance | 週一~五 09:00 | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約) |
 
