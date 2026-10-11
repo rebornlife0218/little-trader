@@ -367,3 +367,13 @@
   .ie-legend i{display:inline-block;width:12px;height:12px;border-radius:3px;opacity:.7;}
   .ie-legend i.ie-miss{background:var(--up);opacity:.25;}
   .md-demo{margin:14px 0 18px;}
+  /* 機率樹、生日問題(modules/stats/demos.js) */
+  .pt-ctrl button.active{border-color:var(--amber);color:var(--amber);}
+  .pt-inputs{margin:12px 0 4px;}
+  .pt-inputs .paramgrid{grid-template-columns:repeat(4,1fr);gap:10px 16px;}
+  @media (max-width:700px){ .pt-inputs .paramgrid{grid-template-columns:repeat(2,1fr);} }
+  .pt-inputs input{width:100%;box-sizing:border-box;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  .pt-inputs input:disabled{opacity:.6;}
+  .pt-svg{width:100%;max-width:760px;height:auto;display:block;margin:6px 0;}
+  .pt-calc p{margin:6px 0;font-size:13px;line-height:1.9;}
+  .bd-slider{max-width:420px;}
