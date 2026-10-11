@@ -237,5 +237,24 @@ window.LTStatDemos = (() => {
     draw();
   }
 
-  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday };
+  /* ---------- 圖解：樣本空間的分割與事件 B 被切成的小塊 ---------- */
+  function partition(el) {
+    const xs = [20, 150, 250, 370, 460], names = ['A₁', 'A₂', 'A₃', 'A₄'];
+    const id = 'pt' + Math.random().toString(36).slice(2, 7);
+    el.innerHTML = `
+      <svg viewBox="0 0 480 220" class="part-svg" role="img" aria-label="樣本空間 S 被分割成 A1 到 A4，事件 B 被切成四塊">
+        <defs><clipPath id="${id}"><ellipse cx="240" cy="128" rx="190" ry="52"/></clipPath></defs>
+        <rect x="20" y="30" width="440" height="170" rx="8" fill="none" stroke="var(--border-strong)" stroke-width="1.5"/>
+        <text x="28" y="22" font-size="13" fill="var(--mute)">S</text>
+        ${names.map((n, i) => `<rect x="${xs[i]}" y="30" width="${xs[i + 1] - xs[i]}" height="170" fill="${i % 2 ? 'var(--panel)' : 'var(--panel2)'}" stroke="var(--border-strong)"/>
+          <text x="${(xs[i] + xs[i + 1]) / 2}" y="56" font-size="15" font-weight="700" text-anchor="middle" fill="var(--text)">${n}</text>`).join('')}
+        <g clip-path="url(#${id})">${names.map((n, i) => `<rect x="${xs[i]}" y="30" width="${xs[i + 1] - xs[i]}" height="170" fill="var(--amber)" fill-opacity="${0.22 + i * 0.1}"/>`).join('')}</g>
+        <ellipse cx="240" cy="128" rx="190" ry="52" fill="none" stroke="var(--amber)" stroke-width="2"/>
+        ${names.map((n, i) => `<text x="${(xs[i] + xs[i + 1]) / 2 + (i === 0 ? 22 : i === 3 ? -14 : 0)}" y="133" font-size="12" text-anchor="middle" fill="var(--text)">B∩${n}</text>`).join('')}
+        <text x="440" y="96" font-size="14" font-weight="700" text-anchor="end" fill="var(--amber)">B</text>
+      </svg>
+      <div class="note" style="text-align:center;margin-top:4px;">A₁～A₄ 互不重疊、合起來剛好是 S；事件 B(橘色)因此被切成互斥的四塊 B∩A₁、…、B∩A₄。</div>`;
+  }
+
+  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition };
 })();
