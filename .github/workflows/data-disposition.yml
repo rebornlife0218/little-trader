@@ -1,0 +1,19 @@
+name: 資料 · 台股處置股
+
+# 資料集 disposition：pipeline/disposition/update.py → data 分支的 disposition/
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '0 11 * * 1-5'    # 台北 週一~週五 19:00(證交所、櫃買中心公告當日處置股之後)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    uses: ./.github/workflows/_dataset.yml
+    with:
+      dataset: disposition

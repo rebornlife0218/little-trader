@@ -10,7 +10,7 @@
   s2 上季輸家：報酬最差的 10 檔，等權重
   s3 上季高夏普＋最佳化：夏普值最好的 20 檔，以極大化夏普值決定權重(只做多)
   s4 上季贏家中低波動：報酬最好的 20 檔中，波動最小的 10 檔，等權重
-  ew 全部成分股等權重(用來和 RSP 比較，檢查資料剩下多少倖存者偏差)
+  ew 全部成分股等權重(與 SPY 的市值加權對照)
 持有期間股票下市(沒有股價)就以最後價格轉為現金；交易成本由網頁依換手率另外扣除。
 
 執行方式
@@ -19,8 +19,7 @@
   加上 --offline 只用本機快取，不向 Tiingo 下載
 
 輸出 web/data/sp500/backtest.json：
-  d 交易日、nav 各策略與 SPY/RSP 的每日淨值(未扣交易成本)、q 每季的成分股數、可用數、換手率、無風險利率、持股
-  biased 只用 Yahoo(有倖存者偏差)時的結果摘要，用來對照
+  d 交易日、nav 各策略與 SPY 的每日淨值(未扣交易成本)、q 每季的成分股數、可用數、換手率、無風險利率、持股
 """
 import io
 import json
@@ -199,15 +198,6 @@ def build_prices(M, days, start, tiingo_key, use_tiingo=True):
     return pd.DataFrame(cols, index=days), src
 
 
-def stats(nav_ret, rf_daily):
-    nav = (1 + nav_ret).cumprod()
-    yrs = len(nav) / 252
-    cagr = nav.iloc[-1] ** (1 / yrs) - 1
-    vol = nav_ret.std() * np.sqrt(252)
-    mdd = (nav / nav.cummax() - 1).min()
-    return {'ret': round(float(cagr), 4), 'vol': round(float(vol), 4), 'sharpe': round(float((cagr - rf_daily.mean() * 252) / vol), 2), 'mdd': round(float(mdd), 4)}
-
-
 def main():
     full = '--full' in sys.argv
     key = os.environ.get('TIINGO_API_KEY') or (Path(os.path.expanduser('~/.tiingo_key')).read_text().strip() if Path(os.path.expanduser('~/.tiingo_key')).exists() else '')
@@ -224,7 +214,7 @@ def main():
         start = '1999-09-01'
     else:
         start = (pd.Timestamp(old['q'][-3]['start']) - pd.Timedelta(days=120)).strftime('%Y-%m-%d')
-    bench = yahoo_close(['SPY', 'RSP', '^IRX'], start)
+    bench = yahoo_close(['SPY', '^IRX'], start)
     days = pd.DatetimeIndex(bench['SPY'].dropna().index)
     qends = [q for q in quarter_ends(days)]
     irx = bench['^IRX'].reindex(days).ffill() / 100
@@ -237,14 +227,6 @@ def main():
         daily, quarters = run(P, M, days, qends, rf_q, k0)
         first = pd.Timestamp(quarters[0]['start'])
         d = days[days >= first]
-        nav = {s: (1 + daily[s].loc[d].iloc[1:]).cumprod() for s in STRATS}
-        # 只用 Yahoo(倖存者偏差)的對照組
-        Pb, _ = build_prices(M, days, start, key, use_tiingo=False)
-        db, _ = run(Pb, M, days, qends, rf_q, k0)
-        rfd = irx.loc[d].iloc[1:].fillna(0) / 252
-        biased = {'from': d[0].strftime('%Y-%m-%d'),
-                  'with': {s: stats(daily[s].loc[d].iloc[1:], rfd) for s in STRATS},
-                  'yahoo_only': {s: stats(db[s].loc[d].iloc[1:], rfd) for s in STRATS}}
         out_q = quarters
         base_d, base_nav = [], {}
         new_d = d
@@ -262,16 +244,15 @@ def main():
         out_q = [x for x in oq if x['start'] < cut] + quarters
         new_d = days[days >= pd.Timestamp(cut)]
         new_ret = {s: daily[s].loc[new_d] for s in STRATS}
-        biased = old.get('biased')
 
-    # 合併每日淨值(SPY、RSP 用 Yahoo 還原股價)
+    # 合併每日淨值(SPY 用 Yahoo 還原股價)
     if full:
         dates = [x.strftime('%Y-%m-%d') for x in new_d]
         navs = {}
         for s in STRATS:
             r = new_ret[s].copy(); r.iloc[0] = 0
             navs[s] = list((1 + r).cumprod().round(6))
-        for b in ['SPY', 'RSP']:
+        for b in ['SPY']:
             px = bench[b].reindex(new_d)
             navs[b.lower()] = [None if pd.isna(v) else round(float(v), 6) for v in (px / px.loc[px.first_valid_index()])]
     else:
@@ -280,7 +261,7 @@ def main():
         for s in STRATS:
             r = new_ret[s].iloc[1:]
             navs[s] = base_nav[s] + list((base_nav[s][-1] * (1 + r).cumprod()).round(6))
-        for b in ['SPY', 'RSP']:
+        for b in ['SPY']:
             px = bench[b].reindex(new_d)
             base = base_nav[b.lower()][-1]
             navs[b.lower()] = base_nav[b.lower()] + [round(float(base * v), 6) for v in (px / px.iloc[0]).iloc[1:]]
@@ -288,7 +269,7 @@ def main():
 
     out = dataset_dir(NAME)
     write_json(out / 'backtest.json', {
-        'd': dates, 'nav': navs, 'q': out_q, 'biased': biased,
+        'd': dates, 'nav': {k: v for k, v in navs.items() if k != 'rsp'}, 'q': out_q,
         'asof': dates[-1],
         'note': '每季最後一個交易日收盤換股；nav 為未扣交易成本的每日淨值；q[].turn 為換手率(新舊權重差的絕對值加總)',
     })
