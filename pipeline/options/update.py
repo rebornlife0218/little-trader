@@ -4,6 +4,7 @@
   - history.json：每日的 30 天平價隱含波動率、Put/Call 比、成交量與未平倉量(第一次回補 1 年，之後增量更新)
   - chain.json：最新交易日各到期契約的 T 字報價(結算價、成交量、未平倉量、隱含波動率)
   - futures.json：台指期近月走勢、三大法人淨未平倉、期限結構(見 futures.py)
+  - spot.json：加權指數最近約 300 個交易日的收盤(歷史波動率、期現貨價差用；網頁不必下載整份 indices/TAIEX.json)
 排程：.github/workflows/data-options.yml；本機手動：python pipeline/options/update.py
 
 計算方式
@@ -217,7 +218,9 @@ def main():
         raise RuntimeError('沒有下載到任何選擇權資料')
 
     latest_exps, latest_day = None, None
-    days = sorted(df['date'].unique()) if not df.empty else []
+    # 期交所把週五(或假日前)的夜盤算在下一個交易日：開盤前下載到的「當日」只有盤後時段，
+    # 沒有一般時段的結算價，算不出 IV 與 T 字報價，要等收盤後的資料才算完整
+    days = sorted(d for d in df['date'].unique() if (df[df['date'] == d]['session'] == '一般').any()) if not df.empty else []
     for d in days:
         row, exps = summarize(df[df['date'] == d], d, chain=(d == days[-1]))
         rows[row['d']] = row
@@ -227,12 +230,16 @@ def main():
     else:
         chain = {'date': latest_day.isoformat(), 'r': R, 'multiplier': 50, 'expiries': latest_exps}
 
-    hist = sorted(rows.values(), key=lambda r: r['d'])
+    # 先前只有盤後時段而算不出來的日子(IV 與 P/C 比都是空的)不保留，等完整資料再補
+    hist = sorted((r for r in rows.values() if r['iv30'] is not None or r['pcoi'] is not None), key=lambda r: r['d'])
     fut = futures.update(load_published(DATASET, 'futures.json'), today, BACKFILL_DAYS)
     out_dir = dataset_dir(DATASET)
     write_json(out_dir / 'futures.json', fut)
     write_json(out_dir / 'history.json', {k: [r[k] for r in hist] for k in HIST_KEYS})
     write_json(out_dir / 'chain.json', chain)
+    tx = load_published('indices', 'TAIEX.json')
+    if tx and tx.get('d'):
+        write_json(out_dir / 'spot.json', {'d': tx['d'][-300:], 'c': tx['c'][-300:]})
     meta = write_meta(DATASET, '臺灣期貨交易所 期貨、選擇權每日交易行情與三大法人', 'https://www.taifex.com.tw/cht/3/dlOptDataDown',
                       '週一~週五 16:00、06:00(台北時間)', last_trade_date=chain['date'], days=len(hist))
     last = hist[-1]

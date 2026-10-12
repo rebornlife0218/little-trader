@@ -34,6 +34,10 @@
       let D;
       try { D = await LTOpt.load(); } catch (err) { if (ctx.alive()) el.innerHTML = LTOpt.errorPanel(err.message); return; }
       if (!ctx.alive()) return;
+      if (!D.chain.expiries || !D.chain.expiries.length) {   // 期交所資料不完整(例如只有盤後時段)：不要讓頁面壞掉
+        el.innerHTML = `<div class="panel"><div class="empty"><p>最新交易日(${D.chain.date})的選擇權報價尚未完整公布，請稍後再試。</p></div></div>`;
+        return;
+      }
       const { chain, hist, spot, futures } = D;
       const n = hist.d.length - 1;
       // 歷史波動率對齊選擇權資料的日期
