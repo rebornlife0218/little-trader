@@ -1056,13 +1056,15 @@ function computeCycle(rows, key, prm){
   // 每月第幾個交易日／當月共幾個交易日
   const pos = new Array(n), cnt = {};
   for (let i=0;i<n;i++){ const m = rows[i].date.slice(0,7); cnt[m] = (cnt[m]||0)+1; pos[i] = cnt[m]; }
-  const part = {'月初':[], '月中':[], '月底':[]}, wd = {};
+  const part = {'月初':[], '月中':[], '月底':[]}, wd = {}, partMonth = {};   // partMonth[1~12][月初/月中/月底]
   for (let i=from;i<n;i++){
     const r = c[i]/c[i-1]-1, d = rows[i].date;
     let p;
     if (prm.monthDef==='td'){ const k = pos[i], K = cnt[d.slice(0,7)]; p = k<=5 ? '月初' : k>K-5 ? '月底' : '月中'; }
     else { const day = +d.slice(8,10); p = day<=10 ? '月初' : day<=20 ? '月中' : '月底'; }
     part[p].push(r);
+    const pm = partMonth[+d.slice(5,7)] = partMonth[+d.slice(5,7)] || {'月初':[], '月中':[], '月底':[]};
+    pm[p].push(r);
     const w = new Date(d+'T00:00:00Z').getUTCDay();
     (wd[w] = wd[w]||[]).push(r);
   }
@@ -1075,7 +1077,7 @@ function computeCycle(rows, key, prm){
     const m = +rows[i].date.slice(5,7);
     (months[m] = months[m]||[]).push(c[i]/c[monthEnd[j-1]]-1);
   }
-  return { from, part, wd, months, election: computeElection(rows, key) };
+  return { from, part, wd, months, partMonth, election: computeElection(rows, key) };
 }
 // 選舉：選前/選後報酬(不受統計期間影響，選舉次數本來就少)
 function computeElection(rows, key){
@@ -1137,6 +1139,21 @@ function renderCycle(){
   const wdGroups = [1,2,3,4,5,6].filter(w=>res.wd[w] && (w<6 || res.wd[w].length)).map(w=>({name:WEEKDAYS[w], list:res.wd[w], hint: w===6 ? '早年週六有半日交易' : ''}));
   const monthGroups = Array.from({length:12},(_,i)=>({name:(i+1)+'月', list:res.months[i+1]||[]}));
   const allDaily = [].concat(...Object.values(res.part));
+  const partMonthRows = Array.from({length:12},(_,i)=>{
+    const pm = res.partMonth[i+1] || {'月初':[], '月中':[], '月底':[]};
+    return { m:i+1, cells: PART_COLORS.map(p=>cycleSummary(pm[p.name])) };
+  });
+  const heatScale = Math.max(...partMonthRows.flatMap(r=>r.cells.map(c=>Math.abs(c.avg))).filter(Number.isFinite), 1e-9);
+  const heatCell = (c, scale)=> Number.isNaN(c.avg) ? '<td class="na">—</td>'
+    : `<td style="background:color-mix(in srgb, ${c.avg>=0?'var(--up)':'var(--down)'} ${Math.round(Math.min(Math.abs(c.avg)/scale,1)*55)}%, transparent)">${fmtPct(c.avg,3)}<small class="hint-s">${(c.win*100).toFixed(0)}%</small></td>`;
+  const cellsAll = partMonthRows.flatMap(r=>r.cells.map((c,j)=>({m:r.m, p:PART_COLORS[j].name, ...c}))).filter(c=>c.count>0);
+  const partMonthInsight = cellsAll.length ? (()=>{
+    const s = [...cellsAll].sort((a,b)=>b.avg-a.avg), top = s.slice(0,3), bot = s.slice(-3).reverse();
+    const pos = PART_COLORS.map(p=>({name:p.name, n:partMonthRows.filter(r=>{ const c=r.cells[PART_COLORS.findIndex(x=>x.name===p.name)]; const mx=Math.max(...r.cells.map(x=>x.avg)); return c.avg===mx; }).length}));
+    const most = pos.reduce((a,b)=>b.n>a.n?b:a);
+    return `<li><b>平均最好</b>：${top.map(c=>`${c.m}月${c.p}(${fmtPct(c.avg,3)})`).join('、')}；<b>平均最差</b>：${bot.map(c=>`${c.m}月${c.p}(${fmtPct(c.avg,3)})`).join('、')}。</li>
+      <li>12 個月份中，有 ${most.n} 個月份是「${most.name}」表現最好。每一格的樣本只有該月份的部分交易日(每年約 7～10 天)，差異容易受少數年份影響。</li>`;
+  })() : '';
   const periodText = `${rows[Math.max(res.from-1,0)].date} ~ ${rows[rows.length-1].date}`;
   let html = `
     <div class="panel">
@@ -1170,12 +1187,50 @@ function renderCycle(){
 
     <div class="panel">
       <h3>月份效應(1 ~ 12 月)</h3>
-      ${table('月份', monthGroups, 1)}
+      <h4>各月份的平均報酬與中位數</h4>
+      <div id="cyMonthRet"></div>
+      ${LTChart.legend([{name:'平均報酬(紅漲綠跌)', color:'var(--up)'}, {name:'中位數', color:'var(--blue)'}])}
+      <h4>各月份的上漲機率</h4>
+      <div id="cyMonthWin"></div>
       <ul class="insight">${insight('月份', monthGroups)}</ul>
-      <div class="note">月報酬＝月底收盤 ÷ 上個月底收盤 − 1，尚未結束的當月不計入。</div>
+      <details class="cy-detail"><summary>詳細數據(次數、最大漲跌幅)</summary>${table('月份', monthGroups, 1)}</details>
+      <div class="note">月報酬＝月底收盤 ÷ 上個月底收盤 − 1，尚未結束的當月不計入。上漲機率的虛線為 50%。</div>
+    </div>
+
+    <div class="panel">
+      <h3>各月份的月初 / 月中 / 月底</h3>
+      <div id="cyMonthPart"></div>
+      ${LTChart.legend(PART_COLORS)}
+      <div class="tablewrap"><table class="stattable cy-heat">
+        <thead><tr><th>月份</th>${PART_COLORS.map(p=>`<th>${p.name}<small class="hint-s">平均每日漲跌 · 上漲機率</small></th>`).join('')}</tr></thead>
+        <tbody>${partMonthRows.map(r=>`<tr><td>${r.m}月</td>${r.cells.map(c=>heatCell(c, heatScale)).join('')}</tr>`).join('')}</tbody>
+      </table></div>
+      <ul class="insight">${partMonthInsight}</ul>
+      <div class="note">每個月份各自依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分成三段，計算該段交易日的平均每日漲跌；可在上方「統計設定」切換定義。顏色越深代表平均漲跌越大(紅漲綠跌)。</div>
     </div>`;
+  state.cycleCharts = { monthGroups, partMonthRows };
   html += renderElection(res.election, key);
   return html;
+}
+// 窄螢幕(手機)只顯示數字，避免 12 個月份的標籤擠在一起
+const monthLabel = (v, tip)=> tip || window.innerWidth >= 600 ? v : v.replace('月','');
+const PART_COLORS = [{name:'月初', color:'var(--amber)'}, {name:'月中', color:'var(--blue)'}, {name:'月底', color:'#a78bfa'}];
+// 週期性分析的圖：月份效應(平均、中位數、上漲機率)、各月份的月初/月中/月底
+function drawCycleCharts(){
+  const C = state.cycleCharts, a = document.getElementById('cyMonthRet');
+  if (!C || !a) return;
+  const S = C.monthGroups.map(g=>cycleSummary(g.list)), x = C.monthGroups.map(g=>g.name);
+  const pctFmt = v=>(v*100).toFixed(1)+'%';
+  LTChart.bars(a, { x, xFmt:monthLabel, xAll:true, label:'各月份平均報酬', height:230, yFmt:pctFmt, refY:[{y:0}],
+    tipFmt:(s,v,i)=>`${s.name} ${fmtPct(v,2)}(${S[i].count} 次)`,
+    series:[{name:'平均報酬', y:S.map(s=>s.avg), color:'var(--up)', colors:S.map(s=>s.avg>=0?'var(--up)':'var(--down)')},
+            {name:'中位數', y:S.map(s=>s.med), color:'var(--blue)'}] });
+  LTChart.bars(document.getElementById('cyMonthWin'), { x, xFmt:monthLabel, xAll:true, label:'各月份上漲機率', height:170, yMin:0, yMax:1,
+    yFmt:v=>(v*100).toFixed(0)+'%', refY:[{y:0.5, color:'var(--dim)'}], tipFmt:(s,v,i)=>`上漲機率 ${(v*100).toFixed(0)}%(${S[i].count} 次)`,
+    series:[{name:'上漲機率', y:S.map(s=>s.win), color:'var(--amber)', colors:S.map(s=>s.win>=0.5?'var(--up)':'var(--down)')}] });
+  LTChart.bars(document.getElementById('cyMonthPart'), { x:C.partMonthRows.map(r=>r.m+'月'), xFmt:monthLabel, xAll:true, label:'各月份月初月中月底的平均每日漲跌', height:260,
+    yFmt:v=>(v*100).toFixed(2)+'%', refY:[{y:0}], tipFmt:(s,v)=>`${s.name} 平均每日 ${fmtPct(v,3)}`,
+    series:PART_COLORS.map((p,j)=>({name:p.name, color:p.color, y:C.partMonthRows.map(r=>r.cells[j].avg)})) });
 }
 function renderElection(el, key){
   if (!el){
@@ -1521,12 +1576,13 @@ function render(){
   } else if (mode.key==='cycle'){
     html += renderCycle();
   } else {
-    html += `<div class="panel"><div class="empty"><h3 style="margin:0;">${mode.name}</h3><p>此分析模式建置中，敬請期待。</p></div></div>`;
+    html += LT.UNDER_CONSTRUCTION;
   }
 
   app.innerHTML = html;
   updateOhlcInfo();
   requestAnimationFrame(()=>drawChart(state.active));
+  if (mode.key==='cycle') drawCycleCharts();
 }
 
 // 跌深反彈統計表：與K棒型態分析相同的表格呈現

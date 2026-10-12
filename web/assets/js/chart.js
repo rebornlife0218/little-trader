@@ -1,10 +1,10 @@
 /* ==========================================================================
    LTChart：共用的 SVG 圖表(折線、長條)，自動跟隨暗色/淺色主題與容器寬度。
      LTChart.line(el, { x, series:[{ name, y, color, dash, width, fill }], ... })
-     LTChart.bars(el, { x, series:[{ name, y, color }], ... })
+     LTChart.bars(el, { x, series:[{ name, y, color, colors }], ... })(colors：每根長條各自的顏色，可省略)
    共通選項：height、xFmt(x)、yFmt(y)、xType:'date'|'num'、refY:[{ y, label, color }]、
             refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt、
-            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)
+            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別)
    顏色請用 CSS 變數(例如 'var(--amber)')，切換主題時不必重畫。
    ========================================================================== */
 const LTChart = (() => {
@@ -62,7 +62,7 @@ const LTChart = (() => {
       <text x="${PAD.l - 6}" y="${Y(v) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(yFmt(v))}</text>`).join('');
     // x 軸刻度：依寬度挑選約 6 個
     const nx = Math.max(2, Math.min(8, Math.floor(iw / 90)));
-    const idx = [...new Set(Array.from({ length: nx }, (_, k) => Math.round(k * (xs.length - 1) / (nx - 1))))];
+    const idx = o.xAll ? xs.map((_, i) => i) : [...new Set(Array.from({ length: nx }, (_, k) => Math.round(k * (xs.length - 1) / (nx - 1))))];
     g += idx.map(i => `<text x="${kind === 'bars' ? X(i) : X(xs[i])}" y="${H - 8}" font-size="10.5" text-anchor="middle" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`).join('');
     return { W, H, xs, X, Y, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
   }
@@ -140,7 +140,7 @@ const LTChart = (() => {
       return o.series.map((s, j) => s.y.map((v, i) => {
         if (!Number.isFinite(v)) return '';
         const x = f.X(i) - f.band * 0.4 + j * bw, y = f.Y(Math.max(v, 0)), h = Math.abs(f.Y(v) - f.Y(0));
-        return `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h, 0.5)}" fill="${s.color}" opacity=".85"/>`;
+        return `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h, 0.5)}" fill="${(s.colors && s.colors[i]) || s.color}" opacity=".85"/>`;
       }).join('')).join('');
     });
   }
