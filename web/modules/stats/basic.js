@@ -158,6 +158,13 @@
         fig.prepend(img);
         p.replaceWith(fig);
       }
+      // R 產生的圖(img/chNN-*.png)有深色與淺色兩版(r/theme.R)：兩張都放，CSS 依目前主題只顯示一張(另一張 lazy 不會下載)
+      if (/^img\/ch\d+-[\w-]+\.png$/.test(s) && !s.endsWith('-light.png')) {
+        const light = img.cloneNode();
+        light.src = MD_DIR + s.replace(/\.png$/, '-light.png');
+        img.classList.add('th-dark'); light.classList.add('th-light');
+        img.after(light);
+      }
     });
     box.querySelectorAll('blockquote').forEach(q => q.classList.add('callout'));
     box.querySelectorAll('table').forEach(t => { t.classList.add('stattable', 'md-table'); t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`; });

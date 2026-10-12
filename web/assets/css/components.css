@@ -290,7 +290,9 @@
   .doc .katex{font-size:1.08em;}
   .doc .katex-display{margin:8px 0 14px;padding:10px 12px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;overflow-x:auto;overflow-y:hidden;}
   .md-fig{margin:6px 0 16px;text-align:center;}
-  .md-fig img{max-width:100%;width:560px;height:auto;background:#fff;border:1px solid var(--border);border-radius:8px;}
+  .md-fig img{max-width:100%;width:620px;height:auto;border-radius:8px;}
+  /* 統計學的 R 圖(透明背景)有深色與淺色兩版，依網站主題顯示其中一張 */
+  :root[data-theme="light"] .md-fig img.th-dark, :root:not([data-theme="light"]) .md-fig img.th-light{display:none;}
   .md-fig figcaption{font-size:12px;color:var(--dim);margin-top:4px;}
   .chap-foot{display:flex;justify-content:space-between;margin-top:22px;padding-top:14px;border-top:1px solid var(--border);}
   .chap-nav{color:var(--amber);text-decoration:none;font-weight:600;font-size:13.5px;}

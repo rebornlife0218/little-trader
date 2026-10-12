@@ -140,6 +140,8 @@ cd C:\Users\User\Projects\little-trader
 
 第一次執行前要先在 R 安裝 `mfp` 套件(`install.packages("mfp")`，bodyfat 資料在裡面)；Protein 資料會從網路讀取。
 
+**圖的樣式**：每一章的程式都會載入 `r/theme.R`，用 `lt_fig(名稱, 寬, 高, function(T) { ... })` 畫圖，同一張圖自動輸出兩版：`img/<名稱>.png`(深色主題)與 `img/<名稱>-light.png`(淺色主題)，背景透明、顏色取自網站的配色(畫圖時用 `T$blue`、`T$amber`、`T$red`、`T$green`、`T$fg`、`T$mute` 等，不要寫死 `"steelblue"`)。Markdown 裡照常寫 `![說明](img/ch01-bar.png)`，網頁會依目前主題顯示對應的那一張。需要 R 套件 `ragg`(`install.packages("ragg")`，文字較清楚)。
+
 想新增圖片：在 R 程式裡照著 `dev("檔名.png"); 畫圖指令; dev.off()` 的格式加一行，執行後在 `.md` 裡用 `![圖說](img/檔名.png)` 插入。
 
 ## 章節名稱、互動模擬與市場實例
