@@ -150,7 +150,6 @@ cd C:\Users\User\Projects\little-trader
 {
   title: '機率',                                  // 章節名稱(上方章節按鈕與章名)
   md: 'ch02',                                     // 內容檔 web/content/stats/basic/ch02.md
-  st: ['basic-probability', 'Basic Probability'], // 右上角 Seeing Theory 連結(選填，不要就寫 null)
   demo: ['dice', 'coin'],                         // 文末互動模擬(選填)
   live: 'describe',                               // 文末台股市場實例(選填)
 },

@@ -4,7 +4,16 @@
    網址：#/stats/basic/<章節編號>
    章節內容可寫在 content/stats/basic/*.md(設定 md 欄位)，編輯方式見 docs/CONTENT.md */
 (() => {
-  const ST = 'https://seeing-theory.brown.edu/';
+  // 參考教材(章節最下方)
+  const BOOKS = [
+    ['張翔', '《提綱挈領學統計》', '本站章節架構的主要參考，重點整理清楚，適合準備考試'],
+    ['管中閔', '《統計學：觀念與方法》', '觀念講解深入，第 6 章「多大才算大樣本」參考此書'],
+    ['林惠玲、陳正倉', '《統計學：方法與應用》', '國內大學常用的中文教材，觀念與計算練習完整'],
+    ['Freedman, Pisani & Purves', '《Statistics》', '觀念導向、少公式，最適合第一次接觸統計的入門經典'],
+    ['Moore, McCabe & Craig', '《Introduction to the Practice of Statistics》', '大學統計課常用的教科書，資料分析與推論並重'],
+    ['Anderson, Sweeney & Williams', '《Statistics for Business and Economics》', '商管學院常用，例題多與企業、經濟、財務相關'],
+    ['Wackerly, Mendenhall & Scheaffer', '《Mathematical Statistics with Applications》', '數理統計入門，適合想看定理推導的讀者'],
+  ];
 
   /* ---------- 小工具 ---------- */
   const fmt = (v, d = 2) => Number.isFinite(v) ? v.toFixed(d) : '—';
@@ -72,7 +81,6 @@
       <text x="${bx}" y="66" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">B</text>
     </svg><figcaption>${caption}</figcaption></figure>`;
   }
-  const stLink = (path, name) => `<a href="${ST}${path}/index.html" target="_blank" rel="noopener">Seeing Theory · ${name} ↗</a>`;
 
   // 直方圖(SVG)＋常態曲線
   function histogramSVG(data, { lo, hi, step, normal, tick = x => (x * 100).toFixed(1) + '%' }) {
@@ -167,40 +175,40 @@
       title: '概論及敘述統計學', md: 'ch01', live: 'describe',
     },
     {
-      title: '機率', md: 'ch02', st: ['basic-probability', 'Basic Probability'],   // 擲骰子、擲錢幣模擬內嵌在 ch02.md 的 [[demo dice]]、[[demo coin]]
+      title: '機率', md: 'ch02',   // 擲骰子、擲錢幣模擬內嵌在 ch02.md 的 [[demo dice]]、[[demo coin]]
     },
     {
-      title: '隨機變數', md: 'ch03', st: ['probability-distributions', 'Probability Distributions'],
+      title: '隨機變數', md: 'ch03',
     },
     {
-      title: '多元隨機變數', md: 'ch04', st: null, live: 'cov',
+      title: '多元隨機變數', md: 'ch04', live: 'cov',
     },
     {
-      title: '常見機率模型', md: 'ch05', st: ['probability-distributions', 'Probability Distributions'], live: 'normal',
+      title: '常見機率模型', md: 'ch05', live: 'normal',
     },
     {
-      title: '抽樣方法與抽樣分配', md: 'ch06', st: null, demo: 'clt',
+      title: '抽樣方法與抽樣分配', md: 'ch06', demo: 'clt',
     },
     {
-      title: '點估計', md: 'ch07', st: ['frequentist-inference', 'Frequentist Inference'],
+      title: '點估計', md: 'ch07',
     },
     {
-      title: '區間估計', md: 'ch08', st: ['frequentist-inference', 'Frequentist Inference'], live: 'ci',
+      title: '區間估計', md: 'ch08', live: 'ci',
     },
     {
-      title: '假說檢定', md: 'ch09', st: null, live: 'ttest',
+      title: '假說檢定', md: 'ch09', live: 'ttest',
     },
     {
-      title: '變異數分析', md: 'ch10', st: null, live: 'anova',
+      title: '變異數分析', md: 'ch10', live: 'anova',
     },
     {
-      title: '線性迴歸', md: 'ch11', st: ['regression-analysis', 'Regression Analysis'], live: 'regress',
+      title: '線性迴歸', md: 'ch11', live: 'regress',
     },
     {
-      title: '卡方檢定', md: 'ch12', st: null, live: 'chi2',
+      title: '卡方檢定', md: 'ch12', live: 'chi2',
     },
     {
-      title: '其他', md: 'ch13', st: ['bayesian-inference', 'Bayesian Inference'], live: 'runs',
+      title: '其他', md: 'ch13', live: 'runs',
     },
   ];
 
@@ -459,7 +467,6 @@
         <article class="panel doc chapter">
           <div class="chap-head">
             <h2>第 ${idx + 1} 章　${ch.title}</h2>
-            ${ch.st ? `<div class="chap-st">搭配互動教材：${stLink(ch.st[0], ch.st[1])}</div>` : ''}
           </div>
           <div id="chapBody">${ch.md ? '<div class="page-loading chap-loading"><span class="spinner"></span>載入中…</div>' : ch.body()}</div>
           ${[].concat(ch.demo || []).map(d => `<div class="demo-box">${DEMOS[d].html}</div>`).join('')}
@@ -468,7 +475,7 @@
         </article>
         <div class="panel doc">
           <h3>參考教材</h3>
-          <ul><li><b>張翔</b>《提綱挈領學統計》</li></ul>
+          <ul>${BOOKS.map(b => `<li><b>${b[0]}</b> ${b[1]}：${b[2]}</li>`).join('')}</ul>
         </div>`;
       const demos = [].concat(ch.demo || []);
       if (demos.includes('dice')) diceRolls = [];
