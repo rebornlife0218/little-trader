@@ -1,6 +1,7 @@
-/* ETF · ETF大禮包：兩個分頁
+/* ETF · ETF大禮包：三個分頁
    · ETF介紹：ETF 是什麼、種類、成本、配息與總報酬、折溢價
-   · 怎麼存ETF：0050 vs 勞退基金、常存 ETF 績效比較、ARKK 研究(追高的代價)、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)
+   · 怎麼存ETF：常存 ETF 績效比較、ETF 配息課稅試算、0050 vs 勞退基金
+   · ETF研究：ARKK 研究(追高的代價)、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)
    資料集：data/etf_compare/(compare.json、etfs.json；pipeline/etf_compare/update.py) */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -110,7 +111,8 @@
         </div></header>
         <div class="mode-tabs pk-tabs">
           <button class="mode-tab active" data-tab="intro"><b>ETF介紹</b><small>是什麼、種類、成本、配息、折溢價</small></button>
-          <button class="mode-tab" data-tab="save"><b>怎麼存ETF</b><small>0050 vs 勞退、常存 ETF 比較、ARKK 研究、單筆 vs 定期定額</small></button>
+          <button class="mode-tab" data-tab="save"><b>怎麼存ETF</b><small>常存 ETF 比較、配息怎麼繳稅、0050 vs 勞退</small></button>
+          <button class="mode-tab" data-tab="research"><b>ETF研究</b><small>ARKK 研究、單筆 vs 定期定額 vs 逢低買入</small></button>
         </div>
 
         <div class="pk-pane" data-pane="intro">
@@ -278,9 +280,12 @@
               </ul></div>
             </details>
           </div>
+` : failed}
+        </div>
 
+        <div class="pk-pane" data-pane="research" hidden>${C && E ? `
           <div class="panel">
-            <h3>四、ARKK 研究：基金賺錢，投資人卻賠錢</h3>
+            <h3>一、ARKK 研究：基金賺錢，投資人卻賠錢</h3>
             <div id="pkArkkChart"></div>
             <p class="note" id="pkArkkNote"></p>
             <div class="doc">
@@ -302,7 +307,7 @@
           </div>
 
           <div class="panel">
-            <h3>五、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)</h3>
+            <h3>二、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)</h3>
             <div class="doc">
               <ul>
                 <li><b>單筆投入</b>(Lump Sum Investing，LSI)：手上有一筆錢，一次全部投入。</li>
@@ -355,7 +360,7 @@
       };
       el.querySelector('.pk-tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
       let saved = 'intro'; try { saved = localStorage.getItem('lt.pkTab') || 'intro'; } catch (e) {}
-      showTab(saved === 'save' ? 'save' : 'intro');
+      showTab(['save', 'research'].includes(saved) ? saved : 'intro');
       if (!C || !E) return;
       const $ = s => el.querySelector(s);
 
@@ -415,7 +420,7 @@
         ${twList.map(x => { const mo = MO[x.code], r = mo.a.slice(1).map((v, k) => v / mo.a[k] - 1), s = statsOf(r, 12);
           return `<tr><td><b>${x.code}</b> ${esc(x.name)}</td><td>${x.start}</td><td>${(r.length / 12).toFixed(1)}</td><td class="${cls(s.cagr)}">${pctf(s.cagr)}</td><td class="down">${pctf(s.mdd, 0)}</td></tr>`; }).join('')}</tbody>`;
 
-      /* ---------- 三、ARKK ---------- */
+      /* ---------- ETF研究 · 一、ARKK ---------- */
       const ak = MO.ARKK;
       if (ak) {
         const peakI = ak.a.reduce((b, v, i) => v > ak.a[b] ? i : b, 0), last = ak.a.length - 1;
@@ -468,7 +473,7 @@
       ['#txDeps', '#txSal1', '#txSal2', '#txDiv', '#txInt', '#txEq'].forEach(id => { $(id).oninput = drawTax; });
       drawTax();
 
-      /* ---------- 五、LSI vs DCA vs BTD ---------- */
+      /* ---------- ETF研究 · 二、LSI vs DCA vs BTD ---------- */
       const seriesOf = key => {
         if (key === 'taiex' || key === 'taiex_tr') {   // 加權指數 / 報酬指數：日資料 → 月底
           const tx = E[key], mo = monthly({ d: tx.d, c: tx.c, a: tx.c });
