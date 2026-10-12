@@ -1,6 +1,6 @@
 /* 選擇權共用工具(LTOpt)：Black-Scholes 定價與 Greeks、策略定義、資料載入
    各頁面(市場概況、台指期貨、Black-Scholes 計算器、策略損益圖)都靠這支，要先於它們載入。
-   資料集：data/options/(pipeline/options/update.py：選擇權與台指期)、data/indices/TAIEX.json(現貨價) */
+   資料集：data/options/(pipeline/options/update.py：選擇權與台指期、spot.json 加權指數近一年收盤) */
 const LTOpt = (() => {
   const MULT = 50;            // 臺指選擇權每點 50 元
   const R_DEFAULT = 0.017;    // 預設無風險利率(約一年期定存)
@@ -79,11 +79,21 @@ const LTOpt = (() => {
   const pnl = (legs, S, T, r, v) => legs.reduce((a, l) => a + l.side * (l.qty || 1) * (legValue(l, S, T, r, l.iv || v) - l.entry), 0);
 
   /* ---------- 資料 ---------- */
-  async function load() {
+  // 選擇權各頁(市場概況、策略損益圖、台指期貨)共用同一份資料：載入一次後留在記憶體 5 分鐘，切換頁面不必重新下載
+  let cache = null, cachedAt = 0;
+  function load() {
+    if (!cache || Date.now() - cachedAt > 5 * 60e3) {
+      cachedAt = Date.now();
+      cache = loadAll().catch(e => { cache = null; throw e; });
+    }
+    return cache;
+  }
+  async function loadAll() {
     const [chain, hist, fut, taiex] = await Promise.all([
       LT.loadJSON('options', 'chain.json'), LT.loadJSON('options', 'history.json'),
       LT.loadJSON('options', 'futures.json').catch(() => null),
-      LT.loadJSON('indices', 'TAIEX.json').catch(() => null),
+      // 加權指數近一年收盤(約 6KB)；舊資料沒有 spot.json 時才改抓整份 TAIEX.json
+      LT.loadJSON('options', 'spot.json').catch(() => LT.loadJSON('indices', 'TAIEX.json')).catch(() => null),
     ]);
     const spot = taiex ? { date: taiex.data.d[taiex.data.d.length - 1], close: taiex.data.c[taiex.data.c.length - 1], data: taiex.data } : null;
     return { meta: chain.meta, chain: chain.data, hist: hist.data, futures: fut && fut.data, spot };
