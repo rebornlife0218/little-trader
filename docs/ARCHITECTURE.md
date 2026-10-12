@@ -17,7 +17,7 @@ web/                                網站(部署時整個資料夾就是網站�
     home/home.js                    首頁：各區塊入口、各資料集更新狀態
     indices/indices.js              指數：大盤漲跌分析、K棒型態
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
-    etf/pack.js                     ETF：ETF大禮包(ETF介紹、怎麼存ETF)
+    etf/pack.js                     ETF：ETF大禮包(ETF介紹、怎麼存ETF、ETF研究)
     etf/etf.js                      ETF：即將發行ETF
     stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
     stock/tw.js                     股票 · 台股：隔日沖、波段、策略(建置中)
