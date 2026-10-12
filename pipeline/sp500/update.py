@@ -43,7 +43,7 @@ START = '2000-01-01'                 # 第一次換股：1999 年最後一個交
 STRATS = ['s1', 's2', 's3', 's4', 'ew']
 CACHE = Path(os.path.expanduser('~/.cache/little-trader/tiingo'))
 MIN_COVER = 0.8                      # 訊號季至少要有 80% 交易日有股價才列入
-MIN_DOLLAR_VOL = 2e6                 # 成分股期間每日成交金額的中位數(美元)；太低代表 Yahoo 的代號已被別家小公司沿用
+MIN_DOLLAR_VOL = 2e6                 # 成分股期間每日成交金額的中位數(美元)；太低代表代號已被別家小公司沿用(Yahoo、Tiingo 都會遇到)
 
 
 def yahoo_sym(t):
@@ -72,27 +72,32 @@ def yahoo_close(symbols, start, with_volume=False):
 
 
 def tiingo_series(t, key):
-    """Tiingo 還原股價；先查本機快取，沒有且有金鑰才下載(下載後寫回快取)"""
+    """Tiingo 的還原股價與每日成交金額(未還原收盤價 × 成交量)；先查本機快取，沒有且有金鑰才下載(下載後寫回快取)。
+    回傳 (還原股價, 成交金額或 None)；舊版快取沒有成交金額時第二項為 None"""
     f = CACHE / f'{yahoo_sym(t)}.json'
     if not f.exists() and key:
         CACHE.mkdir(parents=True, exist_ok=True)
-        for _ in range(3):
-            r = requests.get(f'https://api.tiingo.com/tiingo/daily/{t.lower()}/prices',
-                             params={'startDate': '1995-01-01', 'token': key, 'columns': 'adjClose'}, timeout=60)
-            if r.status_code == 200 and r.text.startswith('['):
-                rows = r.json()
-                f.write_text(json.dumps({'d': [x['date'][:10] for x in rows], 'c': [x['adjClose'] for x in rows]}))
-                break
-            if 'allocation' in r.text.lower() or r.status_code == 429:
-                print(f'Tiingo 達到請求上限，略過 {t}', file=sys.stderr)
-                return None
+        r = requests.get(f'https://api.tiingo.com/tiingo/daily/{t.lower()}/prices',
+                         params={'startDate': '1995-01-01', 'token': key, 'columns': 'adjClose,close,volume'}, timeout=60)
+        if r.status_code == 200 and r.text.startswith('['):
+            rows = r.json()
+            f.write_text(json.dumps({'d': [x['date'][:10] for x in rows], 'c': [x['adjClose'] for x in rows],
+                                     'dv': [round((x.get('close') or 0) * (x.get('volume') or 0)) for x in rows]}))
+        elif 'allocation' in r.text.lower() or r.status_code == 429:
+            print(f'Tiingo 達到請求上限，略過 {t}', file=sys.stderr)
+            return None, None
+        else:
             f.write_text(json.dumps({'d': [], 'c': [], 'err': r.text[:200]}))
-            break
         time.sleep(1)
     if not f.exists():
-        return None
+        return None, None
     j = json.loads(f.read_text())
-    return pd.Series(j['c'], index=pd.to_datetime(j['d']), dtype=float) if j['d'] else None
+    if not j['d']:
+        return None, None
+    idx = pd.to_datetime(j['d'])
+    adj = pd.Series(j['c'], index=idx, dtype=float)
+    dv = pd.Series(j['dv'], index=idx, dtype=float) if 'dv' in j else None
+    return adj, dv
 
 
 def quarter_ends(days):
@@ -167,8 +172,10 @@ def run(P, M, days, qends, rf_q, k0):
     return daily, quarters
 
 
-def build_prices(M, days, start, tiingo_key, use_tiingo=True):
-    """所有在期間內當過成分股的股票：Yahoo 優先，Yahoo 沒有該段股價(或代號已被別家沿用)時改用 Tiingo"""
+def build_prices(M, days, start, tiingo_key):
+    """所有在期間內當過成分股的股票：Yahoo 優先，Yahoo 沒有該段股價時改用 Tiingo。
+    代號可能被別家公司沿用(例如 EP 原為 El Paso，現在是小型股 Empire Petroleum)，兩個來源都用
+    「成分股期間每日成交金額的中位數 ≥ MIN_DOLLAR_VOL」確認股價真的屬於當時的成分股。"""
     tick = sorted({t for ts in M[M['date'] >= pd.Timestamp(start) - pd.Timedelta(days=120)]['tickers'] for t in ts})
     yc, dv = yahoo_close([yahoo_sym(t) for t in tick], start, with_volume=True)
     cols, src = {}, {'yahoo': 0, 'tiingo': 0, 'none': 0, 'reused': []}
@@ -179,18 +186,24 @@ def build_prices(M, days, start, tiingo_key, use_tiingo=True):
         inmem = [d for d, ts in zip(M['date'], M['tickers']) if t in ts and d >= pd.Timestamp(start)]
         span = (min(inmem) if inmem else days[0], max(inmem) if inmem else days[-1])
         need = (days >= span[0]) & (days <= span[1])
-        # 代號被沿用：例如 EP 原為 El Paso(2012 年被併購)，Yahoo 的 EP 現在是小型股 Empire Petroleum
-        reused = y is not None and y[need].notna().any() and dv[ys].reindex(days)[need].median() < MIN_DOLLAR_VOL
-        if reused:
-            src['reused'].append(t)
+        yahoo_reused = y is not None and y[need].notna().any() and dv[ys].reindex(days)[need].median() < MIN_DOLLAR_VOL
+        if yahoo_reused:
+            src['reused'].append(t + '(Yahoo)')
             y = None
         if y is not None and y[need].notna().mean() >= MIN_COVER:
             cols[t] = y; src['yahoo'] += 1; continue
-        ti = tiingo_series(t, tiingo_key) if use_tiingo else None
+        ti, tdv = tiingo_series(t, tiingo_key)
+        # Yahoo 的代號已被沿用、Tiingo 的同一代號也還在交易到現在：多半是同一家新公司(例如 CCU 原為 Clear Channel，
+        # 現在是智利啤酒商 Cervecerías Unidas)，不採用；真正下市的公司在 Tiingo 的股價會停在下市日
+        if ti is not None and yahoo_reused and ti.index.max() >= days[-1] - pd.Timedelta(days=30):
+            src['reused'].append(t + '(Tiingo)')
+            ti = None
         if ti is not None:
             ti = ti[~ti.index.duplicated()].reindex(days)
             if ti[need].notna().mean() >= 0.5:
-                cols[t] = ti; src['tiingo'] += 1; continue
+                if tdv is None or tdv[~tdv.index.duplicated()].reindex(days)[need].median() >= MIN_DOLLAR_VOL:
+                    cols[t] = ti; src['tiingo'] += 1; continue
+                src['reused'].append(t + '(Tiingo)')
         if y is not None and y.notna().any():
             cols[t] = y; src['yahoo'] += 1
         else:
