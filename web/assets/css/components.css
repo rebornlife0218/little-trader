@@ -463,3 +463,6 @@
   /* ETF 配息課稅：說明文字較長的表格允許換行 */
   table.tx-src td, table.tx-src th{white-space:normal;}
   table.tx-src td:first-child{white-space:nowrap;}
+  /* ETF 分類表：管理方式(合併儲存格)與類型欄各自固定樣式，類型欄才會上下對齊 */
+  table.pk-kind td.pk-mgmt{text-align:center;vertical-align:middle;}
+  table.pk-kind td.pk-type{text-align:left;font-family:'Inter',sans-serif;font-weight:600;white-space:nowrap;}

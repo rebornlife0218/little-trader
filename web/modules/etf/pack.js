@@ -145,14 +145,14 @@
             <div class="tablewrap"><table class="stattable pk-kind">
               <thead><tr><th>管理方式</th><th>類型</th><th>代號尾碼(台幣 / 外幣)</th><th>例子</th></tr></thead>
               <tbody>
-                <tr><td rowspan="6">被動式<br><small class="mute">追蹤指數</small></td><td>股票型</td><td>全數字 / K</td><td style="text-align:left">0050、0056、00878；00625K</td></tr>
-                <tr><td>債券型</td><td>B / C</td><td style="text-align:left">00679B；00687C</td></tr>
-                <tr><td>槓桿型</td><td>L / M</td><td style="text-align:left">00631L</td></tr>
-                <tr><td>反向型</td><td>R / S</td><td style="text-align:left">00632R</td></tr>
-                <tr><td>期貨型</td><td>U / V</td><td style="text-align:left">00635U</td></tr>
-                <tr><td>平衡型(股債多資產)</td><td>T</td><td style="text-align:left">00980T</td></tr>
-                <tr><td rowspan="2">主動式<br><small class="mute">經理人選股</small></td><td>股票型</td><td>A</td><td style="text-align:left">00981A</td></tr>
-                <tr><td>債券型</td><td>D</td><td style="text-align:left">00980D</td></tr>
+                <tr><td rowspan="6" class="pk-mgmt">被動式<br><small class="mute">追蹤指數</small></td><td class="pk-type">股票型</td><td>全數字 / K</td><td style="text-align:left">0050、0056、00878；00625K</td></tr>
+                <tr><td class="pk-type">債券型</td><td>B / C</td><td style="text-align:left">00679B；00687C</td></tr>
+                <tr><td class="pk-type">槓桿型</td><td>L</td><td style="text-align:left">00631L</td></tr>
+                <tr><td class="pk-type">反向型</td><td>R</td><td style="text-align:left">00632R</td></tr>
+                <tr><td class="pk-type">期貨型</td><td>U</td><td style="text-align:left">00635U</td></tr>
+                <tr><td class="pk-type">平衡型(股債多資產)</td><td>T</td><td style="text-align:left">00980T</td></tr>
+                <tr><td rowspan="2" class="pk-mgmt">主動式<br><small class="mute">經理人選股</small></td><td class="pk-type">股票型</td><td>A</td><td style="text-align:left">00981A</td></tr>
+                <tr><td class="pk-type">債券型</td><td>D</td><td style="text-align:left">00980D</td></tr>
               </tbody>
             </table></div>
             <div class="doc" style="margin-top:12px;">
