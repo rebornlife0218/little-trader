@@ -1059,13 +1059,14 @@ function computeCycle(rows, key, prm){
   const part = {'月初':[], '月中':[], '月底':[]}, wd = {}, partMonth = {};   // partMonth[1~12][月初/月中/月底]
   for (let i=from;i<n;i++){
     const r = c[i]/c[i-1]-1, d = rows[i].date;
+    const w = new Date(d+'T00:00:00Z').getUTCDay();
+    if (w===6) continue;   // 早年週六的半日交易不列入每日統計
     let p;
     if (prm.monthDef==='td'){ const k = pos[i], K = cnt[d.slice(0,7)]; p = k<=5 ? '月初' : k>K-5 ? '月底' : '月中'; }
     else { const day = +d.slice(8,10); p = day<=10 ? '月初' : day<=20 ? '月中' : '月底'; }
     part[p].push(r);
     const pm = partMonth[+d.slice(5,7)] = partMonth[+d.slice(5,7)] || {'月初':[], '月中':[], '月底':[]};
     pm[p].push(r);
-    const w = new Date(d+'T00:00:00Z').getUTCDay();
     (wd[w] = wd[w]||[]).push(r);
   }
   // 月報酬：月底收盤 ÷ 上月底收盤；最後一個月尚未結束不計
@@ -1136,16 +1137,15 @@ function renderCycle(){
   };
   const partGroups = ['月初','月中','月底'].map(p=>({name:p, list:res.part[p],
     hint: prm.monthDef==='td' ? {月初:'每月前5個交易日', 月中:'中間的交易日', 月底:'每月最後5個交易日'}[p] : {月初:'1~10日', 月中:'11~20日', 月底:'21日~月底'}[p]}));
-  const wdGroups = [1,2,3,4,5,6].filter(w=>res.wd[w] && (w<6 || res.wd[w].length)).map(w=>({name:WEEKDAYS[w], list:res.wd[w], hint: w===6 ? '早年週六有半日交易' : ''}));
+  const wdGroups = [1,2,3,4,5].filter(w=>res.wd[w]).map(w=>({name:WEEKDAYS[w], list:res.wd[w]}));
   const monthGroups = Array.from({length:12},(_,i)=>({name:(i+1)+'月', list:res.months[i+1]||[]}));
   const allDaily = [].concat(...Object.values(res.part));
   const partMonthRows = Array.from({length:12},(_,i)=>{
     const pm = res.partMonth[i+1] || {'月初':[], '月中':[], '月底':[]};
     return { m:i+1, cells: PART_COLORS.map(p=>cycleSummary(pm[p.name])) };
   });
-  const heatScale = Math.max(...partMonthRows.flatMap(r=>r.cells.map(c=>Math.abs(c.avg))).filter(Number.isFinite), 1e-9);
-  const heatCell = (c, scale)=> Number.isNaN(c.avg) ? '<td class="na">—</td>'
-    : `<td style="background:color-mix(in srgb, ${c.avg>=0?'var(--up)':'var(--down)'} ${Math.round(Math.min(Math.abs(c.avg)/scale,1)*55)}%, transparent)">${fmtPct(c.avg,3)}<small class="hint-s">${(c.win*100).toFixed(0)}%</small></td>`;
+  const partCell = c=> Number.isNaN(c.avg) ? '<td class="na">—</td>'
+    : `<td class="${c.avg>=0?'up':'down'}">${fmtPct(c.avg,3)}<small class="hint-s">${(c.win*100).toFixed(0)}%</small></td>`;
   const cellsAll = partMonthRows.flatMap(r=>r.cells.map((c,j)=>({m:r.m, p:PART_COLORS[j].name, ...c}))).filter(c=>c.count>0);
   const partMonthInsight = cellsAll.length ? (()=>{
     const s = [...cellsAll].sort((a,b)=>b.avg-a.avg), top = s.slice(0,3), bot = s.slice(-3).reverse();
@@ -1201,12 +1201,12 @@ function renderCycle(){
       <h3>各月份的月初 / 月中 / 月底</h3>
       <div id="cyMonthPart"></div>
       ${LTChart.legend(PART_COLORS)}
-      <div class="tablewrap"><table class="stattable cy-heat">
+      <div class="tablewrap"><table class="stattable cy-part">
         <thead><tr><th>月份</th>${PART_COLORS.map(p=>`<th>${p.name}<small class="hint-s">平均每日漲跌 · 上漲機率</small></th>`).join('')}</tr></thead>
-        <tbody>${partMonthRows.map(r=>`<tr><td>${r.m}月</td>${r.cells.map(c=>heatCell(c, heatScale)).join('')}</tr>`).join('')}</tbody>
+        <tbody>${partMonthRows.map(r=>`<tr><td>${r.m}月</td>${r.cells.map(partCell).join('')}</tr>`).join('')}</tbody>
       </table></div>
       <ul class="insight">${partMonthInsight}</ul>
-      <div class="note">每個月份各自依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分成三段，計算該段交易日的平均每日漲跌；可在上方「統計設定」切換定義。顏色越深代表平均漲跌越大(紅漲綠跌)。</div>
+      <div class="note">每個月份各自依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分成三段，計算該段交易日的平均每日漲跌(紅漲綠跌)；可在上方「統計設定」切換定義。</div>
     </div>`;
   state.cycleCharts = { monthGroups, partMonthRows };
   html += renderElection(res.election, key);

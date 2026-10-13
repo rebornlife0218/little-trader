@@ -59,7 +59,7 @@
       // 大盤：7 月的低點
       const M = J.market, iLow = (() => { let k = -1; M.d.forEach((d, i) => { if (d >= '2026-07-01' && d <= '2026-08-31' && M.twii[i] != null && (k < 0 || M.twii[i] < M.twii[k])) k = i; }); return k; })();
       const iPeak = (() => { let k = -1; M.d.forEach((d, i) => { if (d < M.d[iLow] && M.twii[i] != null && (k < 0 || M.twii[i] > M.twii[k])) k = i; }); return k; })();
-      const last = M.twii.length - 1;
+      const last = M.twii.findLastIndex(v => v != null);   // 最後一天可能還沒有指數資料
 
       $('#dpBody').innerHTML = `
         <div class="panel">
