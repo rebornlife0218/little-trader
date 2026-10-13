@@ -56,10 +56,6 @@
       const sn = summary(NEW);
       const months = [...new Set(NEW.map(e => e.start.slice(0, 7)))].sort();
       const byMonth = months.map(m => ({ m, ...summary(NEW.filter(e => e.start.startsWith(m))) }));
-      // 大盤：7 月的低點
-      const M = J.market, iLow = (() => { let k = -1; M.d.forEach((d, i) => { if (d >= '2026-07-01' && d <= '2026-08-31' && M.twii[i] != null && (k < 0 || M.twii[i] < M.twii[k])) k = i; }); return k; })();
-      const iPeak = (() => { let k = -1; M.d.forEach((d, i) => { if (d < M.d[iLow] && M.twii[i] != null && (k < 0 || M.twii[i] > M.twii[k])) k = i; }); return k; })();
-      const last = M.twii.findLastIndex(v => v != null);   // 最後一天可能還沒有指數資料
 
       $('#dpBody').innerHTML = `
         <div class="panel">
@@ -79,12 +75,6 @@
           </table></div>
         </div>
         <div class="panel">
-          <h3>大盤背景：7 月底大跌後反彈</h3>
-          <div id="dpMkt"></div>
-          ${LTChart.legend([{ name: '加權指數', color: 'var(--amber)' }, { name: '櫃買指數', color: 'var(--blue)' }])}
-          <p class="note">以 ${M.d[0].slice(0, 7).replace('-', '/')} 第一個交易日 = 100。新制剛好在大盤反彈初期上路，處置股期間偏漲，有一部分是整體市場上漲帶動，所以上面同時列出同期大盤的報酬作為對照。</p>
-        </div>
-        <div class="panel">
           <h3>新制處置期間報酬的分布</h3>
           <div id="dpHist"></div>
           <h3 style="margin-top:18px;">最近的處置股</h3>
@@ -99,16 +89,7 @@
       $('#dpInsight').innerHTML = `
         <li><b>處置第一天</b>：平均報酬 ${pct(sn.d1, 2)}，中位數 ${pct(sn.d1Med, 2)}。</li>
         <li><b>處置期間仍偏漲</b>：已出關的 ${sn.nFin} 筆平均 ${pct(sn.ret)}(中位數 ${pct(sn.retMed)})、${share(sn.up, sn.nFin)} 上漲，同期大盤平均 ${pct(sn.mkt)}。處置的冷卻效果在新制下看起來不明顯。</li>
-        <li><b>樣本數較小</b>：新制只有約 ${Math.round((Date.parse(J.asof) - Date.parse(J.new_rule)) / 864e5 / 7)} 週、${sn.nFin} 筆已出關的事件，而且期間剛好遇到大盤反彈，結論可能隨更多資料而改變。</li>
-        ${iLow > 0 && iPeak >= 0 ? `<li><b>大盤背景</b>：加權指數從 ${md(M.d[iPeak])} 的 ${Math.round(M.twii[iPeak]).toLocaleString()} 跌到 ${md(M.d[iLow])} 的 ${Math.round(M.twii[iLow]).toLocaleString()}(${pct(M.twii[iLow] / M.twii[iPeak] - 1)})，之後反彈到 ${md(M.d[last])} 的 ${Math.round(M.twii[last]).toLocaleString()}(${pct(M.twii[last] / M.twii[iLow] - 1)})。</li>` : ''}`;
-
-      // 大盤走勢
-      const base = k => M[k].find(v => v != null);
-      LTChart.line($('#dpMkt'), { x: M.d, xType: 'date', label: '大盤走勢', height: 240, xFmt: (d, tip) => tip ? d : d.slice(5).replace('-', '/'),
-        yFmt: v => v.toFixed(0), tipFmt: (s, v) => v.toFixed(1),
-        refX: [{ x: J.new_rule, label: '新制上路', color: 'var(--dim)' }].concat(iLow > 0 ? [{ x: M.d[iLow], label: '低點', color: 'var(--down)' }] : []),
-        series: [{ name: '加權指數', y: M.twii.map(v => v == null ? null : v / base('twii') * 100), color: 'var(--amber)' },
-                 { name: '櫃買指數', y: M.otc.map(v => v == null ? null : v / base('otc') * 100), color: 'var(--blue)' }] });
+        <li><b>樣本數較小</b>：新制只有約 ${Math.round((Date.parse(J.asof) - Date.parse(J.new_rule)) / 864e5 / 7)} 週、${sn.nFin} 筆已出關的事件，而且期間剛好遇到大盤反彈，結論可能隨更多資料而改變。</li>`;
 
       // 期間報酬分布
       const R = NEW.filter(e => e.done && e.ret != null).map(e => e.ret);
