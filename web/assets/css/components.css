@@ -458,10 +458,9 @@
   @media (prefers-reduced-motion: reduce){ .spinner{animation:none;} }
   /* 統計學章節很長(數百個公式)：畫面外的段落先不排版，捲動到附近才排，切換章節更快 */
   .chapter #chapBody > *{content-visibility:auto;contain-intrinsic-size:auto 60px;}
-  /* 週期性分析(modules/indices/indices.js)：月份效應的詳細數據、月份 × 月初月中月底熱度表 */
+  /* 週期性分析(modules/indices/indices.js)：月份效應的詳細數據 */
   .cy-detail{margin-top:12px;}
   .cy-detail summary{cursor:pointer;color:var(--mute);font-size:13px;margin-bottom:8px;}
-  table.cy-part td small.hint-s{display:block;}
   /* ETF 配息課稅：說明文字較長的表格允許換行 */
   table.tx-src td, table.tx-src th{white-space:normal;}
   table.tx-src td:first-child{white-space:nowrap;}
