@@ -1015,24 +1015,24 @@ function renderMyth(){
 /* ============================== 週期性分析 ==============================
    每日漲跌(收盤 ÷ 前一交易日收盤 − 1)依「月初/月中/月底」「週一~週五」分組；月份效應用月報酬。
    有總統直選的地區另外標註選舉日，統計選前選後的漲跌。 */
-// 投票日(多日投票取最後一輪)；w＝當選人。基準日＝投票日當天或之前最後一個交易日(結果揭曉前的收盤)
+// 投票日(多日投票取最後一輪)。基準日＝投票日當天或之前最後一個交易日(結果揭曉前的收盤)
 const ELECTIONS = {
   TW: {region:'台灣', title:'總統大選', list:[
-    {d:'1996-03-23',w:'李登輝'},{d:'2000-03-18',w:'陳水扁'},{d:'2004-03-20',w:'陳水扁'},{d:'2008-03-22',w:'馬英九'},
-    {d:'2012-01-14',w:'馬英九'},{d:'2016-01-16',w:'蔡英文'},{d:'2020-01-11',w:'蔡英文'},{d:'2024-01-13',w:'賴清德'}]},
+    {d:'1996-03-23'},{d:'2000-03-18'},{d:'2004-03-20'},{d:'2008-03-22'},
+    {d:'2012-01-14'},{d:'2016-01-16'},{d:'2020-01-11'},{d:'2024-01-13'}]},
   US: {region:'美國', title:'總統大選', list:[
-    {d:'1992-11-03',w:'柯林頓'},{d:'1996-11-05',w:'柯林頓'},{d:'2000-11-07',w:'小布希'},{d:'2004-11-02',w:'小布希'},
-    {d:'2008-11-04',w:'歐巴馬'},{d:'2012-11-06',w:'歐巴馬'},{d:'2016-11-08',w:'川普'},{d:'2020-11-03',w:'拜登'},{d:'2024-11-05',w:'川普'}]},
+    {d:'1992-11-03'},{d:'1996-11-05'},{d:'2000-11-07'},{d:'2004-11-02'},
+    {d:'2008-11-04'},{d:'2012-11-06'},{d:'2016-11-08'},{d:'2020-11-03'},{d:'2024-11-05'}]},
   KR: {region:'韓國', title:'總統大選', list:[
-    {d:'1992-12-18',w:'金泳三'},{d:'1997-12-18',w:'金大中'},{d:'2002-12-19',w:'盧武鉉'},{d:'2007-12-19',w:'李明博'},
-    {d:'2012-12-19',w:'朴槿惠'},{d:'2017-05-09',w:'文在寅'},{d:'2022-03-09',w:'尹錫悅'},{d:'2025-06-03',w:'李在明'}],
+    {d:'1992-12-18'},{d:'1997-12-18'},{d:'2002-12-19'},{d:'2007-12-19'},
+    {d:'2012-12-19'},{d:'2017-05-09'},{d:'2022-03-09'},{d:'2025-06-03'}],
     note:'2017、2025 年為總統遭彈劾去職後的提前選舉。'},
   SG: {region:'新加坡', title:'總統選舉', list:[
-    {d:'1993-08-28',w:'王鼎昌'},{d:'2011-08-27',w:'陳慶炎'},{d:'2023-09-01',w:'尚達曼'}],
+    {d:'1993-08-28'},{d:'2011-08-27'},{d:'2023-09-01'}],
     note:'只列有實際投票的選舉(1999、2005、2017 年為同額當選，未投票)。新加坡總統為虛位元首，實權在總理。'},
   FR: {region:'法國', title:'總統大選(第二輪)', list:[
-    {d:'1995-05-07',w:'席哈克'},{d:'2002-05-05',w:'席哈克'},{d:'2007-05-06',w:'薩科吉'},{d:'2012-05-06',w:'歐蘭德'},
-    {d:'2017-05-07',w:'馬克宏'},{d:'2022-04-24',w:'馬克宏'}],
+    {d:'1995-05-07'},{d:'2002-05-05'},{d:'2007-05-06'},{d:'2012-05-06'},
+    {d:'2017-05-07'},{d:'2022-04-24'}],
     note:'歐元區沒有共同的總統，以區內影響最大的法國總統大選為代表。'},
 };
 const INDEX_ELECTION = {TAIEX:'TW', SP500:'US', NASDAQ:'US', KOSPI50:'KR', STI:'SG', STOXX50:'FR'};
@@ -1187,14 +1187,11 @@ function renderCycle(){
 
     <div class="panel">
       <h3>月份效應(1 ~ 12 月)</h3>
-      <h4>各月份的平均報酬與中位數</h4>
       <div id="cyMonthRet"></div>
-      ${LTChart.legend([{name:'平均報酬(紅漲綠跌)', color:'var(--up)'}, {name:'中位數', color:'var(--blue)'}])}
-      <h4>各月份的上漲機率</h4>
-      <div id="cyMonthWin"></div>
+      ${LTChart.legend([{name:'平均報酬(紅漲綠跌)', color:'var(--up)'}, {name:'中位數', color:'var(--blue)'}, {name:'上漲機率(右軸)', color:'var(--amber)'}])}
       <ul class="insight">${insight('月份', monthGroups)}</ul>
       <details class="cy-detail"><summary>詳細數據(次數、最大漲跌幅)</summary>${table('月份', monthGroups, 1)}</details>
-      <div class="note">月報酬＝月底收盤 ÷ 上個月底收盤 − 1，尚未結束的當月不計入。上漲機率的虛線為 50%。</div>
+      <div class="note">月報酬＝月底收盤 ÷ 上個月底收盤 − 1，尚未結束的當月不計入。長條為報酬(左軸)，折線為上漲機率(右軸)，虛線為上漲機率 50%。</div>
     </div>
 
     <div class="panel">
@@ -1221,13 +1218,12 @@ function drawCycleCharts(){
   if (!C || !a) return;
   const S = C.monthGroups.map(g=>cycleSummary(g.list)), x = C.monthGroups.map(g=>g.name);
   const pctFmt = v=>(v*100).toFixed(1)+'%';
-  LTChart.bars(a, { x, xFmt:monthLabel, xAll:true, label:'各月份平均報酬', height:230, yFmt:pctFmt, refY:[{y:0}],
-    tipFmt:(s,v,i)=>`${s.name} ${fmtPct(v,2)}(${S[i].count} 次)`,
+  LTChart.bars(a, { x, xFmt:monthLabel, xAll:true, label:'各月份平均報酬、中位數與上漲機率', height:260, yFmt:pctFmt,
+    y2Min:0, y2Max:1, y2Fmt:v=>(v*100).toFixed(0)+'%', refY:[{y:0}, {y:0.5, axis:'right', color:'var(--amber)'}],
+    tipFmt:(s,v,i)=> s.axis==='right' ? `${(v*100).toFixed(0)}%` : `${fmtPct(v,2)}(${S[i].count} 次)`,
     series:[{name:'平均報酬', y:S.map(s=>s.avg), color:'var(--up)', colors:S.map(s=>s.avg>=0?'var(--up)':'var(--down)')},
-            {name:'中位數', y:S.map(s=>s.med), color:'var(--blue)'}] });
-  LTChart.bars(document.getElementById('cyMonthWin'), { x, xFmt:monthLabel, xAll:true, label:'各月份上漲機率', height:170, yMin:0, yMax:1,
-    yFmt:v=>(v*100).toFixed(0)+'%', refY:[{y:0.5, color:'var(--dim)'}], tipFmt:(s,v,i)=>`上漲機率 ${(v*100).toFixed(0)}%(${S[i].count} 次)`,
-    series:[{name:'上漲機率', y:S.map(s=>s.win), color:'var(--amber)', colors:S.map(s=>s.win>=0.5?'var(--up)':'var(--down)')}] });
+            {name:'中位數', y:S.map(s=>s.med), color:'var(--blue)'},
+            {name:'上漲機率', y:S.map(s=>s.win), color:'var(--amber)', axis:'right'}] });
   LTChart.bars(document.getElementById('cyMonthPart'), { x:C.partMonthRows.map(r=>r.m+'月'), xFmt:monthLabel, xAll:true, label:'各月份月初月中月底的平均每日漲跌', height:260,
     yFmt:v=>(v*100).toFixed(2)+'%', refY:[{y:0}], tipFmt:(s,v)=>`${s.name} 平均每日 ${fmtPct(v,3)}`,
     series:PART_COLORS.map((p,j)=>({name:p.name, color:p.color, y:C.partMonthRows.map(r=>r.cells[j].avg)})) });
@@ -1247,13 +1243,13 @@ function renderElection(el, key){
       <h3><span class="tag elec">選</span> ${E.region}${E.title}前後的漲跌</h3>
       <div class="tablewrap"><table class="stattable cycle">
         <thead>
-          <tr><th rowspan="2">投票日</th><th rowspan="2">當選人</th><th rowspan="2">基準日<br>(選前收盤)</th><th colspan="2">選前</th><th rowspan="2">選後<br>第1個交易日</th><th colspan="3">選後(以基準日收盤計)</th></tr>
+          <tr><th rowspan="2">投票日</th><th rowspan="2">基準日<br>(選前收盤)</th><th colspan="2">選前</th><th rowspan="2">選後<br>第1個交易日</th><th colspan="3">選後(以基準日收盤計)</th></tr>
           <tr><th>20日</th><th>5日</th><th>+5日</th><th>+20日</th><th>+60日</th></tr>
         </thead>
         <tbody>
-          ${el.events.map(e=>`<tr class="click" onclick="focusDate('${key}',${e.base})"><td>${e.d}</td><td class="kind">${e.w}</td><td>${rows[e.base].date}</td>${F.map(f=>pct(e[f])).join('')}</tr>`).join('')}
-          <tr class="allrow"><td colspan="3">平均(${el.events.length} 次)</td>${sums.map(s=>pct(s.avg)).join('')}</tr>
-          <tr class="allrow"><td colspan="3">上漲機率</td>${sums.map(s=>win(s.win)).join('')}</tr>
+          ${el.events.map(e=>`<tr class="click" onclick="focusDate('${key}',${e.base})"><td>${e.d}</td><td>${rows[e.base].date}</td>${F.map(f=>pct(e[f])).join('')}</tr>`).join('')}
+          <tr class="allrow"><td colspan="2">平均(${el.events.length} 次)</td>${sums.map(s=>pct(s.avg)).join('')}</tr>
+          <tr class="allrow"><td colspan="2">上漲機率</td>${sums.map(s=>win(s.win)).join('')}</tr>
         </tbody>
       </table></div>
       <div class="note">基準日＝投票日當天或之前最後一個交易日的收盤(開票結果出爐前)。「選前20日／5日」＝基準日相對20／5個交易日前的漲跌；「選後」皆以基準日收盤為基準。點選列可在K線圖上定位到選後第一個交易日。${E.note?' '+E.note:''}${skipped.length?` ${skipped.map(e=>e.d.slice(0,4)).join('、')} 年的選舉不在資料範圍內。`:''}樣本只有幾次，僅供參考。</div>

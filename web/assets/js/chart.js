@@ -5,6 +5,7 @@
    共通選項：height、xFmt(x)、yFmt(y)、xType:'date'|'num'、refY:[{ y, label, color }]、
             refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt、
             yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別)
+   右側 y 軸：series 加 axis:'right'(長條圖中畫成折線＋圓點)，搭配 y2Min、y2Max、y2Fmt；refY 也可加 axis:'right'
    顏色請用 CSS 變數(例如 'var(--amber)')，切換主題時不必重畫。
    ========================================================================== */
 const LTChart = (() => {
@@ -38,8 +39,9 @@ const LTChart = (() => {
 
   function frame(el, o, kind) {
     const W = Math.max(280, el.clientWidth || 600), H = o.height || 260;
+    const R2 = o.series.filter(s => s.axis === 'right'), r = R2.length ? 46 : PAD.r;
     const xs = o.x.map(v => toNum(v, o.xType));
-    const ys = o.series.flatMap(s => s.y).concat((o.refY || []).map(r => r.y)).filter(Number.isFinite);
+    const ys = o.series.filter(s => s.axis !== 'right').flatMap(s => s.y).concat((o.refY || []).filter(q => q.axis !== 'right').map(q => q.y)).filter(Number.isFinite);
     if (kind === 'bars') ys.push(0);
     let yLo = o.yMin ?? Math.min(...ys), yHi = o.yMax ?? Math.max(...ys);
     const padY = (yHi - yLo || Math.abs(yHi) || 1) * 0.06;
@@ -49,7 +51,7 @@ const LTChart = (() => {
     // yTicks(lo, hi)：自訂刻度(例如對數座標)，只保留範圍內的刻度
     const yt = o.yTicks ? o.yTicks(yLo, yHi).filter(v => v >= yLo && v <= yHi) : ticks(yLo, yHi);
     if (!o.yTicks) { yLo = Math.min(yLo, yt[0]); yHi = Math.max(yHi, yt[yt.length - 1]); }
-    const iw = W - PAD.l - PAD.r, ih = H - PAD.t - PAD.b;
+    const iw = W - PAD.l - r, ih = H - PAD.t - PAD.b;
     const xLo = Math.min(...xs), xHi = Math.max(...xs);
     const band = kind === 'bars' ? iw / xs.length : 0;
     const X = kind === 'bars'
@@ -58,19 +60,30 @@ const LTChart = (() => {
     const Y = v => PAD.t + (yHi - v) / (yHi - yLo) * ih;
     const yFmt = o.yFmt || defaultFmt;
     const xFmt = o.xFmt || (o.xType === 'date' ? v => String(v).slice(0, 7) : defaultFmt);
-    let g = yt.map(v => `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/>
+    let g = yt.map(v => `<line x1="${PAD.l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/>
       <text x="${PAD.l - 6}" y="${Y(v) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(yFmt(v))}</text>`).join('');
     // x 軸刻度：依寬度挑選約 6 個
     const nx = Math.max(2, Math.min(8, Math.floor(iw / 90)));
     const idx = o.xAll ? xs.map((_, i) => i) : [...new Set(Array.from({ length: nx }, (_, k) => Math.round(k * (xs.length - 1) / (nx - 1))))];
     g += idx.map(i => `<text x="${kind === 'bars' ? X(i) : X(xs[i])}" y="${H - 8}" font-size="10.5" text-anchor="middle" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`).join('');
-    return { W, H, xs, X, Y, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
+    // 右側 y 軸(只標刻度文字，不另畫格線)
+    let Y2 = Y;
+    if (R2.length) {
+      const v2 = R2.flatMap(s => s.y).filter(Number.isFinite);
+      let lo2 = o.y2Min ?? Math.min(...v2), hi2 = o.y2Max ?? Math.max(...v2);
+      const t2 = ticks(lo2, hi2, 4); lo2 = Math.min(lo2, t2[0]); hi2 = Math.max(hi2, t2[t2.length - 1]);
+      Y2 = v => PAD.t + (hi2 - v) / (hi2 - lo2 || 1) * ih;
+      const y2Fmt = o.y2Fmt || defaultFmt;
+      g += t2.map(v => `<text x="${W - r + 6}" y="${Y2(v) + 3.5}" font-size="10.5" text-anchor="start" fill="var(--mute)">${esc(y2Fmt(v))}</text>`).join('');
+    }
+    return { W, H, r, xs, X, Y, Y2, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
   }
 
   function refs(o, f, kind) {
     const xPos = v => kind === 'bars' ? f.X(nearest(f.xs, toNum(v, o.xType))) : f.X(toNum(v, o.xType));
-    let g = (o.refY || []).map(r => `<line x1="${PAD.l}" x2="${f.W - PAD.r}" y1="${f.Y(r.y)}" y2="${f.Y(r.y)}" stroke="${r.color || 'var(--border-strong)'}" stroke-dasharray="4 4"/>
-      ${r.label ? `<text x="${f.W - PAD.r - 4}" y="${f.Y(r.y) - 4}" font-size="10.5" text-anchor="end" fill="${r.color || 'var(--mute)'}">${esc(r.label)}</text>` : ''}`).join('');
+    const yOf = r => r.axis === 'right' ? f.Y2(r.y) : f.Y(r.y);
+    let g = (o.refY || []).map(r => `<line x1="${PAD.l}" x2="${f.W - f.r}" y1="${yOf(r)}" y2="${yOf(r)}" stroke="${r.color || 'var(--border-strong)'}" stroke-dasharray="4 4"/>
+      ${r.label ? `<text x="${f.W - f.r - 4}" y="${yOf(r) - 4}" font-size="10.5" text-anchor="end" fill="${r.color || 'var(--mute)'}">${esc(r.label)}</text>` : ''}`).join('');
     g += (o.refX || []).map(r => `<line x1="${xPos(r.x)}" x2="${xPos(r.x)}" y1="${PAD.t}" y2="${f.H - PAD.b}" stroke="${r.color || 'var(--border-strong)'}" stroke-dasharray="4 4"/>
       ${r.label ? `<text x="${xPos(r.x) + 4}" y="${PAD.t + 10}" font-size="10.5" fill="${r.color || 'var(--mute)'}">${esc(r.label)}</text>` : ''}`).join('');
     g += (o.points || []).map(p => `<circle cx="${xPos(p.x)}" cy="${f.Y(p.y)}" r="4" fill="${p.color || 'var(--text)'}" stroke="var(--panel)" stroke-width="1.5"/>
@@ -85,7 +98,7 @@ const LTChart = (() => {
     const tipFmt = o.tipFmt || ((s, v) => f.yFmt(v));
     const move = ev => {
       const rect = svg.getBoundingClientRect(), px = (ev.touches ? ev.touches[0].clientX : ev.clientX) - rect.left;
-      if (px < PAD.l || px > f.W - PAD.r) { leave(); return; }
+      if (px < PAD.l || px > f.W - f.r) { leave(); return; }
       const i = kind === 'bars'
         ? Math.min(f.xs.length - 1, Math.max(0, Math.floor((px - PAD.l) / f.band)))
         : nearest(f.xs, f.xs[0] + (px - PAD.l) / f.iw * (f.xs[f.xs.length - 1] - f.xs[0]));
@@ -136,12 +149,18 @@ const LTChart = (() => {
 
   function bars(el, o) {
     render(el, o, 'bars', f => {
-      const n = o.series.length, bw = Math.max(1, f.band * 0.8 / n);
-      return o.series.map((s, j) => s.y.map((v, i) => {
+      const B = o.series.filter(s => s.axis !== 'right'), n = B.length, bw = Math.max(1, f.band * 0.8 / n);
+      const g = B.map((s, j) => s.y.map((v, i) => {
         if (!Number.isFinite(v)) return '';
         const x = f.X(i) - f.band * 0.4 + j * bw, y = f.Y(Math.max(v, 0)), h = Math.abs(f.Y(v) - f.Y(0));
         return `<rect x="${x}" y="${y}" width="${bw}" height="${Math.max(h, 0.5)}" fill="${(s.colors && s.colors[i]) || s.color}" opacity=".85"/>`;
       }).join('')).join('');
+      // 右側 y 軸的數列畫成折線＋圓點
+      return g + o.series.filter(s => s.axis === 'right').map(s => {
+        const pts = s.y.map((v, i) => Number.isFinite(v) ? [f.X(i), f.Y2(v)] : null).filter(Boolean);
+        return `<polyline points="${pts.map(p => p.join(',')).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`
+          + pts.map(p => `<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="${s.color}" stroke="var(--panel)" stroke-width="1.5"/>`).join('');
+      }).join('');
     });
   }
 
