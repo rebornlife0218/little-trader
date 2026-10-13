@@ -1144,15 +1144,13 @@ function renderCycle(){
     const pm = res.partMonth[i+1] || {'月初':[], '月中':[], '月底':[]};
     return { m:i+1, cells: PART_COLORS.map(p=>cycleSummary(pm[p.name])) };
   });
-  const partCell = c=> Number.isNaN(c.avg) ? '<td class="na">—</td>'
-    : `<td class="${c.avg>=0?'up':'down'}">${fmtPct(c.avg,3)}<small class="hint-s">${(c.win*100).toFixed(0)}%</small></td>`;
   const cellsAll = partMonthRows.flatMap(r=>r.cells.map((c,j)=>({m:r.m, p:PART_COLORS[j].name, ...c}))).filter(c=>c.count>0);
   const partMonthInsight = cellsAll.length ? (()=>{
     const s = [...cellsAll].sort((a,b)=>b.avg-a.avg), top = s.slice(0,3), bot = s.slice(-3).reverse();
     const pos = PART_COLORS.map(p=>({name:p.name, n:partMonthRows.filter(r=>{ const c=r.cells[PART_COLORS.findIndex(x=>x.name===p.name)]; const mx=Math.max(...r.cells.map(x=>x.avg)); return c.avg===mx; }).length}));
     const most = pos.reduce((a,b)=>b.n>a.n?b:a);
     return `<li><b>平均最好</b>：${top.map(c=>`${c.m}月${c.p}(${fmtPct(c.avg,3)})`).join('、')}；<b>平均最差</b>：${bot.map(c=>`${c.m}月${c.p}(${fmtPct(c.avg,3)})`).join('、')}。</li>
-      <li>12 個月份中，有 ${most.n} 個月份是「${most.name}」表現最好。每一格的樣本只有該月份的部分交易日(每年約 7～10 天)，差異容易受少數年份影響。</li>`;
+      <li>12 個月份中，有 ${most.n} 個月份是「${most.name}」表現最好。每個月份每一段的樣本只有該月份的部分交易日(每年約 7～10 天)，差異容易受少數年份影響。</li>`;
   })() : '';
   const periodText = `${rows[Math.max(res.from-1,0)].date} ~ ${rows[rows.length-1].date}`;
   let html = `
@@ -1197,13 +1195,9 @@ function renderCycle(){
     <div class="panel">
       <h3>各月份的月初 / 月中 / 月底</h3>
       <div id="cyMonthPart"></div>
-      ${LTChart.legend(PART_COLORS)}
-      <div class="tablewrap"><table class="stattable cy-part">
-        <thead><tr><th>月份</th>${PART_COLORS.map(p=>`<th>${p.name}<small class="hint-s">平均每日漲跌 · 上漲機率</small></th>`).join('')}</tr></thead>
-        <tbody>${partMonthRows.map(r=>`<tr><td>${r.m}月</td>${r.cells.map(partCell).join('')}</tr>`).join('')}</tbody>
-      </table></div>
+      ${LTChart.legend(PART_COLORS.map(p=>({name:p.name+' 平均每日漲跌', color:p.color})).concat([{name:'上漲機率(右軸，同色折線)', color:'var(--dim)'}]))}
       <ul class="insight">${partMonthInsight}</ul>
-      <div class="note">每個月份各自依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分成三段，計算該段交易日的平均每日漲跌(紅漲綠跌)；可在上方「統計設定」切換定義。</div>
+      <div class="note">每個月份各自依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分成三段，計算該段交易日的平均每日漲跌(長條，左軸)與上漲機率(折線，右軸，虛線為 50%)；可在上方「統計設定」切換定義。</div>
     </div>`;
   state.cycleCharts = { monthGroups, partMonthRows };
   html += renderElection(res.election, key);
@@ -1224,9 +1218,11 @@ function drawCycleCharts(){
     series:[{name:'平均報酬', y:S.map(s=>s.avg), color:'var(--up)', colors:S.map(s=>s.avg>=0?'var(--up)':'var(--down)')},
             {name:'中位數', y:S.map(s=>s.med), color:'var(--blue)'},
             {name:'上漲機率', y:S.map(s=>s.win), color:'var(--amber)', axis:'right'}] });
-  LTChart.bars(document.getElementById('cyMonthPart'), { x:C.partMonthRows.map(r=>r.m+'月'), xFmt:monthLabel, xAll:true, label:'各月份月初月中月底的平均每日漲跌', height:260,
-    yFmt:v=>(v*100).toFixed(2)+'%', refY:[{y:0}], tipFmt:(s,v)=>`${s.name} 平均每日 ${fmtPct(v,3)}`,
-    series:PART_COLORS.map((p,j)=>({name:p.name, color:p.color, y:C.partMonthRows.map(r=>r.cells[j].avg)})) });
+  LTChart.bars(document.getElementById('cyMonthPart'), { x:C.partMonthRows.map(r=>r.m+'月'), xFmt:monthLabel, xAll:true, label:'各月份月初月中月底的平均每日漲跌與上漲機率', height:300,
+    yFmt:v=>(v*100).toFixed(2)+'%', y2Min:0, y2Max:1, y2Fmt:v=>(v*100).toFixed(0)+'%', refY:[{y:0}, {y:0.5, axis:'right', color:'var(--dim)'}],
+    tipFmt:(s,v,i)=> s.axis==='right' ? `${(v*100).toFixed(0)}%` : `${fmtPct(v,3)}(${C.partMonthRows[i].cells[PART_COLORS.findIndex(p=>p.name===s.name)].count} 天)`,
+    series:PART_COLORS.map((p,j)=>({name:p.name, color:p.color, y:C.partMonthRows.map(r=>r.cells[j].avg)}))
+      .concat(PART_COLORS.map((p,j)=>({name:p.name+'上漲機率', color:p.color, axis:'right', y:C.partMonthRows.map(r=>r.cells[j].win)}))) });
 }
 function renderElection(el, key){
   if (!el){
