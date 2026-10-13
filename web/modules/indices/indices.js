@@ -1174,15 +1174,15 @@ function renderCycle(){
     </div>
 
     <div class="panel">
-      <h3>月初 / 月中 / 月底</h3>
-      ${table('時段', [{name:'全部交易日', list:allDaily, cls:'allrow'}, ...partGroups], 2)}
-      <ul class="insight">${insight('月初/月中/月底', partGroups)}</ul>
-    </div>
-
-    <div class="panel">
       <h3>週一 ~ 週五</h3>
       ${table('星期', [{name:'全部交易日', list:allDaily, cls:'allrow'}, ...wdGroups], 2)}
       <ul class="insight">${insight('星期效應', wdGroups)}</ul>
+    </div>
+
+    <div class="panel">
+      <h3>月初 / 月中 / 月底</h3>
+      ${table('時段', [{name:'全部交易日', list:allDaily, cls:'allrow'}, ...partGroups], 2)}
+      <ul class="insight">${insight('月初/月中/月底', partGroups)}</ul>
     </div>
 
     <div class="panel">
