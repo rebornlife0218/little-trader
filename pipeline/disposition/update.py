@@ -115,6 +115,10 @@ def main():
     sym = {e['code']: e['code'] + ('.TW' if e['market'] == 'TWSE' else '.TWO') for e in events}
     first = (pd.Timestamp(min(e['start'] for e in events)) - pd.Timedelta(days=20)).strftime('%Y-%m-%d')
     px = download(sorted(set(sym.values())) + ['^TWII'], first)
+    # Yahoo 的台股當日資料常常晚到(只有日期、價格空白)：最後幾天加權指數或多數個股沒有收盤就先不算
+    stocks = px['Close'].drop(columns='^TWII')
+    ok = px['Close']['^TWII'].notna() & (stocks.notna().mean(axis=1) >= 0.5)
+    px = px.loc[:ok[ok].index[-1]]
     O, C, A = px['Open'], px['Close'], px['Adj Close'].copy()
     A['^TWOII'] = fetch_otc(pd.Timestamp(first).date(), today).reindex(A.index)
 
@@ -155,7 +159,7 @@ def main():
     d = dataset_dir(NAME)
     write_json(d / 'events.json', {'asof': A.index[-1].strftime('%Y-%m-%d'), 'new_rule': NEW_RULE, 'events': out, 'market': market})
     write_meta(NAME, '臺灣證券交易所、櫃買中心 處置有價證券公告；Yahoo Finance', 'https://www.twse.com.tw/zh/announcement/punish.html',
-               '每個工作日 19:00', files=['events.json'], events=len(out))
+               '每個工作日 19:23、隔天 06:43', files=['events.json'], events=len(out))
     print(f'完成：{len(out)} 筆有股價的處置事件，新制 {sum(x["rule"] == "new" for x in out)} 筆')
 
 

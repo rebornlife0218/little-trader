@@ -461,7 +461,7 @@
   /* 週期性分析(modules/indices/indices.js)：月份效應的詳細數據、月份 × 月初月中月底熱度表 */
   .cy-detail{margin-top:12px;}
   .cy-detail summary{cursor:pointer;color:var(--mute);font-size:13px;margin-bottom:8px;}
-  table.cy-heat td small.hint-s{display:block;}
+  table.cy-part td small.hint-s{display:block;}
   /* ETF 配息課稅：說明文字較長的表格允許換行 */
   table.tx-src td, table.tx-src th{white-space:normal;}
   table.tx-src td:first-child{white-space:nowrap;}
