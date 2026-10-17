@@ -21,17 +21,23 @@ HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
 COLS = ['name', 'type', 'manager', 'size', 'period', 'apply_date', 'approve_date', 'amount']
 
 
-def fetch_html(retries=3):
+def fetch_html(retries=5):
+    """MoneyDJ 偶爾回 200 但內容沒有基金表格(忙碌/維護頁)，也視為失敗重試。"""
     last = None
     for i in range(1, retries + 1):
         try:
             r = requests.get(URL, headers=HEADERS, timeout=30)
             r.raise_for_status()
-            return r.content.decode('big5', errors='replace')  # MoneyDJ 為 Big5 編碼
+            html = r.content.decode('big5', errors='replace')  # MoneyDJ 為 Big5 編碼
+            if 'FDJ-1_TB' not in html:
+                snippet = clean(BeautifulSoup(html, 'html.parser').get_text(' '))[:200]
+                raise RuntimeError(f'回應中找不到基金表格(長度 {len(html)})：{snippet}')
+            return html
         except Exception as e:  # noqa: BLE001
             last = e
             print(f'第 {i} 次下載失敗：{e!r}', file=sys.stderr)
-            time.sleep(10 * i)
+            if i < retries:
+                time.sleep(20 * i)
     raise RuntimeError(f'下載失敗：{last!r}')
 
 
