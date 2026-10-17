@@ -112,7 +112,7 @@
             <li><b>期間</b>：CMoney 資料從 2016 年 1 月開始，需要先累積半年的資料計算波動，回測從 ${esc(B.m[0].start)} 開始。</li>
           </ul>
           <h4>和原始版本的差別(修正前視偏誤)</h4>
-          <p>原始版本(<a href="https://github.com/rebornlife0218/Trading_Strategy" target="_blank" rel="noopener">Trading_Strategy/LowVolatility</a>，Yahoo Finance、2014~2024)有幾個會讓回測結果偏好的地方：</p>
+          <p>原始版本(<a href="https://github.com/rebornlife0218/Trading_Strategy/tree/cf78ce9/LowVolatility" target="_blank" rel="noopener">Trading_Strategy/LowVolatility</a>，Yahoo Finance、2014~2024)有幾個會讓回測結果偏好的地方：</p>
           <ul>
             <li><b>前視偏誤</b>：用當天收盤價算出波動、決定持股，同一天的報酬就算進組合，等於事先知道當天的價格。這裡改為月底收盤後選股、隔天開盤才進場。</li>
             <li><b>倖存者偏差</b>：股票清單是「現在」的上市櫃公司，期間內下市、被併購的公司都不在裡面。這裡使用每個月當時有交易的股票，包含後來下市櫃的公司。</li>

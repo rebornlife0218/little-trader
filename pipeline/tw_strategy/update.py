@@ -1,6 +1,6 @@
 """
 資料集 tw_strategy：台股低波動策略回測(資料來自本機 PostgreSQL 的 cm schema) → web/data/tw_strategy/
-原始版本：rebornlife0218/Trading_Strategy 的 LowVolatility_TW.py，這裡修正它的偏誤：
+原始版本：rebornlife0218/Trading_Strategy 的 LowVolatility_TW.py(已整合到這裡並從該 repo 刪除，最後版本在 commit cf78ce9)，這裡修正它的偏誤：
   - 前視偏誤：原版用「當天收盤」選股，同一天的報酬就算進組合。這裡在每月最後一個交易日收盤後選股，
     隔一個交易日以開盤價(還原開盤價)進場，持有到下個月第一個交易日開盤換股。
   - 倖存者偏差：原版用「現在」的上市櫃代號清單；cm.tw_daily 含已下市櫃股票，每月只從當時有交易的股票挑選。
@@ -160,7 +160,7 @@ def main():
         'params': {'lookback': LOOKBACK, 'min_traded': MIN_TRADED, 'min_value': MIN_VALUE, 'top_n': TOP_N, 'top_pct': TOP_PCT},
     }
     write_json(dataset_dir(DATASET) / 'backtest.json', out)
-    write_meta(DATASET, 'CMoney 台股日資料(本機 PostgreSQL)', 'https://github.com/rebornlife0218/Trading_Strategy',
+    write_meta(DATASET, 'CMoney 台股日資料(本機 PostgreSQL)', 'https://www.cmoney.tw/',
                '每週二~六 13:00(本機排程)', asof=out['asof'])
     for k in [*keys, 'b0050']:
         v = out['nav'][k]
