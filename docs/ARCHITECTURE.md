@@ -46,7 +46,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
   disposition/update.py             台股處置股(證交所、櫃買中心公告；股價本機 PostgreSQL、加權指數用 indices 資料集、櫃買指數用櫃買中心；只在本機執行)
   tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的 CMoney 日資料；只在本機執行)
-  run_local.sh                      本機資料集(tw_strategy、disposition)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
+  run_local.py                      本機資料集(tw_strategy、disposition)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
 
 .github/workflows/
@@ -80,8 +80,8 @@ pipeline/                           資料抓取，一個資料集一個資料�
 | tw_strategy | 本機 PostgreSQL `cm.tw_daily`(CMoney 台股日資料) | 週一~五 23:45、週二~六 12:15(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(未扣成本)；每月換股日、合格股票數、換手率；最新一次選股的持股) |
 
 本機資料集(tw_strategy、disposition)：
-- 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-<資料集>.yml`；由 Windows 工作排程器「LittleTrader_local」在 cm 同步(`CM_PostgreSQL_Sync`：週一~五 23:30、週二~六 12:00；CMoney 台股日資料約 21:30 進 repo)之後執行 `pipeline/run_local.sh`，cm 同步還在跑會先等它結束。輸出記錄在 `~/.cache/little-trader/local.log`。
-- 兩個排程都設定「喚醒電腦執行」：只有插電時能喚醒(電池模式的喚醒計時器已關閉)，執行完沒有操作會自動回到睡眠。
+- 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-<資料集>.yml`；由 Windows 工作排程器「LittleTrader_local」在 cm 同步(`CM_PostgreSQL_Sync`：週一~五 23:30、週二~六 12:00；CMoney 台股日資料約 21:30 進 repo)之後以 `pythonw.exe` 執行 `pipeline/run_local.py`，cm 同步還在跑會先等它結束。不能用 Git Bash：電腦睡眠(新式待命)時排程會在背景執行，msys 的 bash.exe 在這個狀態下啟動失敗(0xC0000142)，所以發佈步驟(同 `publish_data.sh`)在 run_local.py 裡用 Python 呼叫 git.exe。輸出記錄在 `~/.cache/little-trader/local.log`。
+- 兩個排程都設定「喚醒電腦執行」：只有插電時能喚醒(電池模式的喚醒計時器已關閉)；睡眠中會在背景執行、螢幕不會亮，執行完自動回到睡眠(2026-10-17 實測)。
 - 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
 - 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(證交所資料，GitHub Actions 每天 15:30 更新)。
 - 只發佈回測結果，不發佈原始股價。

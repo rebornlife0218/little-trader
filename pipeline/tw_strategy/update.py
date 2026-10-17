@@ -16,7 +16,7 @@
 
 只能在本機執行(GitHub Actions 連不到本機資料庫)：
   python pipeline/tw_strategy/update.py
-  bash pipeline/run_local.sh      # 本機資料集一起更新 + 發佈到 data 分支 + 重新部署(Windows 排程呼叫這個)
+  python pipeline/run_local.py    # 本機資料集一起更新 + 發佈到 data 分支 + 重新部署(Windows 排程呼叫這個)
 資料庫連線見 common.pg_connect()。
 """
 import io
