@@ -23,6 +23,7 @@
 import io
 import os
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -94,7 +95,9 @@ def main():
         p = cf[w]
         with np.errstate(invalid='ignore', divide='ignore'):
             r5 = p[5:] / p[:-5] - 1
-        vol = np.nanstd(r5, axis=0, ddof=1)
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', RuntimeWarning)   # 還沒上市或已下市的股票整欄都是缺值
+            vol = np.nanstd(r5, axis=0, ddof=1)
         idx = np.where(ok & np.isfinite(vol))[0]
         idx = idx[np.argsort(vol[idx], kind='stable')]
         k = max(TOP_N, round(len(idx) * TOP_PCT))
