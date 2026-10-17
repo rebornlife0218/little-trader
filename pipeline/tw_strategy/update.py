@@ -16,22 +16,19 @@
 
 只能在本機執行(GitHub Actions 連不到本機資料庫)：
   python pipeline/tw_strategy/update.py
-  bash pipeline/tw_strategy/run_local.sh      # 更新 + 發佈到 data 分支 + 重新部署(Windows 排程呼叫這個)
-連線設定用環境變數 PGHOST / PGPORT / PGUSER / PGDATABASE(預設 localhost:9457、postgres)，
-密碼由 libpq 從 %APPDATA%\\postgresql\\pgpass.conf 讀取，不寫在程式裡。
+  bash pipeline/run_local.sh      # 本機資料集一起更新 + 發佈到 data 分支 + 重新部署(Windows 排程呼叫這個)
+資料庫連線見 common.pg_connect()。
 """
 import io
-import os
 import sys
 import warnings
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from common import dataset_dir, write_json, write_meta  # noqa: E402
+from common import dataset_dir, pg_connect, write_json, write_meta  # noqa: E402
 
 DATASET = 'tw_strategy'
 LOOKBACK = 120          # 回看交易日數(約半年)
@@ -53,13 +50,8 @@ SQL_NAMES = '''
 SQL_DELISTED = 'SELECT "股票代號", "股票名稱", "產業名稱", "終止日期" FROM cm.tw_delisted_company'
 
 
-def connect():
-    return psycopg.connect(host=os.environ.get('PGHOST', 'localhost'), port=os.environ.get('PGPORT', '9457'),
-                           user=os.environ.get('PGUSER', 'postgres'), dbname=os.environ.get('PGDATABASE', 'postgres'))
-
-
 def load():
-    with connect() as conn:
+    with pg_connect() as conn:
         buf = io.BytesIO()
         with conn.cursor().copy(SQL) as cp:
             for chunk in cp:
@@ -160,8 +152,8 @@ def main():
         'params': {'lookback': LOOKBACK, 'min_traded': MIN_TRADED, 'min_value': MIN_VALUE, 'top_n': TOP_N, 'top_pct': TOP_PCT},
     }
     write_json(dataset_dir(DATASET) / 'backtest.json', out)
-    write_meta(DATASET, 'CMoney 台股日資料(本機 PostgreSQL)', 'https://www.cmoney.tw/',
-               '每週二~六 13:00(本機排程)', asof=out['asof'])
+    write_meta(DATASET, 'PostgreSQL', '',
+               '週一~五 23:45、週二~六 12:15(本機排程)', asof=out['asof'])
     for k in [*keys, 'b0050']:
         v = out['nav'][k]
         yrs = (len(v) - 1) / 252

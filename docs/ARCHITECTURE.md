@@ -44,9 +44,9 @@ pipeline/                           資料抓取，一個資料集一個資料�
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
   etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
-  disposition/update.py             台股處置股(證交所、櫃買中心公告；股價 Yahoo、櫃買指數用櫃買中心)
+  disposition/update.py             台股處置股(證交所、櫃買中心公告；股價本機 PostgreSQL、加權指數用 indices 資料集、櫃買指數用櫃買中心；只在本機執行)
   tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的 CMoney 日資料；只在本機執行)
-  tw_strategy/run_local.sh          本機排程：更新 → 發佈到 data 分支 → 觸發部署
+  run_local.sh                      本機資料集(tw_strategy、disposition)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
 
 .github/workflows/
@@ -72,16 +72,18 @@ pipeline/                           資料抓取，一個資料集一個資料�
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
 | etf_compare | 勞動基金運用局、Yahoo Finance、臺灣證券交易所(除權除息計算結果表) | 週一~五 09:00 | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；台股 ETF 的配息用證交所官方資料，Yahoo 缺 2013 年以前的配息) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
-| disposition | 臺灣證券交易所、櫃買中心 處置有價證券；Yahoo Finance | 週一~五 19:23、隔天 06:43 | `events.json`(2025 年起每個處置事件：期間、新制/舊制、第一天開收、處置前 5 日、處置期間、出關後 5 日與同期大盤報酬；加權與櫃買指數近 200 天) |
+| disposition | 臺灣證券交易所、櫃買中心 處置有價證券；股價本機 PostgreSQL `cm.tw_daily` | 週一~五 23:45、週二~六 12:15(本機排程) | `events.json`(2026/7 起每個處置事件：期間、新制/舊制、第一天開收、處置前 5 日、處置期間、出關後 5 日與同期大盤報酬) |
 | sp500 | fja05680/sp500 歷史成分股、Yahoo Finance、Tiingo | 週六 09:00 | `backtest.json`(四種策略、全部成分股等權重、SPY 的每日淨值(未扣成本)；每季的成分股數、可取得股價數、換手率、無風險利率、持股) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
-| tw_strategy | CMoney 台股日資料(本機 PostgreSQL `cm.tw_daily`) | 週二~六 13:00(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(未扣成本)；每月換股日、合格股票數、換手率；最新一次選股的持股) |
+| tw_strategy | 本機 PostgreSQL `cm.tw_daily`(CMoney 台股日資料) | 週一~五 23:45、週二~六 12:15(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(未扣成本)；每月換股日、合格股票數、換手率；最新一次選股的持股) |
 
-tw_strategy 的特殊處理：
-- 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-tw_strategy.yml`；由 Windows 工作排程器「LittleTrader_tw_strategy」在 cm 同步(`CM_PostgreSQL_Sync`，週二~六 12:00)之後執行 `pipeline/tw_strategy/run_local.sh`，輸出記錄在 `~/.cache/little-trader/tw_strategy.log`。
-- 連線用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
+本機資料集(tw_strategy、disposition)：
+- 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-<資料集>.yml`；由 Windows 工作排程器「LittleTrader_local」在 cm 同步(`CM_PostgreSQL_Sync`：週一~五 23:30、週二~六 12:00；CMoney 台股日資料約 21:30 進 repo)之後執行 `pipeline/run_local.sh`，cm 同步還在跑會先等它結束。輸出記錄在 `~/.cache/little-trader/local.log`。
+- 兩個排程都設定「喚醒電腦執行」：只有插電時能喚醒(電池模式的喚醒計時器已關閉)，執行完沒有操作會自動回到睡眠。
+- 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
+- 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(證交所資料，GitHub Actions 每天 15:30 更新)。
 - 只發佈回測結果，不發佈原始股價。
 
 sp500 的特殊處理：
