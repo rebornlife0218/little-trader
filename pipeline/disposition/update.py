@@ -1,7 +1,7 @@
 """
 資料集 disposition：台股處置股(上市 + 上櫃)與處置前後的股價表現
 
-處置公告：臺灣證券交易所「處置有價證券」(上市)、櫃買中心「上櫃處置有價證券」
+處置名單：本機 PostgreSQL 的 cm.tw_disposition(CMoney，依證交所、櫃買中心公告)
 股價：本機 PostgreSQL 的 cm.tw_daily(CMoney 日資料；開收用原始價格判斷 K 棒，報酬用還原股價)
 大盤：加權指數用 data 分支已發佈的 indices/TAIEX.json(證交所)，櫃買指數用櫃買中心資料
 資料庫在本機，GitHub Actions 連不到，只在本機執行：python pipeline/run_local.py(Windows 排程呼叫)
@@ -15,10 +15,9 @@
   post5 出關後 5 個交易日的報酬
   mkt   同期間大盤(上市用加權指數、上櫃用櫃買指數)的報酬
 """
-import re
 import sys
 import time
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -31,16 +30,8 @@ NAME = 'disposition'
 START = date(2026, 7, 1)            # 新制(2026-08-10)前一個多月起，涵蓋跨越實施日的處置
 NEW_RULE = '2026-08-10'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (little-trader data bot)'}
-TWSE_API = 'https://www.twse.com.tw/rwd/zh/announcement/punish'
-TPEX_API = 'https://www.tpex.org.tw/www/zh-tw/bulletin/disposal'
 OTC_API = 'https://www.tpex.org.tw/www/zh-tw/indexInfo/inx'   # 櫃買指數(月查詢)
 TAIEX_URL = f'https://raw.githubusercontent.com/{REPO}/data/indices/TAIEX.json'
-
-
-def roc(s):
-    """民國日期 115/08/10 → 2026-08-10"""
-    y, m, d = (int(x) for x in s.strip().split('/'))
-    return f'{y + 1911}-{m:02d}-{d:02d}'
 
 
 def get_json(url, params):
@@ -55,38 +46,27 @@ def get_json(url, params):
     raise RuntimeError(f'無法下載 {url}')
 
 
-def parse_rows(rows, market, idx):
-    """idx：(公布日期, 代號, 名稱, 起訖, 措施, 原因) 在該表的欄位位置"""
-    out = []
-    for r in rows:
-        code = str(r[idx[1]]).strip()
-        if not re.fullmatch(r'[1-9]\d{3}', code):      # 只看股票(排除權證、ETF、ETN)
-            continue
-        span = re.split(r'[~～]', str(r[idx[3]]))
-        if len(span) != 2:
-            continue
-        out.append({'code': code, 'name': re.sub(r'\(.*$', '', str(r[idx[2]])).strip(), 'market': market,
-                    'announced': roc(r[idx[0]]), 'start': roc(span[0]), 'end': roc(span[1]),
-                    'kind': str(r[idx[4]]).strip(), 'reason': str(r[idx[5]]).strip()})
-    return out
+# 處置名單：cm.tw_disposition(上市、上櫃都有，處置迄日已含順延與新制過渡的縮短)；名稱與市場取最新一年的公司基本資料
+SQL_EVENTS = '''
+  SELECT d."股票代號", ci."股票名稱", ci."上市上櫃", d."處置時間起"::date, d."處置時間迄"::date,
+         d."處置措施", d."處置條件", d."處置內容"
+  FROM cm.tw_disposition d
+  LEFT JOIN (SELECT DISTINCT ON ("股票代號") "股票代號", "股票名稱", "上市上櫃" FROM cm.tw_company_info
+             ORDER BY "股票代號", "年度" DESC) ci USING ("股票代號")
+  WHERE d."處置時間迄" >= %s AND d."股票代號" ~ '^[1-9][0-9]{3}$'   -- 只看股票(排除權證、ETF、ETN)
+'''
 
 
-def fetch_events(today):
+def fetch_events():
+    with pg_connect() as conn:
+        rows = conn.execute(SQL_EVENTS, (START,)).fetchall()
     events = []
-    # 一次查一年，避免超過查詢範圍
-    y = START.year
-    while y <= today.year:
-        a, b = date(y, 1, 1) if y > START.year else START, min(date(y, 12, 31), today)
-        tw = get_json(TWSE_API, {'startDate': a.strftime('%Y%m%d'), 'endDate': b.strftime('%Y%m%d'), 'response': 'json'})
-        # 欄位：編號, 公布日期, 證券代號, 證券名稱, 累計, 處置條件, 處置起迄時間, 處置措施, 處置內容, 備註
-        events += parse_rows(tw.get('data') or [], 'TWSE', (1, 2, 3, 6, 7, 5))
-        time.sleep(3)
-        tp = get_json(TPEX_API, {'startDate': a.strftime('%Y/%m/%d'), 'endDate': b.strftime('%Y/%m/%d'), 'response': 'json'})
-        # 欄位：編號, 公布日期, 證券代號, 證券名稱, 累計, 處置起訖時間, 處置原因, 處置措施, ...
-        rows = tp['tables'][0]['data'] if tp.get('tables') else []
-        events += parse_rows(rows, 'TPEx', (1, 2, 3, 5, 7, 6))
-        time.sleep(3)
-        y += 1
+    for code, name, mk, st, en, kind, reason, body in rows:
+        # 上櫃的處置措施欄是空的：內容提到「曾發布處置」就是再次處置(與櫃買中心公告比對 120 筆全部相符)
+        if not kind:
+            kind = '再次處置' if '曾發布處置' in (body or '') else '第一次處置'
+        events.append({'code': code, 'name': name or '', 'market': 'TPEx' if mk == '2' else 'TWSE',   # 7 = 創新板(上市)
+                       'start': st.isoformat(), 'end': en.isoformat(), 'kind': kind, 'reason': reason or ''})
     # 同一檔同一起日只留一筆
     uniq = {(e['code'], e['start']): e for e in events}
     return sorted(uniq.values(), key=lambda e: (e['start'], e['code']))
@@ -125,7 +105,7 @@ def load_prices(codes, start):
 
 def main():
     today = date.today()
-    events = fetch_events(today)
+    events = fetch_events()
     print(f'處置事件 {len(events)} 筆(上市 {sum(e["market"] == "TWSE" for e in events)}、上櫃 {sum(e["market"] == "TPEx" for e in events)})')
     first = pd.Timestamp(min(e['start'] for e in events)) - pd.Timedelta(days=20)
     O, C, A, last_day = load_prices(sorted({e['code'] for e in events}), first.date())
@@ -165,7 +145,7 @@ def main():
                                mdays[mdays <= last][-1] if (mdays <= last).any() else None)})
     d = dataset_dir(NAME)
     write_json(d / 'events.json', {'asof': last_day.strftime('%Y-%m-%d'), 'new_rule': NEW_RULE, 'events': out})
-    write_meta(NAME, '臺灣證券交易所、櫃買中心 處置有價證券公告；股價 PostgreSQL', 'https://www.twse.com.tw/zh/announcement/punish.html',
+    write_meta(NAME, 'PostgreSQL', '',
                '週一~五 23:45、週二~六 12:15(本機排程)', files=['events.json'], events=len(out))
     print(f'完成：{len(out)} 筆有股價的處置事件，新制 {sum(x["rule"] == "new" for x in out)} 筆')
 
