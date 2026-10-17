@@ -7,5 +7,5 @@ cd "$(dirname "$0")/../.."
 export PYTHONIOENCODING=utf-8
 python pipeline/tw_strategy/update.py
 GITHUB_TOKEN="$(gh auth token)" GITHUB_REPOSITORY=rebornlife0218/little-trader bash pipeline/publish_data.sh tw_strategy
-gh workflow run deploy.yml --ref main
+gh workflow run deploy.yml --ref main --repo rebornlife0218/little-trader
 echo "已觸發重新部署"
