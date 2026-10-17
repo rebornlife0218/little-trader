@@ -81,7 +81,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 
 本機資料集(tw_strategy、disposition)：
 - 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-<資料集>.yml`；由 Windows 工作排程器「LittleTrader_local」在 cm 同步(`CM_PostgreSQL_Sync`：週一~五 23:30、週二~六 12:00；CMoney 台股日資料約 21:30 進 repo)之後以 `pythonw.exe` 執行 `pipeline/run_local.py`，cm 同步還在跑會先等它結束。不能用 Git Bash：電腦睡眠(新式待命)時排程會在背景執行，msys 的 bash.exe 在這個狀態下啟動失敗(0xC0000142)，所以發佈步驟(同 `publish_data.sh`)在 run_local.py 裡用 Python 呼叫 git.exe。輸出記錄在 `~/.cache/little-trader/local.log`。
-- 兩個排程都設定「喚醒電腦執行」：只有插電時能喚醒(電池模式的喚醒計時器已關閉)；睡眠中會在背景執行、螢幕不會亮，執行完自動回到睡眠(2026-10-17 實測)。
+- 兩個排程都設定「喚醒電腦執行」與「錯過時間就補跑」(2026-10-17 實測)：插電睡眠時會在背景準時執行、螢幕不會亮，執行完自動回到睡眠；用電池睡眠時叫不醒(新式待命會擋掉，即使開啟電池模式的喚醒計時器也一樣)，等下次喚醒電腦才補跑。
 - 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
 - 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(證交所資料，GitHub Actions 每天 15:30 更新)。
 - 只發佈回測結果，不發佈原始股價。
