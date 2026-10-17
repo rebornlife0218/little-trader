@@ -15,7 +15,7 @@
 
 ## 運作方式
 
-網站是純靜態網頁(GitHub Pages)，沒有後端伺服器；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。台股處置股與台股策略回測的股價來自本機 PostgreSQL(GitHub Actions 連不到)，改由本機排程執行同樣的流程(`pipeline/run_local.sh`)。
+網站是純靜態網頁(GitHub Pages)，沒有後端伺服器；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。台股處置股與台股策略回測的股價來自本機 PostgreSQL(GitHub Actions 連不到)，改由本機排程執行同樣的流程(`pipeline/run_local.py`)。
 
 ```
  資料來源                    GitHub Actions(依各資料集排程)                 GitHub Pages

@@ -4,7 +4,7 @@
 處置公告：臺灣證券交易所「處置有價證券」(上市)、櫃買中心「上櫃處置有價證券」
 股價：本機 PostgreSQL 的 cm.tw_daily(CMoney 日資料；開收用原始價格判斷 K 棒，報酬用還原股價)
 大盤：加權指數用 data 分支已發佈的 indices/TAIEX.json(證交所)，櫃買指數用櫃買中心資料
-資料庫在本機，GitHub Actions 連不到，只在本機執行：bash pipeline/run_local.sh(Windows 排程呼叫)
+資料庫在本機，GitHub Actions 連不到，只在本機執行：python pipeline/run_local.py(Windows 排程呼叫)
 新制：2026-08-10 起處置期間由 10 個營業日縮短為 5 個營業日(當沖過熱 12 → 7)，撮合改為約每 2 分鐘一次。
 
 每個處置事件記錄：
