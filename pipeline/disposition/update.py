@@ -2,7 +2,9 @@
 資料集 disposition：台股處置股(上市 + 上櫃)與處置前後的股價表現
 
 處置公告：臺灣證券交易所「處置有價證券」(上市)、櫃買中心「上櫃處置有價證券」
-股價：Yahoo Finance(上市 .TW、上櫃 .TWO；開高低收用原始價格判斷 K 棒，報酬用還原股價)；櫃買指數用櫃買中心資料
+股價：本機 PostgreSQL 的 cm.tw_daily(CMoney 日資料；開收用原始價格判斷 K 棒，報酬用還原股價)
+大盤：加權指數用 data 分支已發佈的 indices/TAIEX.json(證交所)，櫃買指數用櫃買中心資料
+資料庫在本機，GitHub Actions 連不到，只在本機執行：bash pipeline/run_local.sh(Windows 排程呼叫)
 新制：2026-08-10 起處置期間由 10 個營業日縮短為 5 個營業日(當沖過熱 12 → 7)，撮合改為約每 2 分鐘一次。
 
 每個處置事件記錄：
@@ -21,10 +23,9 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-import yfinance as yf
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from common import dataset_dir, write_json, write_meta  # noqa: E402
+from common import REPO, dataset_dir, pg_connect, write_json, write_meta  # noqa: E402
 
 NAME = 'disposition'
 START = date(2026, 7, 1)            # 新制(2026-08-10)前一個多月起，涵蓋跨越實施日的處置
@@ -32,7 +33,8 @@ NEW_RULE = '2026-08-10'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (little-trader data bot)'}
 TWSE_API = 'https://www.twse.com.tw/rwd/zh/announcement/punish'
 TPEX_API = 'https://www.tpex.org.tw/www/zh-tw/bulletin/disposal'
-OTC_API = 'https://www.tpex.org.tw/www/zh-tw/indexInfo/inx'   # 櫃買指數(月查詢)；Yahoo 沒有櫃買指數
+OTC_API = 'https://www.tpex.org.tw/www/zh-tw/indexInfo/inx'   # 櫃買指數(月查詢)
+TAIEX_URL = f'https://raw.githubusercontent.com/{REPO}/data/indices/TAIEX.json'
 
 
 def roc(s):
@@ -102,33 +104,43 @@ def fetch_otc(start, today):
     return pd.Series(out, dtype=float).sort_index().rename(index=pd.Timestamp)
 
 
-def download(symbols, start):
-    df = yf.download(symbols, start=start, auto_adjust=False, progress=False, threads=True, group_by='column')
-    df.index = pd.to_datetime(df.index).tz_localize(None)
-    return df
+def fetch_taiex():
+    """加權指數每日收盤(indices 資料集，證交所資料)"""
+    j = get_json(TAIEX_URL, {})
+    return pd.Series(j['c'], index=pd.to_datetime(j['d']), dtype=float)
+
+
+def load_prices(codes, start):
+    """cm.tw_daily 的開盤、收盤(原始價格)與還原收盤價，各為 日期 × 代號"""
+    with pg_connect() as conn:
+        rows = conn.execute('SELECT "日期", "股票代號", "開盤價", "收盤價", "還原收盤價" FROM cm.tw_daily '
+                            'WHERE "股票代號" = ANY(%s) AND "日期" >= %s AND "收盤價" IS NOT NULL',
+                            (codes, start)).fetchall()
+        last = conn.execute('SELECT max("日期") FROM cm.tw_daily').fetchone()[0]
+    df = pd.DataFrame(rows, columns=['d', 's', 'o', 'c', 'a'])
+    df['d'] = pd.to_datetime(df['d'])
+    piv = {k: df.pivot(index='d', columns='s', values=k).sort_index() for k in ('o', 'c', 'a')}
+    return piv['o'], piv['c'], piv['a'], pd.Timestamp(last)
 
 
 def main():
     today = date.today()
     events = fetch_events(today)
     print(f'處置事件 {len(events)} 筆(上市 {sum(e["market"] == "TWSE" for e in events)}、上櫃 {sum(e["market"] == "TPEx" for e in events)})')
-    sym = {e['code']: e['code'] + ('.TW' if e['market'] == 'TWSE' else '.TWO') for e in events}
-    first = (pd.Timestamp(min(e['start'] for e in events)) - pd.Timedelta(days=20)).strftime('%Y-%m-%d')
-    px = download(sorted(set(sym.values())) + ['^TWII'], first)
-    # Yahoo 的台股當日資料常常晚到(只有日期、價格空白)：最後幾天加權指數或多數個股沒有收盤就先不算
-    stocks = px['Close'].drop(columns='^TWII')
-    ok = px['Close']['^TWII'].notna() & (stocks.notna().mean(axis=1) >= 0.5)
-    px = px.loc[:ok[ok].index[-1]]
-    O, C, A = px['Open'], px['Close'], px['Adj Close'].copy()
-    A['^TWOII'] = fetch_otc(pd.Timestamp(first).date(), today).reindex(A.index)
+    first = pd.Timestamp(min(e['start'] for e in events)) - pd.Timedelta(days=20)
+    O, C, A, last_day = load_prices(sorted({e['code'] for e in events}), first.date())
+    A = A.copy()
+    A['^TWII'] = fetch_taiex().reindex(A.index)
+    A['^TWOII'] = fetch_otc(first.date(), today).reindex(A.index)
+    print(f'股價(cm.tw_daily)到 {last_day.date()}')
 
     def ret(s, a, b):
         return None if a is None or b is None or pd.isna(s.get(a)) or pd.isna(s.get(b)) else round(float(s[b] / s[a] - 1), 5)
 
     out = []
     for e in events:
-        s = sym[e['code']]
-        if s not in A.columns:
+        s = e['code']
+        if s not in C.columns:
             continue
         days = A[s].dropna().index
         st, en = pd.Timestamp(e['start']), pd.Timestamp(e['end'])
@@ -151,15 +163,10 @@ def main():
                     'post5': ret(A[s], last, after[4]) if len(after) >= 5 else None,
                     'mkt': ret(A[mk], mdays[mdays < d1][-1] if (mdays < d1).any() else None,
                                mdays[mdays <= last][-1] if (mdays <= last).any() else None)})
-    # 大盤走勢(背景)：加權指數與櫃買指數
-    idx = A[['^TWII', '^TWOII']].loc[pd.Timestamp(today) - pd.Timedelta(days=200):].dropna(how='all')
-    market = {'d': idx.index.strftime('%Y-%m-%d').tolist(),
-              'twii': [None if pd.isna(v) else round(float(v), 2) for v in idx['^TWII']],
-              'otc': [None if pd.isna(v) else round(float(v), 2) for v in idx['^TWOII']]}
     d = dataset_dir(NAME)
-    write_json(d / 'events.json', {'asof': A.index[-1].strftime('%Y-%m-%d'), 'new_rule': NEW_RULE, 'events': out, 'market': market})
-    write_meta(NAME, '臺灣證券交易所、櫃買中心 處置有價證券公告；Yahoo Finance', 'https://www.twse.com.tw/zh/announcement/punish.html',
-               '每個工作日 19:23、隔天 06:43', files=['events.json'], events=len(out))
+    write_json(d / 'events.json', {'asof': last_day.strftime('%Y-%m-%d'), 'new_rule': NEW_RULE, 'events': out})
+    write_meta(NAME, '臺灣證券交易所、櫃買中心 處置有價證券公告；股價 PostgreSQL', 'https://www.twse.com.tw/zh/announcement/punish.html',
+               '週一~五 23:45、週二~六 12:15(本機排程)', files=['events.json'], events=len(out))
     print(f'完成：{len(out)} 筆有股價的處置事件，新制 {sum(x["rule"] == "new" for x in out)} 筆')
 
 

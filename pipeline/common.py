@@ -35,6 +35,15 @@ def load_published(name: str, file: str, default=None):
     return default
 
 
+def pg_connect():
+    """本機 PostgreSQL(cm schema，CMoney 資料)：只有在本機執行的資料集(tw_strategy、disposition)用到。
+    連線用環境變數 PGHOST / PGPORT / PGUSER / PGDATABASE(預設 localhost:9457、postgres)，
+    密碼由 libpq 從 %APPDATA%/postgresql/pgpass.conf 讀取，不寫在程式裡。"""
+    import psycopg
+    return psycopg.connect(host=os.environ.get('PGHOST', 'localhost'), port=os.environ.get('PGPORT', '9457'),
+                           user=os.environ.get('PGUSER', 'postgres'), dbname=os.environ.get('PGDATABASE', 'postgres'))
+
+
 def dataset_dir(name: str, clean: bool = True) -> Path:
     """回傳 web/data/<name>/，clean=True 時先清空舊檔。"""
     d = DATA / name
