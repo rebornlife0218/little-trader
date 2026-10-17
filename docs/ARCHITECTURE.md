@@ -20,7 +20,8 @@ web/                                網站(部署時整個資料夾就是網站�
     etf/pack.js                     ETF：ETF大禮包(ETF介紹、怎麼存ETF、ETF研究)
     etf/etf.js                      ETF：即將發行ETF
     stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
-    stock/tw.js                     股票 · 台股：隔日沖、波段、策略(建置中)
+    stock/tw.js                     股票 · 台股：隔日沖、波段(建置中)
+    stock/tw-strategy.js            股票 · 台股：策略回測(低波動選股；資料集 tw_strategy)
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
@@ -44,6 +45,8 @@ pipeline/                           資料抓取，一個資料集一個資料�
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
   etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
   disposition/update.py             台股處置股(證交所、櫃買中心公告；股價 Yahoo、櫃買指數用櫃買中心)
+  tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的 CMoney 日資料；只在本機執行)
+  tw_strategy/run_local.sh          本機排程：更新 → 發佈到 data 分支 → 觸發部署
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
 
 .github/workflows/
@@ -74,6 +77,12 @@ pipeline/                           資料抓取，一個資料集一個資料�
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
+| tw_strategy | CMoney 台股日資料(本機 PostgreSQL `cm.tw_daily`) | 週二~六 13:00(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(未扣成本)；每月換股日、合格股票數、換手率；最新一次選股的持股) |
+
+tw_strategy 的特殊處理：
+- 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-tw_strategy.yml`；由 Windows 工作排程器「LittleTrader_tw_strategy」在 cm 同步(`CM_PostgreSQL_Sync`，週二~六 12:00)之後執行 `pipeline/tw_strategy/run_local.sh`，輸出記錄在 `~/.cache/little-trader/tw_strategy.log`。
+- 連線用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
+- 只發佈回測結果，不發佈原始股價。
 
 sp500 的特殊處理：
 - 已下市、被併購公司的股價 Yahoo 沒有，改用 Tiingo(需要 API 金鑰：本機放在 `~/.tiingo_key`，GitHub Actions 用 Secret `TIINGO_API_KEY`；`data-sp500.yml` 要 `secrets: inherit`)。Tiingo 的原始股價只快取在本機 `~/.cache/little-trader/tiingo/`，**不發佈**(授權不允許轉載)，data 分支只放回測結果。
