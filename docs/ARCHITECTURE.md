@@ -20,7 +20,7 @@ web/                                網站(部署時整個資料夾就是網站�
     etf/pack.js                     ETF：ETF大禮包(ETF介紹、怎麼存ETF、ETF研究)
     etf/etf.js                      ETF：即將發行ETF
     stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
-    stock/tw.js                     股票 · 台股：隔日沖、波段(建置中)
+    stock/tw.js                     股票 · 台股：隔日沖(建置中)
     stock/tw-strategy.js            股票 · 台股：策略回測(做多：低波動選股、融資都沒退，算我輸嗎；做空：大盤跌個股逆勢漲就是欠踹；一律和 0050 比較；資料集 tw_strategy)
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)

@@ -8,7 +8,7 @@ const LT = (() => {
   const SECTIONS = [
     { key: 'index', name: '指數', desc: '全球主要指數的急跌反彈與K棒型態統計' },
     { key: 'etf', name: 'ETF', desc: 'ETF大禮包(0050 vs 勞退基金、折溢價)與即將發行的新 ETF' },
-    { key: 'stock', name: '股票', desc: '台股處置股、隔日沖、波段，美股財報行事曆與策略' },
+    { key: 'stock', name: '股票', desc: '台股處置股、隔日沖、策略，美股財報行事曆與策略' },
     { key: 'option', name: '選擇權', desc: '臺指選擇權與台指期：隱含波動率、籌碼、價差與策略損益' },
     { key: 'stats', name: '統計學', desc: '統計學與計量方法的學習資源' },
     { key: 'other', name: '其他', desc: '研究與交易時常用的網站推薦' },
