@@ -256,6 +256,33 @@ window.LTStatDemos = (() => {
       <div class="note" style="text-align:center;margin-top:4px;">A₁～A₄ 互不重疊、合起來剛好是 S；事件 B(橘色)因此被切成互斥的四塊 B∩A₁、…、B∩A₄。</div>`;
   }
 
+  /* ---------- 準確度與精確度：四個靶(靶心 = 真值 θ，每個點 = 一次抽樣得到的估計值) ---------- */
+  function targets(el) {
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    const gauss = () => Math.sqrt(-2 * Math.log(rnd())) * Math.cos(2 * Math.PI * rnd());
+    const CASES = [
+      { t: '準確又精確', s: '不偏、變異數小', dx: 0, dy: 0, sd: 5 },
+      { t: '準確不精確', s: '不偏、變異數大', dx: 0, dy: 0, sd: 17 },
+      { t: '精確不準確', s: '有偏誤、變異數小', dx: 22, dy: -20, sd: 5 },
+      { t: '不準確也不精確', s: '有偏誤、變異數大', dx: 22, dy: -20, sd: 17 },
+    ];
+    const W = 150, cy = 72;
+    el.innerHTML = `
+      <svg viewBox="0 0 ${W * 4} 176" class="part-svg" role="img" aria-label="四個靶：準確又精確、準確不精確、精確不準確、不準確也不精確">
+        ${CASES.map((c, k) => {
+          const cx = W * k + W / 2;
+          const pts = Array.from({ length: 12 }, () => [cx + c.dx + gauss() * c.sd, cy + c.dy + gauss() * c.sd]);
+          return [56, 40, 24, 9].map((r, i) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${i % 2 ? 'var(--panel)' : 'var(--panel2)'}" stroke="var(--border-strong)"/>`).join('')
+            + `<circle cx="${cx}" cy="${cy}" r="2.5" fill="var(--text)"/>`
+            + pts.map(([x, y]) => `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.6" fill="var(--amber)" stroke="var(--panel)" stroke-width="1"/>`).join('')
+            + `<text x="${cx}" y="150" font-size="13" font-weight="700" text-anchor="middle" fill="var(--text)">${c.t}</text>
+               <text x="${cx}" y="168" font-size="11.5" text-anchor="middle" fill="var(--mute)">${c.s}</text>`;
+        }).join('')}
+      </svg>
+      <div class="note" style="text-align:center;margin-top:4px;">靶心是真值 θ，每個橘點是一次抽樣算出的估計值 θ̂。點群的中心離靶心多遠是<b>準確度</b>(偏誤)，點彼此有多集中是<b>精確度</b>(變異數)。</div>`;
+  }
+
   /* ---------- 機率模型關係圖：點選分配，看它和其他分配的連結 ---------- */
   const DIST_NODES = {
     bern:   { x: 90,  y: 70,  name: '伯努利', kind: 'd', desc: '一次試驗，成功記 1、失敗記 0。所有「成功次數」類分配的基本單位。' },
@@ -333,5 +360,5 @@ window.LTStatDemos = (() => {
     draw();
   }
 
-  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, 'dist-map': distMap };
+  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, targets, 'dist-map': distMap };
 })();
