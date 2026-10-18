@@ -145,7 +145,7 @@
         if (idx[idx.length - 1] !== B.d.length - 1 - i0) idx.push(B.d.length - 1 - i0);
         const xs = idx.map(i => B.d[i0 + i]), xFmt = (d, tip) => tip ? d : d.slice(0, 4);
         LTChart.line($('#usChart'), { x: xs, xType: 'date', label: '累積報酬', height: 320, xFmt,
-          yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => (10 ** v).toFixed(2) + ' 倍' : (s, v) => v.toFixed(2) + ' 倍',
+          yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),
           yTicks: log ? () => LOG_TICKS.map(Math.log10) : undefined, refY: [{ y: log ? 0 : 1 }],
           series: keys.map(k => ({ name: meta(k).name, color: meta(k).color, width: k === main ? 2.6 : 1.5, dash: k === 'ew' ? '5 4' : undefined,
             y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })) });
@@ -189,7 +189,7 @@
           return `<tr class="${strat ? 'click' : 'allrow'}" ${strat ? `data-go="${s.key}"` : ''}><td>${esc(s.name)}</td><td style="text-align:left">${esc(s.short)}</td>
             <td class="${cls(x.ret)} ${strat ? beat(x.ret, S.ret) : ''}">${pct(x.ret)}</td><td class="${strat ? beat(x.vol, S.vol, false) : ''}">${(x.vol * 100).toFixed(1)}%</td>
             <td class="${strat ? beat(x.sharpe, S.sharpe) : ''}">${x.sharpe.toFixed(2)}</td><td class="down ${strat ? beat(x.mdd, S.mdd) : ''}">${pct(x.mdd, 1)}</td>
-            <td>${x.mult.toFixed(1)} 倍</td><td>${w == null ? '—' : (w * 100).toFixed(0) + '%'}</td><td>${isStrat(s.key) ? (turnAvg(s.key) / 2 * 100).toFixed(0) + '%' : '—'}</td></tr>`; };
+            <td class="${cls(x.mult - 1)}">${pct(x.mult - 1, 0)}</td><td>${w == null ? '—' : (w * 100).toFixed(0) + '%'}</td><td>${isStrat(s.key) ? (turnAvg(s.key) / 2 * 100).toFixed(0) + '%' : '—'}</td></tr>`; };
         const best = STRATS.slice().sort((a, b) => st[b.key].sharpe - st[a.key].sharpe)[0];
         const beatRet = STRATS.filter(s => st[s.key].ret > S.ret), beatSh = STRATS.filter(s => st[s.key].sharpe > S.sharpe);
         const keys = [...STRATS.map(s => s.key), 'spy', 'ew'], rows = yearRows(C, keys);
@@ -197,7 +197,7 @@
         $('#usView').innerHTML = `
           <div class="panel">
             <h3>四種策略 vs SPY</h3>
-            <div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>選股規則</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>最大回撤</th><th>資產成長</th><th>贏 SPY 的季數</th><th>每季換手率(單邊)</th></tr></thead>
+            <div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>選股規則</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>最大回撤</th><th>總報酬</th><th>贏 SPY 的季數</th><th>每季換手率(單邊)</th></tr></thead>
               <tbody>${STRATS.map(s => row(s, true)).join('')}${BENCH.map(s => row(s, false)).join('')}</tbody></table></div>
             <p class="note">粗體底線表示優於 SPY；點選策略列可切換到該策略的分析。夏普值 = (年化報酬 − 無風險利率) ÷ 年化波動，無風險利率用期間內美國 3 個月國庫券殖利率的平均；換手率(單邊) = 每季賣出(或買進)金額占資產的比例，100% 代表整批換掉；交易成本 = 單邊成本 × (賣出 + 買進金額)，在每次換股時扣除。</p>
             <ul class="insight">
@@ -246,7 +246,7 @@
               ${card(`${(turnAvg(k) / 2 * 100).toFixed(0)}%`, '每季換手率(單邊)', `每年成本約 ${(turnAvg(k) * cost * 4 * 100).toFixed(1)}%`)}
             </div>
             <ul class="insight">
-              <li>${y0} 年初到 ${B.asof.slice(0, 7).replace('-', '/')}，資產成長 ${x.mult.toFixed(1)} 倍(SPY ${S.mult.toFixed(1)} 倍)；年化報酬${x.ret > S.ret ? '高於' : '低於'} SPY ${pct(Math.abs(x.ret - S.ret)).replace('+', '')}，夏普值${x.sharpe > S.sharpe ? '高於' : '低於'} SPY(${x.sharpe.toFixed(2)} vs ${S.sharpe.toFixed(2)})${x.ret > S.ret && x.sharpe <= S.sharpe ? '：多賺的報酬是靠承擔更大的波動換來的' : ''}。</li>
+              <li>${y0} 年初到 ${B.asof.slice(0, 7).replace('-', '/')}，總報酬 ${pct(x.mult - 1, 0)}(SPY ${pct(S.mult - 1, 0)})；年化報酬${x.ret > S.ret ? '高於' : '低於'} SPY ${pct(Math.abs(x.ret - S.ret)).replace('+', '')}，夏普值${x.sharpe > S.sharpe ? '高於' : '低於'} SPY(${x.sharpe.toFixed(2)} vs ${S.sharpe.toFixed(2)})${x.ret > S.ret && x.sharpe <= S.sharpe ? '：多賺的報酬是靠承擔更大的波動換來的' : ''}。</li>
               <li>每季平均比 SPY ${dMean >= 0 ? '多' : '少'} ${pct(Math.abs(dMean)).replace('+', '')}；表現最好的一季 ${Q[bi].q} 贏 ${pct(d[bi], 1)}，最差的一季 ${Q[wi].q} 輸 ${pct(d[wi], 1)}。</li>
               <li>最大回撤 ${pct(x.mdd, 1)}，${x.mdd < S.mdd ? `比 SPY 的 ${pct(S.mdd, 1)} 更深，持有這個策略要能承受更大的帳面虧損` : `比 SPY 的 ${pct(S.mdd, 1)} 淺`}。</li>
             </ul>

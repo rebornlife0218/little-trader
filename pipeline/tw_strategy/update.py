@@ -14,7 +14,7 @@
   b0050  0050 還原股價買進持有
 波動 = 過去 120 個交易日的 5 日報酬標準差(原版用 5 日報酬；cm 從 2016 年開始，回看期間從原版的 10 年改為半年)
 
-同一個資料集也產生「融資都沒退，算我輸嗎」(margin.py → margin.json)，這裡最後會呼叫它。
+同一個資料集也產生事件型策略(events.py → margin.json、against.json…)，這裡最後會呼叫它。
 
 只能在本機執行(GitHub Actions 連不到本機資料庫)：
   python pipeline/tw_strategy/update.py
@@ -33,7 +33,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common import dataset_dir, pg_connect, write_json, write_meta  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import margin  # noqa: E402
+import events  # noqa: E402
 
 DATASET = 'tw_strategy'
 LOOKBACK = 120          # 回看交易日數(約半年)
@@ -164,7 +164,7 @@ def main():
         yrs = (len(v) - 1) / 252
         print(f'{k:6s} 資產 {v[-1]:.2f} 倍，年化 {v[-1] ** (1 / yrs) - 1:+.2%}')
     print(f"{len(months)} 個月，最新選股 {out['picks']['signal']}，合格 {out['picks']['n']} 檔")
-    margin.main()   # dataset_dir 會清空資料夾，所以在 backtest.json 之後才寫 margin.json
+    events.main()   # dataset_dir 會清空資料夾，所以在 backtest.json 之後才寫各事件型策略的 JSON
 
 
 if __name__ == '__main__':

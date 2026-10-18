@@ -21,7 +21,7 @@ web/                                網站(部署時整個資料夾就是網站�
     etf/etf.js                      ETF：即將發行ETF
     stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
     stock/tw.js                     股票 · 台股：隔日沖、波段(建置中)
-    stock/tw-strategy.js            股票 · 台股：策略回測(做多：低波動選股、融資都沒退，算我輸嗎；做空建置中；資料集 tw_strategy)
+    stock/tw-strategy.js            股票 · 台股：策略回測(做多：低波動選股、融資都沒退，算我輸嗎；做空：大盤跌個股逆勢漲就是欠踹；一律和 0050 比較；資料集 tw_strategy)
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
@@ -45,8 +45,8 @@ pipeline/                           資料抓取，一個資料集一個資料�
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
   etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
   disposition/update.py             台股處置股(處置名單與股價：本機 PostgreSQL；加權指數用 indices 資料集、櫃買指數用櫃買中心；只在本機執行)
-  tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的 CMoney 日資料；只在本機執行)，最後呼叫 margin.py
-  tw_strategy/margin.py             台股「融資都沒退，算我輸嗎」：回測＋每日選股
+  tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的 CMoney 日資料；只在本機執行)，最後呼叫 events.py
+  tw_strategy/events.py             台股事件型策略的共用引擎(每天選股、隔天開盤進場、持有幾天出場；漲跌停進不了場或出不了場)：融資都沒退(做多)、大盤跌個股逆勢漲(做空)，每個策略一個 JSON
   run_local.py                      本機資料集(tw_strategy、disposition)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
 
@@ -76,7 +76,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 | disposition | 本機 PostgreSQL `cm.tw_disposition`(處置名單)、`cm.tw_daily`(股價)；櫃買中心(櫃買指數) | 週一~五 23:45、週二~六 12:15(本機排程) | `events.json`(2026/7 起每個處置事件：期間、新制/舊制、第一天開收、處置前 5 日、處置期間、出關後 5 日與同期大盤報酬) |
 | sp500 | fja05680/sp500 歷史成分股、Yahoo Finance、Tiingo | 週六 09:00 | `backtest.json`(四種策略、全部成分股等權重、SPY 的每日淨值(未扣成本)；每季的成分股數、可取得股價數、換手率、無風險利率、持股) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
-| tw_strategy | 本機 PostgreSQL `cm.tw_daily`(CMoney 台股日資料) | 週一~五 23:45、週二~六 12:15(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(未扣成本)；每月換股日、合格股票數、換手率；最新一次選股的持股)；`margin.json`(融資都沒退：每日淨值、持有檔數、當天買賣比例、每筆交易(含跌停延後天數)、開盤漲停買不到的訊號、最近 20 個交易日的選股) |
+| tw_strategy | 本機 PostgreSQL `cm.tw_daily`(CMoney 台股日資料) | 週一~五 23:45、週二~六 12:15(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(未扣成本)；每月換股日、合格股票數、換手率；最新一次選股的持股)；事件型策略各一個 `<策略>.json`(`margin` 融資都沒退、`against` 大盤跌個股逆勢漲：每日淨值、0050 淨值、持有檔數、當天進出比例、每筆交易(含漲跌停延後天數)、漲跌停進不了場的訊號、最近 20 個交易日的選股與欄位) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
 
