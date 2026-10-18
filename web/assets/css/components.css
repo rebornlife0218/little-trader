@@ -283,6 +283,9 @@
   .doc h3.md-h2{font-size:17px;margin:28px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);color:var(--amber);}
   .doc #chapBody > h3.md-h2:first-child{margin-top:4px;}
   .doc h4.md-h3{font-size:15px;margin:22px 0 8px;color:var(--text);}
+  .doc h3.md-h2, .doc h4.md-h3{scroll-margin-top:16px;}
+  .doc a.xref{color:var(--amber);text-decoration:none;border-bottom:1px dotted currentColor;}
+  .doc a.xref:hover{border-bottom-style:solid;}
   .doc table.md-table{width:auto;max-width:100%;}
   .doc table.md-table td, .doc table.md-table th{text-align:left;white-space:normal;font-family:'Inter',sans-serif;text-transform:none;}
   .doc table.md-table td:first-child{white-space:nowrap;}

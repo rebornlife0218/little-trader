@@ -1,7 +1,7 @@
 /* 統計學 · 初級統計學
    給第一次修統計學的學生：13 章架構參考張翔《提綱挈領學統計》(編排略有調整)，
    並用本站的台股加權指數資料做「市場實例」，部分章節附互動模擬。
-   網址：#/stats/basic/<章節編號>
+   網址：#/stats/basic/<章節編號>[/<節名>](有節名時捲到該節)
    章節內容可寫在 content/stats/basic/*.md(設定 md 欄位)，編輯方式見 docs/CONTENT.md */
 (() => {
   // 參考教材(章節最下方)
@@ -172,7 +172,44 @@
     const retag = (sel, tag, cls) => box.querySelectorAll(sel).forEach(h => { const e = document.createElement(tag); e.className = cls; e.innerHTML = h.innerHTML; h.replaceWith(e); });
     retag('h3', 'h4', 'md-h3');
     retag('h2', 'h3', 'md-h2');
+    crossLinks(box, +name.replace(/\D/g, ''));
     return box.innerHTML;
+  }
+
+  /* ---------- 章節互相連結：網址 #/stats/basic/<章>/<節名> 會捲到該節 ----------
+     文中的「第 N 章」連到該章；「第 N 章「節名」」連到該章的那一節；同一章裡「節名」與某個節標題相同(可省略標題最後的括號)也會變成連結。
+     Markdown 連結寫 [文字](#節名) 代表本章的節 */
+  const secKey = s => s.trim().replace(/\s*[(（][^)）]*[)）]\s*$/, '');
+  const secHref = (ch, sec) => `#/stats/basic/${ch}${sec ? '/' + encodeURIComponent(sec) : ''}`;
+  function crossLinks(box, cur) {
+    const heads = new Map();
+    box.querySelectorAll('h3.md-h2, h4.md-h3').forEach(h => { const t = h.textContent.trim(); h.dataset.sec = t; heads.set(t, t); heads.set(secKey(t), t); });
+    box.querySelectorAll('a[href^="#"]:not([href^="#/"])').forEach(a => { a.setAttribute('href', secHref(cur, decodeURIComponent(a.getAttribute('href').slice(1)))); a.classList.add('xref'); });
+    const re = /第 ?(\d+) ?章(?:「([^」]+)」)?|「([^」]+)」/g;
+    const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT, { acceptNode: n =>
+      n.parentElement.closest('a, code, pre, .katex, h3, h4, figcaption') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    nodes.forEach(node => {
+      const s = node.nodeValue; let last = 0, out = null; re.lastIndex = 0;
+      for (let m; (m = re.exec(s));) {
+        let href = null;
+        if (m[1]) { const ch = +m[1]; if (ch !== cur || m[2]) href = secHref(ch, ch === cur ? heads.get(m[2]) || heads.get(secKey(m[2])) || m[2] : m[2]); }
+        else { const h = heads.get(m[3]) || heads.get(secKey(m[3])); if (h) href = secHref(cur, h); }
+        if (!href) continue;
+        out = out || document.createDocumentFragment();
+        out.append(s.slice(last, m.index));
+        const a = document.createElement('a'); a.href = href; a.className = 'xref'; a.textContent = m[0];
+        out.append(a); last = m.index + m[0].length;
+      }
+      if (out) { out.append(s.slice(last)); node.replaceWith(out); }
+    });
+  }
+  // 捲到網址指定的節(標題完全相同，或省略最後的括號)
+  function scrollToSec(box, sec) {
+    if (!sec) return;
+    const hs = [...box.querySelectorAll('[data-sec]')];
+    const h = hs.find(x => x.dataset.sec === sec) || hs.find(x => secKey(x.dataset.sec) === secKey(sec)) || hs.find(x => x.dataset.sec.includes(secKey(sec)));
+    if (h) requestAnimationFrame(() => h.scrollIntoView({ block: 'start' }));
   }
 
   /* ---------- 章節(架構參考大碩補習班張翔老師的統計學課程，編排略有調整) ---------- */
@@ -506,6 +543,7 @@
               if (name === 'clt') { cltMeans = []; window.LTStat.clt(0); }
             } else d.textContent = `找不到互動動畫：${name}`;
           });
+          scrollToSec(box, decodeURIComponent(location.hash.split('/')[4] || ''));
         } catch (err) {
           if (!ctx.alive()) return;
           box.innerHTML = `<span class="mute">章節內容載入失敗：${err.message}</span>`;
