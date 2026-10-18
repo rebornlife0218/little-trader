@@ -144,17 +144,16 @@
         for (let i = 0; i < B.d.length - i0; i += step) idx.push(i);
         if (idx[idx.length - 1] !== B.d.length - 1 - i0) idx.push(B.d.length - 1 - i0);
         const xs = idx.map(i => B.d[i0 + i]), xFmt = (d, tip) => tip ? d : d.slice(0, 4);
-        LTChart.line($('#usChart'), { x: xs, xType: 'date', label: '累積報酬', height: 320, xFmt,
+        const dd = k => { let pk = -Infinity; return navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; }); };
+        const D = Object.fromEntries(ddKeys.map(k => [k, dd(k)]));
+        LTChart.line($('#usChart'), { x: xs, xType: 'date', label: '累積報酬與回撤', height: 320, xFmt,
           yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),
           yTicks: log ? () => LOG_TICKS.map(Math.log10) : undefined, refY: [{ y: log ? 0 : 1 }],
           series: keys.map(k => ({ name: meta(k).name, color: meta(k).color, width: k === main ? 2.6 : 1.5, dash: k === 'ew' ? '5 4' : undefined,
-            y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })) });
+            y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })),
+          lower: { height: 130, label: '回撤：從前一個高點下跌的幅度', yMax: 0, fill: true, yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
+            series: ddKeys.map(k => ({ name: meta(k).name + ' 回撤', color: meta(k).color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } });
         $('#usLegend').innerHTML = LTChart.legend(keys.map(meta));
-        const dd = k => { let pk = -Infinity; return navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; }); };
-        const D = Object.fromEntries(ddKeys.map(k => [k, dd(k)]));
-        LTChart.line($('#usDD'), { x: xs, xType: 'date', label: '回撤', height: 200, xFmt, yMax: 0,
-          yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
-          series: ddKeys.map(k => ({ name: meta(k).name, color: meta(k).color, width: k === main ? 1.8 : 1.4, y: idx.map(i => D[k][i]) })) });
       }
       /* 每年報酬(熱度表)：每年最後一個交易日的淨值比 */
       function yearRows(C, keys) {
@@ -177,9 +176,7 @@
         <h4>${title}</h4>
         <div id="usChart"></div>
         <div id="usLegend"></div>
-        <p class="note">已依上方設定扣除交易成本。對數刻度下，同樣的垂直距離代表同樣的報酬率(例如 1→2 和 5→10 都是翻倍)，長期走勢不會被後期的大數字壓扁。</p>
-        <h4>回撤：從前一個高點下跌的幅度</h4>
-        <div id="usDD"></div>`;
+        <p class="note">上方為累積報酬(期初 = 1)，下方為回撤(從前一個高點下跌的幅度)，已依上方設定扣除交易成本。對數刻度下，同樣的垂直距離代表同樣的報酬率(例如 1→2 和 5→10 都是翻倍)，長期走勢不會被後期的大數字壓扁。</p>`;
 
       /* ---------- 總覽比較 ---------- */
       function renderAll(C) {
@@ -209,7 +206,7 @@
           </div>
           <div class="panel">
             <h3>走勢比較</h3>
-            ${chartBlock('累積報酬(期初 = 1)')}
+            ${chartBlock('累積報酬與回撤')}
             <h4>每年報酬</h4>
             <div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th>${keys.map(k => `<th>${esc(short(k))}</th>`).join('')}</tr></thead><tbody>
               ${rows.slice().reverse().map(r => `<tr><td>${yrLabel(r)}</td>${keys.map(k => heat(r.r[k], k !== 'spy' && r.r[k] > r.r.spy)).join('')}</tr>`).join('')}
@@ -253,7 +250,7 @@
           </div>
           <div class="panel">
             <h3>走勢</h3>
-            ${chartBlock(`累積報酬(期初 = 1)：${esc(short(k))} vs SPY vs 全部成分股等權重`)}
+            ${chartBlock(`累積報酬與回撤：${esc(short(k))} vs SPY vs 全部成分股等權重`)}
             <h4>每年報酬</h4>
             <div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th><th>${esc(short(k))}</th><th>SPY</th><th>差距</th><th>全部成分股等權重</th></tr></thead><tbody>
               ${rows.slice().reverse().map(r => `<tr><td>${yrLabel(r)}</td>${heat(r.r[k], r.r[k] > r.r.spy)}${heat(r.r.spy, false)}<td class="${cls(r.r[k] - r.r.spy)}">${pct(r.r[k] - r.r.spy, 1)}</td>${heat(r.r.ew, false)}</tr>`).join('')}

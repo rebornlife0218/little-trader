@@ -6,6 +6,8 @@
             refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt、
             yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別)
    右側 y 軸：series 加 axis:'right'(長條圖中畫成折線＋圓點)，搭配 y2Min、y2Max、y2Fmt；refY 也可加 axis:'right'
+   下方子圖(折線圖)：lower:{ height, series:[{ name, y, color, width }], yMin, yMax, yFmt, tipFmt, label, fill }
+            畫在同一張圖的下方，共用 x 軸與十字線，例如權益曲線下方接回撤(fill:true 時從 0 往下塗色)
    顏色請用 CSS 變數(例如 'var(--amber)')，切換主題時不必重畫。
    ========================================================================== */
 const LTChart = (() => {
@@ -38,7 +40,8 @@ const LTChart = (() => {
   }
 
   function frame(el, o, kind) {
-    const W = Math.max(280, el.clientWidth || 600), H = o.height || 260;
+    const L0 = o.lower, gap = L0 ? 22 : 0, lh = L0 ? (L0.height || 120) : 0;
+    const W = Math.max(280, el.clientWidth || 600), H = (o.height || 260) + lh + gap;
     const R2 = o.series.filter(s => s.axis === 'right'), r = R2.length ? 46 : PAD.r;
     const xs = o.x.map(v => toNum(v, o.xType));
     const ys = o.series.filter(s => s.axis !== 'right').flatMap(s => s.y).concat((o.refY || []).filter(q => q.axis !== 'right').map(q => q.y)).filter(Number.isFinite);
@@ -51,7 +54,7 @@ const LTChart = (() => {
     // yTicks(lo, hi)：自訂刻度(例如對數座標)，只保留範圍內的刻度
     const yt = o.yTicks ? o.yTicks(yLo, yHi).filter(v => v >= yLo && v <= yHi) : ticks(yLo, yHi);
     if (!o.yTicks) { yLo = Math.min(yLo, yt[0]); yHi = Math.max(yHi, yt[yt.length - 1]); }
-    const iw = W - PAD.l - r, ih = H - PAD.t - PAD.b;
+    const iw = W - PAD.l - r, ih = H - PAD.t - PAD.b - lh - gap;
     const xLo = Math.min(...xs), xHi = Math.max(...xs);
     const band = kind === 'bars' ? iw / xs.length : 0;
     const X = kind === 'bars'
@@ -76,7 +79,20 @@ const LTChart = (() => {
       const y2Fmt = o.y2Fmt || defaultFmt;
       g += t2.map(v => `<text x="${W - r + 6}" y="${Y2(v) + 3.5}" font-size="10.5" text-anchor="start" fill="var(--mute)">${esc(y2Fmt(v))}</text>`).join('');
     }
-    return { W, H, r, xs, X, Y, Y2, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
+    // 下方子圖：自己的 y 軸與格線，畫在主圖下方
+    let L = null;
+    if (L0) {
+      const v = L0.series.flatMap(s => s.y).filter(Number.isFinite);
+      let lo = L0.yMin ?? Math.min(...v), hi = L0.yMax ?? Math.max(...v);
+      const tl = ticks(lo, hi, 3); lo = Math.min(lo, tl[0]); hi = Math.max(hi, tl[tl.length - 1]);
+      const top = PAD.t + ih + gap, fmt = L0.yFmt || defaultFmt;
+      L = { top, Y: v => top + (hi - v) / (hi - lo || 1) * lh, fmt };
+      g += `<line x1="${PAD.l}" x2="${W - r}" y1="${top - gap / 2}" y2="${top - gap / 2}" stroke="var(--border)"/>`;
+      g += tl.map(t => `<line x1="${PAD.l}" x2="${W - r}" y1="${L.Y(t)}" y2="${L.Y(t)}" stroke="var(--grid)"/>
+        <text x="${PAD.l - 6}" y="${L.Y(t) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(fmt(t))}</text>`).join('');
+      if (L0.label) g += `<text x="${PAD.l + 4}" y="${top + 11}" font-size="10.5" fill="var(--mute)">${esc(L0.label)}</text>`;
+    }
+    return { W, H, r, xs, X, Y, Y2, L, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
   }
 
   function refs(o, f, kind) {
@@ -105,7 +121,8 @@ const LTChart = (() => {
       const cx = kind === 'bars' ? f.X(i) : f.X(f.xs[i]);
       cross.setAttribute('x1', cx); cross.setAttribute('x2', cx); cross.style.display = '';
       tip.innerHTML = `<b>${esc(f.xFmt(o.x[i], true))}</b>` + o.series.filter(s => !s.noTip).map(s => Number.isFinite(s.y[i])
-        ? `<div><i style="background:${s.color}"></i>${esc(s.name)}　${esc(tipFmt(s, s.y[i], i))}</div>` : '').join('');
+        ? `<div><i style="background:${s.color}"></i>${esc(s.name)}　${esc(tipFmt(s, s.y[i], i))}</div>` : '').join('')
+        + (o.lower ? o.lower.series.filter(s => Number.isFinite(s.y[i])).map(s => `<div><i style="background:${s.color}"></i>${esc(s.name)}　${esc((o.lower.tipFmt || ((_, v) => f.L.fmt(v)))(s, s.y[i], i))}</div>`).join('') : '');
       tip.style.display = 'block';
       const tw = tip.offsetWidth;
       tip.style.left = (cx + 12 + tw > f.W ? cx - tw - 12 : cx + 12) + 'px';
@@ -144,7 +161,13 @@ const LTChart = (() => {
           <polygon points="${first},${y0} ${pts} ${last},${y0}" fill="var(--down)" fill-opacity=".14" clip-path="url(#${id}b)"/>`;
       }
       return g + segs.map(seg => `<polyline points="${seg.map(p => p.join(',')).join(' ')}" fill="none" stroke="${s.color}" stroke-width="${s.width || 2}" ${s.dash ? `stroke-dasharray="${s.dash}"` : ''} stroke-linejoin="round"/>`).join('');
-    }).join(''));
+    }).join('') + (f.L ? o.lower.series.map(s => {
+      const pts = s.y.map((v, i) => Number.isFinite(v) ? [f.X(f.xs[i]), f.L.Y(v)] : null).filter(Boolean);
+      if (!pts.length) return '';
+      const line = pts.map(p => p.join(',')).join(' '), y0 = f.L.Y(0);
+      return (o.lower.fill ? `<polygon points="${pts[0][0]},${y0} ${line} ${pts[pts.length - 1][0]},${y0}" fill="${s.color}" fill-opacity=".12"/>` : '')
+        + `<polyline points="${line}" fill="none" stroke="${s.color}" stroke-width="${s.width || 1.4}" stroke-linejoin="round"/>`;
+    }).join('') : ''));
   }
 
   function bars(el, o) {
