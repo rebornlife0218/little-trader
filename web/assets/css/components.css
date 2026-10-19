@@ -334,7 +334,7 @@
   .lt-tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle;}
 
   /* ---------- 選擇權 ---------- */
-  .opt-form input[type=number], .opt-form select{width:100%;box-sizing:border-box;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .opt-form input[type=number], .opt-form input[type=password], .opt-form select{width:100%;box-sizing:border-box;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;}
   .opt-form select{font-family:'Inter',sans-serif;}
   .opt-form input:focus, .opt-form select:focus, table.legs input:focus{outline:none;border-color:var(--amber);}
   table.legs input{width:96px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-family:'IBM Plex Mono',monospace;font-size:12.5px;text-align:right;}
