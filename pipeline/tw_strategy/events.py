@@ -13,11 +13,15 @@
   - 停利 tp、停損 sl(可省略)：盤中觸及就以該價格出場，跳空越過則以開盤價出場；同一天兩者都觸及時以停損計
   - 最多持有 hold 個交易日：exit='open' 在第 hold+1 個交易日開盤出場；exit='close' 在第 hold 個交易日收盤出場
   - 價格用還原股價(含除權息)；漲跌停用原始價格判斷(漲停價 = 前一日收盤 × 1.1 依升降單位無條件捨去，跌停價 = × 0.9 無條件進位)
-      做多：進場日開盤漲停 → 買不到，再隔一個交易日開盤進場(可能連續延後)；要賣出時(開盤或收盤)剛好是跌停價 → 賣不掉，延到下一個交易日同一時點
-      做空：進場日開盤跌停 → 空不到，再隔一個交易日開盤進場；進場日開盤是漲停價 → 不放空(空在漲停價不合理)，這筆取消；
-            要回補時剛好是漲停價 → 買不回來，延到下一個交易日同一時點
-  - 組合淨值：每天把資金平均分配給當天持有中的部位，當天報酬 = 各部位當天報酬的平均(做空的報酬 = −股價漲跌幅)；
-    沒有部位時持有現金(報酬 0)。交易成本由網頁依當天買賣的部位比例扣除(trade)。
+      做多：進場日開盤漲停(或沒有成交) → 買不到，延後一天開盤進場；隔天仍買不到就放棄這筆
+            要賣出時(開盤或收盤)剛好是跌停價或沒有成交 → 賣不掉，延到下一個交易日同一時點(可能連續延後)
+      做空：進場日開盤跌停(或沒有成交) → 空不到，放棄；進場日開盤是漲停價 → 不放空(空在漲停價不合理)，這筆取消；
+            要回補時剛好是漲停價或沒有成交 → 買不回來，延到下一個交易日同一時點(可能連續延後)
+      持有期間下市櫃：以最後收盤價轉為現金(不計成本)
+  - 資金(simulate)：本金 100 萬；每筆進場金額上限 = 前一天收盤總資產 ÷ 平均一天持有檔數(只算有部位的日子)，且不超過現金，
+    進場價(含滑價、手續費)無條件捨去到整數股；同一天依代號順序進場，現金不夠的訊號放棄(nocash)。持有期間不再平衡。
+  - 成本：手續費 0.1425% × 0.3(買賣都收)、證交稅 0.3%(賣出時收，同一天進出 0.15%)、滑價買賣各一個升降單位(不超過漲跌停價)；
+    借券費(年利率)在網頁依每天收盤的放空比例(expo)與日曆天數扣除，使用者可調整。
 
 策略(公開)：
   against 大盤跌個股逆勢漲就是欠踹(做空)：大盤大跌時逆勢大漲、又有借券空方加碼的股票，隔天開盤放空、當天收盤回補
@@ -54,7 +58,7 @@ BENCH = '0050'
 EPS = 1e-6
 
 COLS = {'open': '開盤價', 'close': '收盤價', 'vol': '成交量', 'o': '還原開盤價', 'h': '還原最高價', 'l': '還原最低價', 'c': '還原收盤價',
-        'sbl': '借券賣出餘額'}
+        'sbl': '借券賣出餘額', 'val': '成交金額(千)'}
 if private:
     COLS.update(private.COLS)
 SQL = f'''COPY (
@@ -150,19 +154,57 @@ def encrypt(obj, password):
     return {'enc': {'iter': KDF_ITER, 'salt': b64(salt), 'iv': b64(iv), 'ct': b64(ct)}}
 
 
-# ---------- 共用：進出場、組合淨值、輸出 ----------
+# ---------- 共用：交易成本與資金 ----------
+CAPITAL = 1_000_000     # 本金 100 萬
+FEE = 0.001425 * 0.3    # 手續費(買賣都收，0.1425% 打 3 折)
+TAX = 0.003             # 股票交易稅(賣出時收)
+TAX_DT = 0.0015         # 當沖交易稅(同一天進出)
+
+
+def traded(W):
+    """當天有成交(沒有成交的日子不能當作進出場價格)"""
+    if 'tr' not in W:
+        W['tr'] = (W['vol'] > 0).to_numpy()
+    return W['tr']
+
+
+def last_day(W):
+    """每檔股票最後一個有資料的交易日(下市櫃的股票在這天之後就沒有資料)"""
+    if 'last' not in W:
+        ok = np.isfinite(W['c'].to_numpy())
+        W['last'] = np.where(ok.any(0), len(ok) - 1 - ok[::-1].argmax(0), -1)
+    return W['last']
+
+
+def fill(raw, buy, lu, ld):
+    """滑價：買進以高一個升降單位成交、賣出以低一個升降單位成交，不超過漲跌停價"""
+    return min(raw + tick(raw), lu) if buy else max(raw - tick(raw), ld)
+
+
+def bench_nav(W, i0):
+    """0050 股息再投入、買進持有：期初(i0 收盤)現金 100 萬，隔天開盤以整數股買進(含手續費與滑價)，之後不再交易"""
+    O, C, RO = W['o'][BENCH].to_numpy(), W['c'][BENCH].ffill().to_numpy(), W['open'][BENCH].to_numpy()
+    LU, LD = (x[:, list(W['c'].columns).index(BENCH)] for x in limits(W))
+    e = i0 + 1
+    px = fill(RO[e], True, LU[e], LD[e])
+    sh = int(CAPITAL // (px * (1 + FEE)))
+    cash = CAPITAL - sh * px * (1 + FEE)
+    units = sh * px / (O[e] * px / RO[e])                    # 還原股價計的單位數：市值 = units × 還原收盤價
+    nav = np.r_[1.0, (cash + units * C[e:]) / CAPITAL]
+    return nav
+
+
+# ---------- 事件型策略：進出場、資金模擬、輸出 ----------
 def backtest(W, sig, st):
-    """逐檔模擬進出場：回傳每筆交易(含漲跌停延後進場、延後出場的天數)"""
+    """逐檔決定進出場的時間與價格(和資金無關)：回傳每筆交易與進不了場而取消的訊號"""
     O, H, L, C = (W[k].to_numpy() for k in ('o', 'h', 'l', 'c'))
     RO, RC = W['open'].to_numpy(), W['close'].to_numpy()
     LU, LD = limits(W)
+    TR, LAST = traded(W), last_day(W)
     long = st['side'] == 'long'
     tp, sl, hold = st['tp'], st['sl'], st['hold']
     S = sig.to_numpy()
     nd, ns = C.shape
-
-    def no_entry(t, j):      # 做多開盤漲停買不到、做空開盤跌停空不到
-        return RO[t, j] >= LU[t, j] - EPS if long else RO[t, j] <= LD[t, j] + EPS
 
     def locked(raw, t, j):   # 做多跌停賣不掉、做空漲停買不回來(raw = 出場時點的原始價格)
         return raw <= LD[t, j] + EPS if long else raw >= LU[t, j] - EPS
@@ -171,29 +213,44 @@ def backtest(W, sig, st):
     for j in range(ns):
         free = 0
         for s in np.where(S[:, j])[0]:
-            if s < free:
+            if s < free or s + 1 >= nd:
                 continue
-            e = s + 1                                             # 隔天開盤進場；停牌或開盤漲跌停(進不了場)就再隔一天
-            while e < nd and (not np.isfinite(O[e, j]) or no_entry(e, j)):
-                e += 1
-            if e >= nd:
-                continue                                          # 資料最後一天還進不了場
+            # 進場：做多開盤漲停(或沒成交)延後一天，隔天仍買不到就放棄；做空開盤跌停(或沒成交)空不到、開盤漲停不放空，都放棄
+            e, why_skip = s + 1, None
+            for k in range(2 if long else 1):
+                e = s + 1 + k
+                if e >= nd:
+                    why_skip = 'end'
+                elif not TR[e, j]:
+                    why_skip = 'halt'
+                elif long and RO[e, j] >= LU[e, j] - EPS:
+                    why_skip = 'up'
+                elif not long and RO[e, j] <= LD[e, j] + EPS:
+                    why_skip = 'down'
+                elif not long and RO[e, j] >= LU[e, j] - EPS:
+                    why_skip = 'upshort'
+                    break
+                else:
+                    why_skip = None
+                    break
+            if why_skip == 'end':
+                continue                                          # 資料最後一天，還不知道進不進得了場
+            if why_skip:
+                skipped.append((j, s, e, why_skip))
+                continue
             edelay = int(e - s - 1)
-            if not long and RO[e, j] >= LU[e, j] - EPS:
-                skipped.append((j, s, e))                         # 做空：開盤就是漲停價，不放空
-                continue
             E = O[e, j]
             x, px, why, when = None, None, None, None
             if tp is not None or sl is not None:
                 win = E * (1 + tp) if long else E * (1 - tp)      # 停利價
                 lose = E * (1 - sl) if long else E * (1 + sl)     # 停損價
+                hit_w = (lambda p: p >= win) if long else (lambda p: p <= win)
+                hit_l = (lambda p: p <= lose) if long else (lambda p: p >= lose)
                 for t in range(e, min(e + hold, nd)):
+                    if not TR[t, j]:
+                        continue                                  # 沒有成交：價格不動
                     o, h, l = O[t, j], H[t, j], L[t, j]
-                    if not np.isfinite(l):
-                        continue                                  # 停牌：價格不動
                     best, worst = (h, l) if long else (l, h)
-                    hit_w = (lambda p: p >= win) if long else (lambda p: p <= win)
-                    hit_l = (lambda p: p <= lose) if long else (lambda p: p >= lose)
                     if t > e and hit_l(o):
                         x, px, why, when = t, o, 'sl', 'open'
                     elif hit_l(worst):
@@ -210,42 +267,93 @@ def backtest(W, sig, st):
                     x, why, when = t, 'time', st['exit']
             delay = 0
             if when is not None:
-                # 開盤或收盤出場：停牌或剛好在出不了場的漲跌停價，就延到下一個交易日同一時點
+                # 開盤或收盤出場：沒有成交或剛好在出不了場的漲跌停價，就延到下一個交易日同一時點；中途下市櫃以最後收盤價轉為現金
                 P, R = (O, RO) if when == 'open' else (C, RC)
                 t = x
-                while t < nd and (not np.isfinite(P[t, j]) or locked(R[t, j], t, j)):
+                while t < nd and t <= LAST[j] and (not TR[t, j] or locked(R[t, j], t, j)):
                     t += 1
-                delay = int(t - x)
-                x = t if t < nd else None
-                if x is not None and (why == 'time' or delay):
-                    px = P[x, j]
+                if t > LAST[j] and LAST[j] < nd - 1:
+                    x, px, why, when = int(LAST[j]), C[LAST[j], j], 'delist', 'close'
+                    delay = 0
+                else:
+                    delay = int(t - x)
+                    x = t if t < nd else None
+                    if x is not None and (why == 'time' or delay):
+                        px = P[x, j]
             if x is None:
                 why, px = 'open', None                            # 還在持有
-            held = None if x is None else int(x - e + (when != 'open'))
-            trades.append((j, s, e, x, E, px, why, delay, held, edelay))
+            trades.append((j, s, e, x, E, px, why, delay, edelay, when))
             free = x if x is not None else nd                     # 出場當天收盤的訊號就可以再進場
     return trades, skipped
 
 
-def portfolio(W, trades, long):
-    """每日組合報酬(平均分配給當天持有的部位；做空的報酬 = −股價漲跌幅)與當天買賣的部位比例"""
-    C = W['c'].ffill().to_numpy()
+def avg_holding(trades, nd):
+    """平均一天持有檔數(只算有部位的日子)：開盤出場的那天不算持有"""
+    n = np.zeros(nd)
+    for j, s, e, x, E, px, why, delay, edelay, when in trades:
+        end = nd - 1 if x is None else (x - 1 if when == 'open' else x)
+        n[e:max(e, end) + 1] += 1
+    return float(n[n > 0].mean()) if (n > 0).any() else 1.0
+
+
+def simulate(W, trades, long, i0):
+    """本金 100 萬的逐日資金模擬：每筆進場金額上限 = 前一天收盤總資產 ÷ 平均一天持有檔數(且不超過現金)，
+    以進場價(含滑價與手續費)無條件捨去到整數股；同一天先處理開盤出場、再依代號順序進場、最後處理盤中與收盤出場。
+    做空視為拿出同樣金額當保證金，損益 = −(還原股價漲跌幅) × 放空金額。不含借券費(網頁依使用者設定扣除)。"""
+    O, C = W['o'].to_numpy(), W['c'].ffill().to_numpy()
+    RO, RC = W['open'].to_numpy(), W['close'].to_numpy()
+    LU, LD = limits(W)
     nd = C.shape[0]
+    cap = 1 / avg_holding(trades, nd)
     sign = 1 if long else -1
-    rs = [[] for _ in range(nd)]
-    nt = np.zeros(nd)
-    for j, s, e, x, E, px, *_ in trades:
-        prev = E
-        for t in range(e, (x if x is not None else nd - 1) + 1):
-            p = px if t == x else C[t, j]
-            rs[t].append(sign * (p / prev - 1))
-            prev = p
-        nt[e] += 1
-        if x is not None:
-            nt[x] += 1
-    ret = np.array([np.mean(r) if r else 0.0 for r in rs])
-    npos = np.array([len(r) for r in rs])
-    return ret, npos, np.where(npos > 0, nt / np.maximum(npos, 1), 0)
+    ins, outs = {}, {}
+    for k, tr in enumerate(trades):
+        ins.setdefault(tr[2], []).append(k)
+        if tr[3] is not None:
+            outs.setdefault(tr[3], []).append(k)
+    cash, pos, res = float(CAPITAL), {}, {}
+    nav, npos, expo = np.ones(nd), np.zeros(nd, int), np.zeros(nd)
+    value = lambda k, p: pos[k][0] * (1 + sign * (p / pos[k][1] - 1))  # noqa: E731  部位市值(p = 還原價)
+
+    def close_out(k, t):
+        nonlocal cash
+        j, e, px, why, when = trades[k][0], trades[k][2], trades[k][5], trades[k][6], trades[k][9]
+        amt, adj_in, cost_in = pos.pop(k)
+        if why == 'delist':
+            adj_out, rate = px, 0.0                               # 下市櫃：以最後收盤價轉為現金，沒有成交、不計成本
+        else:
+            raw = px * (RO[t, j] / O[t, j] if when == 'open' else RC[t, j] / C[t, j])   # 出場的原始價格
+            adj_out = px * fill(raw, not long, LU[t, j], LD[t, j]) / raw
+            rate = FEE + ((TAX_DT if t == e else TAX) if long else 0)   # 做多賣出收交易稅；做空回補是買進，只收手續費
+        got = amt * (1 + sign * (adj_out / adj_in - 1)) - amt * adj_out / adj_in * rate
+        cash += got
+        res[k] = (got - amt - cost_in) / (amt + cost_in if long else amt)
+
+    for t in range(i0 + 1, nd):
+        eq = cash + sum(value(k, C[t - 1, trades[k][0]]) for k in pos)
+        for k in [k for k in outs.get(t, []) if k in pos and trades[k][9] == 'open']:
+            close_out(k, t)
+        for k in sorted(ins.get(t, []), key=lambda k: trades[k][0]):
+            j = trades[k][0]
+            px = fill(RO[t, j], long, LU[t, j], LD[t, j])
+            budget = min(cash, eq * cap)
+            sh = int(budget // (px * (1 + FEE + (0 if long else TAX))))
+            if sh <= 0:
+                continue                                          # 現金不夠買一股：這筆不進場
+            amt = sh * px
+            cost_in = amt * (FEE if long else FEE + (TAX_DT if trades[k][3] == t else TAX))   # 做空：放空時就是賣出，收交易稅
+            cash -= amt + cost_in
+            pos[k] = (amt, O[t, j] * px / RO[t, j], cost_in)
+        npos[t] = len(pos)                                        # 當天持有檔數(含當天收盤出場的部位，不含開盤出場的)
+        for k in [k for k in outs.get(t, []) if k in pos]:
+            close_out(k, t)
+        mv = [value(k, C[t, trades[k][0]]) for k in pos]
+        nav[t] = (cash + sum(mv)) / CAPITAL
+        expo[t] = 0 if long else sum(mv) / max(nav[t] * CAPITAL, EPS)
+    for k in pos:                                                 # 持有中：以最新收盤價計(已扣進場成本)
+        amt, adj_in, cost_in = pos[k]
+        res[k] = (value(k, C[-1, trades[k][0]]) - amt - cost_in) / (amt + cost_in if long else amt)
+    return nav, npos, expo, res, cap
 
 
 def build(W, names, st):
@@ -257,51 +365,61 @@ def build(W, names, st):
     stocks = list(W['c'].columns)
     long = st['side'] == 'long'
     trades, skipped = backtest(W, sig, st)
-    trades.sort(key=lambda t: (t[2], stocks[t[0]]))
-    ret, npos, trade = portfolio(W, trades, long)
-    i0 = int(sig.to_numpy().any(axis=1).argmax())     # 第一個訊號日 = 期初
-    Cb = W['c'][BENCH].ffill().to_numpy()
-    Cl = W['c'].ffill().to_numpy()
+    i0 = int(sig.to_numpy().any(axis=1).argmax())     # 第一個訊號日收盤 = 期初
+    nav, npos, expo, res, cap = simulate(W, trades, long, i0)
+    order = sorted(range(len(trades)), key=lambda k: (trades[k][2], stocks[trades[k][0]]))
     fmt = lambda t: dates[t].strftime('%Y-%m-%d')  # noqa: E731
     nm = lambda j: names.get(stocks[j], ('', ''))  # noqa: E731
-    gross = (lambda p, E: p / E - 1) if long else (lambda p, E: 1 - p / E)  # noqa: E731
-    # 交易：[代號, 名稱, 進場日, 出場日, 報酬(未扣成本；持有中以最新收盤計), 出場原因, 持有天數, 漲跌停延後出場的天數, 漲跌停延後進場的天數]
-    T = [[stocks[j], nm(j)[0], fmt(e), fmt(x) if x is not None else None,
-          round(float(gross(px if x is not None else Cl[-1, j], E)), 5), why, held if held is not None else int(nd - e), delay, edelay]
-         for j, s, e, x, E, px, why, delay, held, edelay in trades]
+    held = lambda tr: (nd - tr[2]) if tr[3] is None else int(tr[3] - tr[2] + (tr[9] != 'open'))  # noqa: E731
+    # 交易：[代號, 名稱, 進場日, 出場日, 報酬(扣手續費、交易稅、滑價，未扣借券費；持有中以最新收盤計), 出場原因, 持有天數, 漲跌停延後出場的天數, 漲跌停延後進場的天數, 持有日曆天數]
+    T = [[stocks[tr[0]], nm(tr[0])[0], fmt(tr[2]), fmt(tr[3]) if tr[3] is not None else None, round(float(res[k]), 5), tr[6], held(tr), tr[7], tr[8],
+          int(((dates[tr[3]] if tr[3] is not None else dates[-1]) - dates[tr[2]]).days)]
+         for k in order if (tr := trades[k]) and k in res]
+    nocash = len(trades) - len(res)
     # 最近 RECENT 個交易日的選股：[代號, 名稱, 產業, 收盤價, 各欄位…]
     S, close = sig.to_numpy(), W['close'].to_numpy()
     V = [c[2].to_numpy(dtype=float) for c in cols]
     num = lambda v: round(float(v), 4) if np.isfinite(v) else None  # noqa: E731
     recent = [{'d': fmt(t), 'p': [[stocks[j], *nm(j), float(close[t, j]), *[num(v[t, j]) for v in V]] for j in np.where(S[t])[0]]}
               for t in range(nd - 1, max(-1, nd - 1 - RECENT), -1)]
-    return {
+    out = {
         'key': st['key'], 'side': st['side'], 'asof': fmt(nd - 1),
         'd': [x.strftime('%Y-%m-%d') for x in dates[i0:]],
-        'nav': {'s': [round(float(x), 6) for x in np.cumprod(1 + ret[i0:])], 'b0050': [round(float(x), 6) for x in Cb[i0:] / Cb[i0]]},
+        'nav': {'s': [round(float(x), 6) for x in nav[i0:]], 'b0050': [round(float(x), 6) for x in bench_nav(W, i0)]},
         'npos': npos[i0:].tolist(),
-        'trade': [round(float(x), 4) for x in trade[i0:]],
         'trades': T,
-        'skipped': [[stocks[j], nm(j)[0], fmt(s), fmt(e)] for j, s, e in sorted(skipped, key=lambda b: b[2])],   # 做空：進場日開盤漲停、取消
+        # 進不了場而取消的訊號：[代號, 名稱, 選股日, 原因]；up = 做多連兩天開盤漲停、down = 做空開盤跌停、upshort = 做空開盤漲停(不放空)、halt = 沒有成交
+        'skipped': [[stocks[j], nm(j)[0], fmt(s), why] for j, s, e, why in sorted(skipped, key=lambda b: b[2])],
+        'nocash': nocash,
+        'cap': round(cap, 4),
         'cols': [[h, f] for h, f, _ in cols],
         'recent': recent,
-        'params': {'tp': st['tp'], 'sl': st['sl'], 'hold': st['hold'], 'exit': st['exit']},
+        'params': {'tp': st['tp'], 'sl': st['sl'], 'hold': st['hold'], 'exit': st['exit'], 'capital': CAPITAL, 'fee': FEE, 'tax': TAX, 'tax_dt': TAX_DT},
     }
+    if not long:
+        out['expo'] = [round(float(x), 4) for x in expo[i0:]]   # 每天收盤放空部位占總資產的比例(網頁據此扣借券費)
+    return out
 
 
-def main(keys=None):
-    W, names = load()
+def main(keys=None, data=None, out=None):
+    """data = load() 的結果(update.py 已經讀過就直接傳進來)；out = 只回傳結果、不寫檔(比較新舊版本用)"""
+    W, names = data or load()
     out_dir = dataset_dir('tw_strategy', clean=False)
+    results = {}
     for st in STRATEGIES:
         if keys and st['key'] not in keys:
             continue
-        out = build(W, names, st)
-        write_json(out_dir / f"{st['key']}.json", encrypt({**out, 'info': st['info']}, st['password']) if st.get('password') else out)
-        T = [t for t in out['trades'] if t[5] != 'open']
+        res = build(W, names, st)
+        results[st['key']] = res
+        if out is None:
+            write_json(out_dir / f"{st['key']}.json", encrypt({**res, 'info': st['info']}, st['password']) if st.get('password') else res)
+        T = [t for t in res['trades'] if t[5] != 'open']
         r = np.array([t[4] for t in T])
-        print(f"{st['key']}({st['side']}) {out['d'][0]} ~ {out['asof']}：延後進場 {sum(t[8] > 0 for t in out['trades'])} 筆、開盤漲停不放空 {len(out['skipped'])} 筆、延後出場 {sum(t[7] > 0 for t in T)} 筆；"
-              f"{len(T)} 筆已出場，勝率 {(r > 0).mean():.1%}，平均 {r.mean():+.2%}；組合 {out['nav']['s'][-1]:.2f} 倍，"
-              f"最新選股 {out['recent'][0]['d']} {len(out['recent'][0]['p'])} 檔")
+        sk = pd.Series([b[3] for b in res['skipped']]).value_counts().to_dict()
+        print(f"{st['key']}({st['side']}) {res['d'][0]} ~ {res['asof']}：延後進場 {sum(t[8] > 0 for t in res['trades'])} 筆、取消 {sk}、現金不足 {res['nocash']} 筆、"
+              f"延後出場 {sum(t[7] > 0 for t in T)} 筆；{len(T)} 筆已出場，勝率 {(r > 0).mean():.1%}，平均 {r.mean():+.2%}(扣成本)；"
+              f"組合 {res['nav']['s'][-1]:.2f} 倍(0050 {res['nav']['b0050'][-1]:.2f} 倍)，每筆上限 {res['cap']:.0%}")
+    return results
 
 
 if __name__ == '__main__':
