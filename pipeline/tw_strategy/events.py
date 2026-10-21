@@ -298,8 +298,9 @@ def avg_holding(trades, nd):
     return float(n[n > 0].mean()) if (n > 0).any() else 1.0
 
 
-def simulate(W, trades, long, i0, cap=None):
+def simulate(W, trades, long, i0, cap=None, whole=True):
     """本金 100 萬的逐日資金模擬。cap = 每檔上限(占總資產)，省略時 = 1 ÷ 平均一天持有檔數；策略指定持有檔數 N 時傳 1/N。
+    whole=False 不取整數股(只用在研究的參考組，例如每月等權買進全部合格股票)。
     有新股票進場的那天，所有部位調整到 目標金額 = 前一天收盤總資產 × min(cap, 1 ÷ 持有檔數)(持有檔數含新進場的股票)：
     開盤先把超過目標的舊部位減碼，再買進新股票(現金不夠就平分剩下的現金)，最後把低於目標的舊部位補足；
     減碼、補足都以一股的價格無條件捨去到整數股，開盤漲跌停或沒有成交的部位不調整，當天預定出場的部位不算、也不調整。
@@ -362,7 +363,8 @@ def simulate(W, trades, long, i0, cap=None):
     def shares_for(k, t, money, buy):
         j = trades[k][0]
         px = fill(RO[t, j], buy, LU[t, j], LD[t, j])
-        return int(max(0.0, money) // (px * (1 + FEE + (TAX if not long and buy is False else 0))))
+        n = max(0.0, money) / (px * (1 + FEE + (TAX if not long and buy is False else 0)))
+        return int(n) if whole else n
 
     def close_out(k, t):
         nonlocal cash
@@ -389,7 +391,8 @@ def simulate(W, trades, long, i0, cap=None):
             for k in keep:                                        # 先減碼：超過目標的部分
                 j = trades[k][0]
                 if can(k, t, False):
-                    sh = int((value(k, O[t, j]) - target) / RO[t, j])
+                    sh = (value(k, O[t, j]) - target) / RO[t, j]
+                    sh = int(sh) if whole else sh
                     if sh > 0:
                         trade(k, t, sh, False)
             for i, k in enumerate(new):                           # 再進場：現金不夠就平分剩下的現金

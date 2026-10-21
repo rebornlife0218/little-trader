@@ -1,6 +1,6 @@
 /* 股票 · 台股 · 其他研究：依主題(營收、因子、事件、機器學習)分類的研究(資料集 tw_research，pipeline/tw_research/update.py)
    最上方選主題，再用下拉式選單選研究；同一系列的研究標同一個顏色。
-   淨值與交易統計已在 pipeline 依整數股與交易成本算好(規則同台股策略，根目錄 CLAUDE.md)，網頁端只計算績效統計、畫圖與顯示報告(Markdown)。
+   淨值與交易統計已在 pipeline 用本機資料庫算好(整數股、交易成本與資金規則同台股策略，根目錄 CLAUDE.md)，網頁端只計算績效統計、畫圖與顯示報告(Markdown)。
    績效統計與圖表共用 tw-strategy.js 的 LTTW。新增研究：pipeline 加一個 <key>.json，這裡的 CATS 加一筆(run = 畫面函式) */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -124,7 +124,7 @@
       <div class="doc">${md(src)}</div>
     </div>`;
   const scaleSel = id => `<div class="paramitem"><label for="${id}">走勢圖縱軸</label><select id="${id}"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>`;
-  const MONEY = '本金 100 萬元，進場金額除以進場價(含滑價與手續費)無條件捨去到整數股，沒用到的資金持有現金(不計利息)。';
+  const MONEY = '本金 100 萬元，買賣金額除以成交價(含滑價與手續費)無條件捨去到整數股；沒有新股票進場的日子不調整，沒用到的資金持有現金(不計利息)。';
   // 回測規則依台股策略頁的同一套原則：漲跌停、沒有成交、下市櫃的處理
   const RULES = '開盤漲停或沒有成交買不到，延後一天，隔天仍買不到就放棄；要賣出時跌停或沒有成交，延到下一個交易日同一時點再賣(可能連續延後)；持有期間下市櫃，以最後收盤價轉為現金。範圍是上市櫃普通股(不含 ETF、存託憑證)，包含已下市櫃的公司；報酬用還原股價(含除權息)。';
   // 每年報酬表：cols = [{ name, nav, cmp }](cmp = 和 0050 比較、粗體標示贏過)
@@ -156,7 +156,7 @@
   }
   const extraCards = t => [
     t.fail ? W().card(`${t.fail.toLocaleString()} 筆`, '開盤漲停買不到', '放棄的訊號') : '',
-    t.nocash ? W().card(`${t.nocash.toLocaleString()} 筆`, '現金不足放棄', t.cap ? `每筆上限為總資產的 ${(t.cap * 100).toFixed(0)}%` : '') : '',
+    t.nocash ? W().card(`${t.nocash.toLocaleString()} 筆`, '買不起一股而放棄', t.cap ? `每檔上限為總資產的 ${(t.cap * 100).toFixed(0)}%` : '') : '',
     t.delist ? W().card(`${t.delist} 筆`, '持有期間下市櫃', '以最後收盤價轉現金') : '',
   ].join('');
 
@@ -172,7 +172,7 @@
         <div class="doc">
           <p><b>規則</b>：營收月份 M 的 21 日(含)之後第一個交易日開盤，買進綜合分數最高的 10 檔或 5 檔；每檔在 M 月營收公告後的第一個交易日開盤賣出(月底後 15 天內沒公告，在 M+1 月 16 日後第一個交易日賣出)。前一個交易日收盤後選股，只用當晚已知的資料。</p>
           <p><b>綜合分數</b>：上月年增、上月年增加速、近 3 月年增、上月月增、連續成長月數(越高越好)與去年同月年增(越低越好)6 個營收因子的百分位平均。<b>市值四分位</b>：每月把合格股票依進場前一日市值切成四等分(Q1 最小、Q4 最大)，只在其中一組裡選股。</p>
-          <p><b>資金分配</b>：每檔上限 = 前一天收盤總資產 ÷ 10(或 5)，且不超過現金；同一天依代號順序買進。${MONEY}</p>
+          <p><b>資金分配</b>：策略寫明持有 10(或 5)檔，每檔上限 = 前一天收盤總資產 ÷ 10(或 5)；有新股票進場的那天，所有部位調整到 min(上限, 1 ÷ 持有檔數)(先減碼、再進場、最後補足，都以整數股調整)；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
         </div>
         <div class="mode-tabs twr-ver" style="margin-top:12px;">${B.versions.map(v => `<button class="mode-tab" data-v="${v.key}"><b>${esc(v.name)}</b><small>${v.key === 'all' ? '全部合格股票' : capTxt(v)}</small></button>`).join('')}</div>
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
@@ -246,7 +246,7 @@
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
           <p><b>規則</b>：月營收年增率 < -10% 的公告(月底後 15 天內的首次公告)，公告後第一個交易日(T1)開盤相對前一天收盤跳空 ≤ -5%，T1 開盤買進。<b>日內</b>：T1 收盤賣出；<b>T+1</b>：隔一個交易日開盤賣出。另測事前 20 日平均成交金額 ≥ 1 千萬(可實際交易的股票)的版本。</p>
-          <p><b>資金分配</b>：先算出整段期間平均一天持有幾檔(只算有部位的日子)，每筆進場金額上限 = 前一天收盤總資產 ÷ 平均持有檔數，且不超過現金；同一天有多檔訊號時依代號順序進場，現金用完的訊號就放棄。${MONEY}</p>
+          <p><b>資金分配</b>：先算出整段期間平均一天持有幾檔(只算有部位的日子)，每檔上限 = 前一天收盤總資產 ÷ 平均持有檔數；有新股票進場的那天，所有部位調整到 min(上限, 1 ÷ 持有檔數)(先減碼、再進場、最後補足，都以整數股調整)；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
         </div>
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
           <div class="paramitem"><label for="twrS">策略</label><select id="twrS">${B.strats.map(s => `<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
@@ -299,7 +299,7 @@
     let h = '5日', g = '分數 = 3';
     const FN = { 成長: '營收年增率', 月增: '營收月增率', 年增加速: '年增加速', 連續成長月數: '連續年增 > 10% 月數', 公告天數: '公告日距月底天數', 開盤跳空: 'T1 開盤跳空',
       事前5日報酬: '事前 5 日報酬', 事前20日報酬: '事前 20 日報酬', 距60日高點: '距 60 日高點', '市值(億)': '市值', 均額10: '10 日均成交金額', 外資5日買超比: '外資 5 日買超比',
-      投信5日買超比: '投信 5 日買超比', '近5日主力買賣超(%)': '近 5 日主力買賣超', 資使用率: '融資使用率' };
+      投信5日買超比: '投信 5 日買超比', '近5日主力買賣超(%)': '近 5 日主力買賣超' };
     const HN = { 日內: '日內(T1 收盤賣)', 'T+1': 'T+1(T2 開盤賣)', '5日': '5 日(T5 收盤賣)' };
     el.innerHTML = `
       <div class="panel">
@@ -307,7 +307,7 @@
         <div class="doc">
           <p><b>事件</b>：月營收年增率 > 10% 的公告(月底後 15 天內的首次公告)，事前 10 日平均成交金額 ≥ 1 千萬；公告後第一個交易日(T1)開盤買進。</p>
           <p><b>策略</b>：每個持有期選 IC 最顯著的 3 個特徵，落在有利方向前 40% 就給 1 分(0 ～ 3 分)，比較「全部事件」、「分數 ≥ 2」、「分數 = 3」。</p>
-          <p><b>資金分配</b>：每筆進場金額上限 = 前一天收盤總資產 ÷ 平均一天持有檔數，且不超過現金；同一天依代號順序進場，現金用完的訊號就放棄。${MONEY}</p>
+          <p><b>資金分配</b>：每檔上限 = 前一天收盤總資產 ÷ 平均一天持有檔數(只算有部位的日子)；有新股票進場的那天，所有部位調整到 min(上限, 1 ÷ 持有檔數)(先減碼、再進場、最後補足，都以整數股調整)；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
         </div>
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
           <div class="paramitem"><label for="twrH">持有期</label><select id="twrH">${HS.map(x => `<option value="${esc(x)}">${esc(HN[x] || x)}</option>`).join('')}</select></div>

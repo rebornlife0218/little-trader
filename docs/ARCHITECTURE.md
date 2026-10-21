@@ -50,7 +50,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_strategy/events.py             台股事件型策略的共用引擎(每天選股、隔天開盤進場、持有幾天出場；漲跌停進不了場或出不了場；本金 100 萬的整數股資金模擬與交易成本，低波動也共用)：融資都沒退(做多)、大盤跌個股逆勢漲(做空)，每個策略一個 JSON
   tw_strategy/private_strategies.py 不公開的策略(條件、網頁說明、密碼；不進版控，只在本機，要自己備份)：輸出時整份加密，網頁輸入密碼後解密
   run_local.py                      本機資料集(tw_strategy、disposition)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
-  tw_research/update.py             台股其他研究：把 CM 資料夾(本機，CM 台股日資料 parquet)各研究的淨值、交易統計與報告整理成網頁 JSON(只在本機手動執行)
+  tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
 
 .github/workflows/
@@ -77,7 +77,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 | etf_compare | 勞動基金運用局、Yahoo Finance、臺灣證券交易所(除權除息計算結果表) | 週一~五 09:00 | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；台股 ETF 的配息用證交所官方資料，Yahoo 缺 2013 年以前的配息) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
 | disposition | 本機 PostgreSQL `cm.tw_disposition`(處置名單)、`cm.tw_daily`(股價)；櫃買中心(櫃買指數) | 週一~五 23:45、週二~六 12:15(本機排程) | `events.json`(2026/7 起每個處置事件：期間、新制/舊制、第一天開收、處置前 5 日、處置期間、出關後 5 日與同期大盤報酬) |
-| tw_research | 本機 CM 資料夾的研究輸出(CM 台股日資料、月營收) | 不定期(研究更新時手動執行) | 每個研究一個 JSON：`rev_pre.json` 營收公告前布局(不限市值與市值四分位 Q1～Q4 的前 10、前 5 檔與全部合格股票淨值、交易統計、進場日敏感度、綜合分數十分位、因子 IC)、`rev_growth.json` 營收成長特徵(3 種持有期 × 3 種分數組合的淨值與持有檔數、特徵 IC t 值、公告前後累積超額報酬)、`rev_drop.json` 營收衰退開低(日內 / T+1 × 全部 / 均額 ≥ 1 千萬的淨值與持有檔數、分組報酬)；都含 `d`(日期，第一天 = 期初)、`b0050`(0050 淨值)、`report`(報告 Markdown，不含建議)；淨值期初 = 1，本金 100 萬整數股、已扣成本。不發佈 csv、png 與原始股價 |
+| tw_research | 本機 PostgreSQL `cm.tw_daily`、`cm.tw_monthly_revenue`、`cm.tw_company_info` | 不定期(研究更新時手動執行) | 每個研究一個 JSON：`rev_pre.json` 營收公告前布局(不限市值與市值四分位 Q1～Q4 的前 10、前 5 檔與全部合格股票淨值、交易統計、進場日敏感度、綜合分數十分位、因子 IC)、`rev_growth.json` 營收成長特徵(3 種持有期 × 3 種分數組合的淨值與持有檔數、特徵 IC t 值、公告前後累積超額報酬)、`rev_drop.json` 營收衰退開低(日內 / T+1 × 全部 / 均額 ≥ 1 千萬的淨值與持有檔數、分組報酬)；都含 `d`(日期，第一天 = 期初)、`b0050`(0050 淨值)、`report`(報告 Markdown，不含建議)；淨值期初 = 1，本金 100 萬整數股、已扣成本，資金規則同 tw_strategy(有新股票進場時再平衡；寫明檔數的用 1/N 上限)。不發佈 csv、png 與原始股價 |
 | sp500 | fja05680/sp500 歷史成分股、Yahoo Finance、Tiingo | 週六 09:00 | `backtest.json`(四種策略、全部成分股等權重、SPY 的每日淨值(未扣成本)；每季的成分股數、可取得股價數、換手率、無風險利率、持股) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
 | tw_strategy | 本機 PostgreSQL `cm.tw_daily`(CMoney 台股日資料) | 週一~五 23:45、週二~六 12:15(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(本金 100 萬、整數股，已扣手續費、交易稅、滑價)；每日持有檔數 `npos`、交易統計 `tstat`(筆數、勝率、平均與中位數報酬、平均持倉天期)；每月換股日、合格股票數、換手率(買賣合計)；最新一次選股的持股)；事件型策略各一個 `<策略>.json`(`margin` 融資都沒退(加密：`{enc: {iter, salt, iv, ct}}`，解密後另含網頁說明 `info`)、`against` 大盤跌個股逆勢漲：每日淨值(已扣成本、未扣借券費)、0050 淨值、持有檔數、做空另有每天放空比例 `expo`(網頁扣借券費)、每筆交易(含漲跌停延後天數、持有日曆天數)、進不了場而放棄的訊號 `skipped`、連一股都買不起而放棄的筆數 `nocash`(有新股票進場時所有部位再平衡到 min(上限, 1/持有檔數)，現金不夠時新股票平分剩下的現金)、每筆資金上限 `cap`、最近 20 個交易日的選股與欄位) |
@@ -90,7 +90,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 - 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
 - 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(證交所資料，GitHub Actions 每天 15:30 更新)。
 - 只發佈回測結果，不發佈原始股價。
-- tw_research(台股其他研究)不在排程裡：研究在 CM 資料夾用 CM 台股日資料(parquet)計算(規則同 tw_strategy，實作在 CM 的 `台股/backtest/engine.py` 與各研究的 backtest.py)，研究更新後手動執行 `python pipeline/run_local.py tw_research`(重跑 `pipeline/tw_research/update.py`、發佈到 data 分支並重新部署)；CM 研究資料夾的位置用環境變數 `CM_BACKTEST_DIR` 指定。
+- tw_research(台股其他研究)不在排程裡：`pipeline/tw_research/update.py` 直接用本機 PostgreSQL 計算(規則同 tw_strategy，共用 `events.py`)，報告文字在 `pipeline/tw_research/reports/`；研究更新後手動執行 `python pipeline/run_local.py tw_research`(重跑、發佈到 data 分支並重新部署)。
 - 台股回測的規則(進出場、漲跌停、資金分配、交易成本、績效指標)以根目錄 `CLAUDE.md` 的「選股回測原則」為準，實作在 `events.py`(事件型)與 `update.py`(低波動，共用 events.py 的成本與漲跌停函式)；績效統計在網頁 `tw-strategy.js` 的 `stats`、`tradeStats` 計算。
 
 sp500 的特殊處理：
