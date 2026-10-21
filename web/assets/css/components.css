@@ -471,3 +471,6 @@
   /* ETF 分類表：管理方式(合併儲存格)與類型欄各自固定樣式，類型欄才會上下對齊 */
   table.pk-kind td.pk-mgmt{text-align:center;vertical-align:middle;}
   table.pk-kind td.pk-type{text-align:left;font-family:'Inter',sans-serif;font-weight:600;white-space:nowrap;}
+  /* 台股其他研究：系列標記(同一系列同一個顏色) */
+  .series-tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:var(--dim);vertical-align:middle;margin-right:4px;}
+  .series-tag i{display:inline-block;width:9px;height:9px;border-radius:50%;}

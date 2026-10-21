@@ -549,4 +549,7 @@
     if (!long) $('#evFee').oninput = draw; $('#evScale').onchange = draw;
     draw();
   }; }
+
+  // 共用給其他台股頁面(tw-research.js)：績效統計與圖表的算法和這頁一致
+  window.LTTW = { stats, card, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
 })();

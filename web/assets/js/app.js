@@ -8,7 +8,7 @@ const LT = (() => {
   const SECTIONS = [
     { key: 'index', name: '指數', desc: '全球主要指數的急跌反彈與K棒型態統計' },
     { key: 'etf', name: 'ETF', desc: 'ETF大禮包(0050 vs 勞退基金、折溢價)與即將發行的新 ETF' },
-    { key: 'stock', name: '股票', desc: '台股處置股、隔日沖、策略，美股財報行事曆與策略' },
+    { key: 'stock', name: '股票', desc: '台股處置股、隔日沖、策略、其他研究，美股財報行事曆與策略' },
     { key: 'option', name: '選擇權', desc: '臺指選擇權與台指期：隱含波動率、籌碼、價差與策略損益' },
     { key: 'stats', name: '統計學', desc: '統計學與計量方法的學習資源' },
     { key: 'other', name: '其他', desc: '研究與交易時常用的網站推薦' },
@@ -23,6 +23,7 @@ const LT = (() => {
     { key: 'sp500', name: 'S&P500 策略回測' },
     { key: 'disposition', name: '台股處置股' },
     { key: 'tw_strategy', name: '台股策略回測' },
+    { key: 'tw_research', name: '台股其他研究' },
   ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
   // 加上 group(例如 '台股')，側欄與首頁會在區塊內再分小組，同組頁面請連續註冊
