@@ -18,8 +18,8 @@
       做空：進場日開盤跌停(或沒有成交) → 空不到，放棄；進場日開盤是漲停價 → 不放空(空在漲停價不合理)，這筆取消；
             要回補時剛好是漲停價或沒有成交 → 買不回來，延到下一個交易日同一時點(可能連續延後)
       持有期間下市櫃：以最後收盤價轉為現金(不計成本)
-  - 資金(simulate)：本金 100 萬；每筆進場金額上限 = 前一天收盤總資產 ÷ 平均一天持有檔數(只算有部位的日子)，且不超過現金，
-    進場價(含滑價、手續費)無條件捨去到整數股；同一天依代號順序進場，現金不夠的訊號放棄(nocash)。持有期間不再平衡。
+  - 資金(simulate)：本金 100 萬；每檔進場金額 = min(前一天收盤總資產 ÷ 平均一天持有檔數(只算有部位的日子), 可用現金 ÷ 當天訊號檔數)，
+    進場價(含滑價、手續費)無條件捨去到整數股；分到的錢不夠買一股的訊號放棄(nocash)。持有期間不再平衡。
   - 成本：手續費 0.1425% × 0.3(買賣都收)、證交稅 0.3%(賣出時收，同一天進出 0.15%)、滑價買賣各一個升降單位(不超過漲跌停價)；
     借券費(年利率)在網頁依每天收盤的放空比例(expo)與日曆天數扣除，使用者可調整。
 
@@ -297,8 +297,8 @@ def avg_holding(trades, nd):
 
 
 def simulate(W, trades, long, i0):
-    """本金 100 萬的逐日資金模擬：每筆進場金額上限 = 前一天收盤總資產 ÷ 平均一天持有檔數(且不超過現金)，
-    以進場價(含滑價與手續費)無條件捨去到整數股；同一天先處理開盤出場、再依代號順序進場、最後處理盤中與收盤出場。
+    """本金 100 萬的逐日資金模擬：每檔進場金額 = min(前一天收盤總資產 ÷ 平均一天持有檔數, 可用現金 ÷ 當天訊號檔數)，
+    以進場價(含滑價與手續費)無條件捨去到整數股；同一天先處理開盤出場、再進場、最後處理盤中與收盤出場。
     做空視為拿出同樣金額當保證金，損益 = −(還原股價漲跌幅) × 放空金額。不含借券費(網頁依使用者設定扣除)。"""
     O, C = W['o'].to_numpy(), W['c'].ffill().to_numpy()
     RO, RC = W['open'].to_numpy(), W['close'].to_numpy()
@@ -333,10 +333,12 @@ def simulate(W, trades, long, i0):
         eq = cash + sum(value(k, C[t - 1, trades[k][0]]) for k in pos)
         for k in [k for k in outs.get(t, []) if k in pos and trades[k][9] == 'open']:
             close_out(k, t)
-        for k in sorted(ins.get(t, []), key=lambda k: trades[k][0]):
+        todays = sorted(ins.get(t, []), key=lambda k: trades[k][0])
+        per = min(eq * cap, cash / max(1, len(todays)))           # 當天的訊號平分可用現金，每檔不超過上限
+        for k in todays:
             j = trades[k][0]
             px = fill(RO[t, j], long, LU[t, j], LD[t, j])
-            budget = min(cash, eq * cap)
+            budget = min(cash, per)
             sh = int(budget // (px * (1 + FEE + (0 if long else TAX))))
             if sh <= 0:
                 continue                                          # 現金不夠買一股：這筆不進場
@@ -416,7 +418,7 @@ def main(keys=None, data=None, out=None):
         T = [t for t in res['trades'] if t[5] != 'open']
         r = np.array([t[4] for t in T])
         sk = pd.Series([b[3] for b in res['skipped']]).value_counts().to_dict()
-        print(f"{st['key']}({st['side']}) {res['d'][0]} ~ {res['asof']}：延後進場 {sum(t[8] > 0 for t in res['trades'])} 筆、取消 {sk}、現金不足 {res['nocash']} 筆、"
+        print(f"{st['key']}({st['side']}) {res['d'][0]} ~ {res['asof']}：延後進場 {sum(t[8] > 0 for t in res['trades'])} 筆、取消 {sk}、買不到一股 {res['nocash']} 筆、"
               f"延後出場 {sum(t[7] > 0 for t in T)} 筆；{len(T)} 筆已出場，勝率 {(r > 0).mean():.1%}，平均 {r.mean():+.2%}(扣成本)；"
               f"組合 {res['nav']['s'][-1]:.2f} 倍(0050 {res['nav']['b0050'][-1]:.2f} 倍)，每筆上限 {res['cap']:.0%}")
     return results
