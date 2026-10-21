@@ -18,8 +18,10 @@
       做空：進場日開盤跌停(或沒有成交) → 空不到，放棄；進場日開盤是漲停價 → 不放空(空在漲停價不合理)，這筆取消；
             要回補時剛好是漲停價或沒有成交 → 買不回來，延到下一個交易日同一時點(可能連續延後)
       持有期間下市櫃：以最後收盤價轉為現金(不計成本)
-  - 資金(simulate)：本金 100 萬；每檔進場金額 = min(前一天收盤總資產 ÷ 平均一天持有檔數(只算有部位的日子), 可用現金 ÷ 當天訊號檔數)，
-    進場價(含滑價、手續費)無條件捨去到整數股；分到的錢不夠買一股的訊號放棄(nocash)。持有期間不再平衡。
+  - 資金(simulate)：本金 100 萬；每檔上限 = 1 ÷ 平均一天持有檔數(只算有部位的日子)，策略指定持有檔數 N 時 = 1/N。
+    有新股票進場的那天，所有部位調整到 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)(含新進場的)：先減碼、再進場、最後補足，
+    都以一股的價格無條件捨去到整數股；開盤漲跌停或沒有成交的部位不調整，當天預定出場的部位不算。現金不夠時新股票平分剩下的現金，
+    不放棄訊號(連一股都買不起才放棄，nocash)。沒有新股票進場的日子不調整。
   - 成本：手續費 0.1425% × 0.3(買賣都收)、證交稅 0.3%(賣出時收，同一天進出 0.15%)、滑價買賣各一個升降單位(不超過漲跌停價)；
     借券費(年利率)在網頁依每天收盤的放空比例(expo)與日曆天數扣除，使用者可調整。
 
@@ -296,56 +298,110 @@ def avg_holding(trades, nd):
     return float(n[n > 0].mean()) if (n > 0).any() else 1.0
 
 
-def simulate(W, trades, long, i0):
-    """本金 100 萬的逐日資金模擬：每檔進場金額 = min(前一天收盤總資產 ÷ 平均一天持有檔數, 可用現金 ÷ 當天訊號檔數)，
-    以進場價(含滑價與手續費)無條件捨去到整數股；同一天先處理開盤出場、再進場、最後處理盤中與收盤出場。
-    做空視為拿出同樣金額當保證金，損益 = −(還原股價漲跌幅) × 放空金額。不含借券費(網頁依使用者設定扣除)。"""
+def simulate(W, trades, long, i0, cap=None):
+    """本金 100 萬的逐日資金模擬。cap = 每檔上限(占總資產)，省略時 = 1 ÷ 平均一天持有檔數；策略指定持有檔數 N 時傳 1/N。
+    有新股票進場的那天，所有部位調整到 目標金額 = 前一天收盤總資產 × min(cap, 1 ÷ 持有檔數)(持有檔數含新進場的股票)：
+    開盤先把超過目標的舊部位減碼，再買進新股票(現金不夠就平分剩下的現金)，最後把低於目標的舊部位補足；
+    減碼、補足都以一股的價格無條件捨去到整數股，開盤漲跌停或沒有成交的部位不調整，當天預定出場的部位不算、也不調整。
+    沒有新股票進場的日子不調整。同一天先處理開盤出場、再調整與進場、最後處理盤中與收盤出場。
+    做空視為拿出同樣金額當保證金，損益 = −(還原股價漲跌幅) × 放空金額。不含借券費(網頁依使用者設定扣除)。
+    每筆報酬 = 這檔從進場到全部出場收回的錢 ÷ 投入的錢 − 1(含所有加減碼與成本)。"""
     O, C = W['o'].to_numpy(), W['c'].ffill().to_numpy()
     RO, RC = W['open'].to_numpy(), W['close'].to_numpy()
     LU, LD = limits(W)
+    TR = traded(W)
     nd = C.shape[0]
-    cap = 1 / avg_holding(trades, nd)
+    cap = cap or 1 / avg_holding(trades, nd)
     sign = 1 if long else -1
     ins, outs = {}, {}
     for k, tr in enumerate(trades):
         ins.setdefault(tr[2], []).append(k)
         if tr[3] is not None:
             outs.setdefault(tr[3], []).append(k)
+    # pos[k] = [還原股價計的單位數 u, 保證金與放空所得 b(做多為 0), 投入金額, 收回金額]；部位市值 = sign × u × 還原價 + b
     cash, pos, res = float(CAPITAL), {}, {}
     nav, npos, expo = np.ones(nd), np.zeros(nd, int), np.zeros(nd)
-    value = lambda k, p: pos[k][0] * (1 + sign * (p / pos[k][1] - 1))  # noqa: E731  部位市值(p = 還原價)
+    value = lambda k, p: sign * pos[k][0] * p + pos[k][1]  # noqa: E731
+
+    def due(k, t):           # 當天預定出場(時間到期，含跌停延後中的)：事先知道，不算進持有檔數
+        x, why, delay = trades[k][3], trades[k][6], trades[k][7]
+        return x is not None and why == 'time' and x - delay <= t
+
+    def can(k, t, add):      # 開盤能不能加碼(add)或減碼：沒有成交、或剛好卡在買不到/賣不掉的漲跌停價就不動
+        j = trades[k][0]
+        if not TR[t, j]:
+            return False
+        buy = add == long    # 做多加碼、做空減碼 = 買進
+        return RO[t, j] < LU[t, j] - EPS if buy else RO[t, j] > LD[t, j] + EPS
+
+    def trade(k, t, sh, add):
+        """以 t 開盤成交 sh 股(add = 加碼/進場，否則減碼)：含滑價、手續費，賣出收交易稅"""
+        nonlocal cash
+        j = trades[k][0]
+        buy = add == long
+        px = fill(RO[t, j], buy, LU[t, j], LD[t, j])
+        amt = sh * px
+        u = amt / (O[t, j] * px / RO[t, j])                       # 還原股價計的單位數
+        p = pos.setdefault(k, [0.0, 0.0, 0.0, 0.0])
+        if add:
+            dt = trades[k][2] == t and trades[k][3] == t        # 做空當天回補：放空時收當沖稅率
+            fee = amt * (FEE + (0 if long else (TAX_DT if dt else TAX)))
+            cash -= amt + fee
+            p[0] += u
+            p[1] += 0 if long else 2 * amt                        # 做空：保證金 + 放空所得
+            p[2] += amt + fee
+        else:
+            fee = amt * (FEE + (TAX if long else 0))
+            f = min(1.0, u / p[0])
+            got = (amt if long else f * p[1] - amt) - fee
+            cash += got
+            p[0] -= f * p[0]
+            p[1] -= f * p[1]
+            p[3] += got
+
+    def shares_for(k, t, money, buy):
+        j = trades[k][0]
+        px = fill(RO[t, j], buy, LU[t, j], LD[t, j])
+        return int(max(0.0, money) // (px * (1 + FEE + (TAX if not long and buy is False else 0))))
 
     def close_out(k, t):
         nonlocal cash
         j, e, px, why, when = trades[k][0], trades[k][2], trades[k][5], trades[k][6], trades[k][9]
-        amt, adj_in, cost_in = pos.pop(k)
+        u, b, paid, got = pos.pop(k)
         if why == 'delist':
-            adj_out, rate = px, 0.0                               # 下市櫃：以最後收盤價轉為現金，沒有成交、不計成本
+            out = sign * u * px + b                               # 下市櫃：以最後收盤價轉為現金，沒有成交、不計成本
         else:
             raw = px * (RO[t, j] / O[t, j] if when == 'open' else RC[t, j] / C[t, j])   # 出場的原始價格
             adj_out = px * fill(raw, not long, LU[t, j], LD[t, j]) / raw
             rate = FEE + ((TAX_DT if t == e else TAX) if long else 0)   # 做多賣出收交易稅；做空回補是買進，只收手續費
-        got = amt * (1 + sign * (adj_out / adj_in - 1)) - amt * adj_out / adj_in * rate
-        cash += got
-        res[k] = (got - amt - cost_in) / (amt + cost_in if long else amt)
+            out = sign * u * adj_out + b - u * adj_out * rate
+        cash += out
+        res[k] = (got + out) / paid - 1
 
     for t in range(i0 + 1, nd):
         eq = cash + sum(value(k, C[t - 1, trades[k][0]]) for k in pos)
         for k in [k for k in outs.get(t, []) if k in pos and trades[k][9] == 'open']:
             close_out(k, t)
-        todays = sorted(ins.get(t, []), key=lambda k: trades[k][0])
-        per = min(eq * cap, cash / max(1, len(todays)))           # 當天的訊號平分可用現金，每檔不超過上限
-        for k in todays:
-            j = trades[k][0]
-            px = fill(RO[t, j], long, LU[t, j], LD[t, j])
-            budget = min(cash, per)
-            sh = int(budget // (px * (1 + FEE + (0 if long else TAX))))
-            if sh <= 0:
-                continue                                          # 現金不夠買一股：這筆不進場
-            amt = sh * px
-            cost_in = amt * (FEE if long else FEE + (TAX_DT if trades[k][3] == t else TAX))   # 做空：放空時就是賣出，收交易稅
-            cash -= amt + cost_in
-            pos[k] = (amt, O[t, j] * px / RO[t, j], cost_in)
+        new = sorted(ins.get(t, []), key=lambda k: trades[k][0])
+        if new:
+            keep = [k for k in pos if not due(k, t)]
+            target = eq * min(cap, 1 / (len(keep) + len(new)))
+            for k in keep:                                        # 先減碼：超過目標的部分
+                j = trades[k][0]
+                if can(k, t, False):
+                    sh = int((value(k, O[t, j]) - target) / RO[t, j])
+                    if sh > 0:
+                        trade(k, t, sh, False)
+            for i, k in enumerate(new):                           # 再進場：現金不夠就平分剩下的現金
+                sh = shares_for(k, t, min(target, cash / (len(new) - i)), long)
+                if sh > 0:
+                    trade(k, t, sh, True)
+            for k in keep:                                        # 最後補足：低於目標的部分
+                j = trades[k][0]
+                if can(k, t, True):
+                    sh = shares_for(k, t, min(target - value(k, O[t, j]), cash), long)
+                    if sh > 0:
+                        trade(k, t, sh, True)
         npos[t] = len(pos)                                        # 當天持有檔數(含當天收盤出場的部位，不含開盤出場的)
         for k in [k for k in outs.get(t, []) if k in pos]:
             close_out(k, t)
@@ -353,8 +409,7 @@ def simulate(W, trades, long, i0):
         nav[t] = (cash + sum(mv)) / CAPITAL
         expo[t] = 0 if long else sum(mv) / max(nav[t] * CAPITAL, EPS)
     for k in pos:                                                 # 持有中：以最新收盤價計(已扣進場成本)
-        amt, adj_in, cost_in = pos[k]
-        res[k] = (value(k, C[-1, trades[k][0]]) - amt - cost_in) / (amt + cost_in if long else amt)
+        res[k] = (pos[k][3] + value(k, C[-1, trades[k][0]])) / pos[k][2] - 1
     return nav, npos, expo, res, cap
 
 
@@ -372,7 +427,7 @@ def build(W, names, st):
     order = sorted(range(len(trades)), key=lambda k: (trades[k][2], stocks[trades[k][0]]))
     fmt = lambda t: dates[t].strftime('%Y-%m-%d')  # noqa: E731
     nm = lambda j: names.get(stocks[j], ('', ''))  # noqa: E731
-    held = lambda tr: (nd - tr[2]) if tr[3] is None else int(tr[3] - tr[2] + (tr[9] != 'open'))  # noqa: E731
+    held = lambda tr: int(nd - tr[2]) if tr[3] is None else int(tr[3] - tr[2] + (tr[9] != 'open'))  # noqa: E731
     # 交易：[代號, 名稱, 進場日, 出場日, 報酬(扣手續費、交易稅、滑價，未扣借券費；持有中以最新收盤計), 出場原因, 持有天數, 漲跌停延後出場的天數, 漲跌停延後進場的天數, 持有日曆天數]
     T = [[stocks[tr[0]], nm(tr[0])[0], fmt(tr[2]), fmt(tr[3]) if tr[3] is not None else None, round(float(res[k]), 5), tr[6], held(tr), tr[7], tr[8],
           int(((dates[tr[3]] if tr[3] is not None else dates[-1]) - dates[tr[2]]).days)]

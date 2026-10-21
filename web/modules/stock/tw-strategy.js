@@ -441,7 +441,7 @@
           <p><b>選股規則</b>：每天收盤後，以下 ${cfg.conds.length} 個條件<b>同時</b>成立(張數單位皆為張)${cfg.exclude ? `，並排除${cfg.exclude.join('、')}` : ''}：</p>
           <ol>${cfg.conds.map(c => `<li>${c}</li>`).join('')}</ol>
           <p><b>進出場</b>：隔一個交易日<b>開盤</b>${T0.in}；${P.tp != null ? `盤中${long ? '漲' : '跌'}到 ${P.tp * 100}% 停利、${long ? '跌' : '漲'}到 ${P.sl * 100}% 停損(跳空越過則以開盤價出場，同一天兩者都碰到以停損計)；否則持有 ${P.hold} 個交易日，` : ''}${exitTxt}。同一檔股票同時只持有一筆。</p>
-          <p><b>資金分配</b>：本金 100 萬元。先算出整段期間平均一天持有幾檔(只算有部位的日子，約 ${(1 / B.cap).toFixed(1)} 檔)，每檔進場金額 = 前一天收盤總資產 × ${(B.cap * 100).toFixed(0)}%(= 1 ÷ 平均持有檔數)；同一天訊號較多、現金不夠時，改成當天的訊號<b>平分可用現金</b>，每檔金額變小但全部進場${B.nocash ? `(分到的錢不夠買一股而放棄的有 ${B.nocash.toLocaleString()} 筆)` : ''}。進場金額除以進場價(含滑價與手續費)無條件捨去到整數股，持有期間不再平衡，沒用到的資金持有現金(不計利息)。${long ? '' : '放空時視為拿出同樣金額當保證金，損益 = −股價漲跌幅 × 放空金額。'}</p>
+          <p><b>資金分配</b>：本金 100 萬元。先算出整段期間平均一天持有幾檔(只算有部位的日子，約 ${(1 / B.cap).toFixed(1)} 檔)，每檔上限 = 總資產的 ${(B.cap * 100).toFixed(0)}%(= 1 ÷ 平均持有檔數)。有新股票進場的那天<b>再平衡</b>：每檔目標金額 = 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)(含新進場的，不含當天要出場的)，開盤先把超過目標的舊部位減碼、再買新股票、最後補足低於目標的舊部位，開盤漲跌停或沒有成交的部位不調整；現金不夠時新股票平分剩下的現金，訊號全部進場${B.nocash ? `(連一股都買不起而放棄的有 ${B.nocash.toLocaleString()} 筆)` : ''}。買賣都以一股的價格(含滑價與手續費)無條件捨去到整數股；沒有新股票進場的日子不調整，沒用到的資金持有現金(不計利息)。有加減碼時，每筆報酬 = 這檔收回的錢 ÷ 投入的錢 − 1。${long ? '' : '放空時視為拿出同樣金額當保證金，損益 = −股價漲跌幅 × 放空金額。'}</p>
         </div>
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
           ${long ? '' : '<div class="paramitem"><label for="evFee">借券費(年利率，%)</label><input id="evFee" type="number" min="0" max="20" step="0.1" value="0.1"></div>'}
@@ -499,7 +499,7 @@
           <ul class="insight">
             <li>${vs0050Txt(B.d[i0 + 1], B.asof, x, S)}，${yWin} / ${rows.length} 年贏過 0050。</li>
             <li><b>持股天數</b>：${(held * 100).toFixed(0)}% 的交易日有部位，有部位時平均 ${avgPos.toFixed(1)} 檔，其餘時間持有現金。${avgPos < 3 ? '資金常常集中在一兩檔，單筆交易的好壞對淨值影響很大。' : ''}</li>
-            ${B.nocash ? `<li><b>現金不夠</b>：舊部位還占著資金、或當天訊號很多時，每檔分到的現金可能不夠買一股，這種訊號放棄，共 ${B.nocash.toLocaleString()} 筆。</li>` : ''}
+            ${B.nocash ? `<li><b>現金不夠</b>：舊部位遇到跌停賣不掉、無法減碼時，新股票分到的現金可能連一股都買不起，這種訊號放棄，共 ${B.nocash.toLocaleString()} 筆。</li>` : ''}
             <li><b>出場原因</b>：${P.tp != null ? `停利 ${by('tp')} 筆、停損 ${by('sl')} 筆、` : ''}${WHY.time} ${by('time')} 筆${by('delist') ? `、下市櫃 ${by('delist')} 筆` : ''}${open.length ? `，目前持有中 ${open.length} 筆` : ''}。</li>
             <li><b>漲跌停與沒有成交</b>：${long ? `開盤漲停買不到、延後一天買進 ${T.filter(t => t.edelay).length} 筆；` : ''}放棄的訊號：${Object.keys(SKIP_TXT).filter(sk).map(k => `${SKIP_TXT[k]} ${sk(k)} 筆`).join('、') || '沒有'}；${T0.lock}${T0.lockOut}、延後${T0.out} ${done.filter(t => t.delay).length} 筆。</li>
           </ul>
