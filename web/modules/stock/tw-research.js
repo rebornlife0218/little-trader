@@ -80,9 +80,12 @@
       return null;
     }
   }
-  // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4
+  // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png，見 drawFigs)
   function md(src) {
     const box = document.createElement('div');
+    src = src.replace(/^!\[([^\]]*)\]\(([\w.-]+\.png)\)[ 	]*$/gm, (_, cap, f) => `
+<figure class="md-fig twr-fig"><div data-fig="${esc(f)}"></div><figcaption>${esc(cap)}</figcaption></figure>
+`);
     box.innerHTML = marked.parse(src);
     box.querySelectorAll('table').forEach(t => { t.classList.add('stattable', 'md-table'); t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`; });
     const retag = (s, tagName, c) => box.querySelectorAll(s).forEach(h => { const e = document.createElement(tagName); e.className = c; e.innerHTML = h.innerHTML; h.replaceWith(e); });
@@ -91,6 +94,30 @@
     box.querySelectorAll('a').forEach(a => { if (!/^https?:/.test(a.getAttribute('href') || '')) a.replaceWith(...a.childNodes); });   // 報告內的相對連結在網站上沒有對應頁面
     return box.innerHTML;
   }
+  // 報告內的圖：figs = { 'xxx.png': el => 畫圖 }，沒有對應的圖就移除
+  function drawFigs(el, figs) {
+    el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig]; if (f) f(div); else div.parentElement.remove(); });
+  }
+  // 累積報酬(對數刻度)：lines = [{ name, nav, color, width }]，圖例接在圖的下方
+  const LOG_TICKS = [0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50];
+  function navLines(div, d, lines) {
+    const n = d.length, step = Math.max(1, Math.floor(n / 700)), idx = [];
+    for (let i = 0; i < n; i += step) idx.push(i);
+    if (idx[idx.length - 1] !== n - 1) idx.push(n - 1);
+    LTChart.line(div, { x: idx.map(i => d[i]), xType: 'date', label: '累積報酬', height: 300, xFmt: (v, tip) => tip ? v : v.slice(0, 4),
+      yFmt: v => W().pct(10 ** v - 1, 0), tipFmt: (s, v) => W().pct(10 ** v - 1, 1), yTicks: () => LOG_TICKS.map(Math.log10), refY: [{ y: 0 }],
+      series: lines.map(l => ({ name: l.name, color: l.color, width: l.width || 1.6, y: idx.map(i => Math.log10(l.nav[i])) })) });
+    div.insertAdjacentHTML('afterend', LTChart.legend(lines));
+  }
+  // 年度報酬長條：lines = [{ name, nav, color }]
+  function yearBars(div, d, lines, b0050) {
+    const rows = lines.map(l => W().yearTable(d, 0, l.nav, b0050));
+    LTChart.bars(div, { x: rows[0].map(r => r.yr), xAll: true, xFmt: v => v, label: '年度報酬', height: 240, yFmt: v => (v * 100).toFixed(0) + '%',
+      tipFmt: (s, v) => `${s.name}：${W().pct(v, 1)}`, series: lines.map((l, j) => ({ name: l.name, color: l.color, y: rows[j].map(r => r.r) })) });
+    div.insertAdjacentHTML('afterend', LTChart.legend(lines));
+  }
+  const CV = ['#94a3b8', '#B07CF0', 'var(--amber)', '#F06FB0', '#5fd0c5'];   // 市值版本：不限、Q1～Q4(Q2 用系列色)
+  const C0050 = 'var(--blue)', CEW = '#94a3b8', CS = ['var(--amber)', 'var(--up)', 'var(--down)', '#B07CF0', '#F06FB0'];
   const reportPanel = (S, src) => `
     <div class="panel">
       <h3>研究報告 ${tag(S.series)}</h3>
@@ -192,8 +219,17 @@
         main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
       $('#twrAll').innerHTML = compareTable(B.versions.flatMap(v => ['t10', 't5'].map(g => ({ name: `${v.name}｜${G[g]}`, nav: v.nav[g], ts: v.ts[g], main: v.key === ver && g === grp }))), Sx);
     }
-    LTChart.bars($('#twrDec'), { x: B.decile.map(r => 'D' + r.d), xAll: true, xFmt: v => v, label: '每筆平均報酬', height: 200, yFmt: v => (v * 100).toFixed(1) + '%',
-      tipFmt: (s, v, i) => `${W().pct(v, 2)}`, series: [{ name: '每筆平均報酬', y: B.decile.map(r => r.mean), colors: B.decile.map(r => r.mean >= 0 ? 'var(--up)' : 'var(--down)') }] });
+    const decile = div => LTChart.bars(div, { x: B.decile.map(r => 'D' + r.d), xAll: true, xFmt: v => v, label: '每筆平均報酬', height: 200, yFmt: v => (v * 100).toFixed(1) + '%',
+      tipFmt: (s, v) => `${W().pct(v, 2)}`, series: [{ name: '每筆平均報酬', y: B.decile.map(r => r.mean), colors: B.decile.map(r => r.mean >= 0 ? 'var(--up)' : 'var(--down)') }] });
+    decile($('#twrDec'));
+    const V0 = B.versions[0];
+    drawFigs(el, {
+      'cum_return.png': div => navLines(div, B.d, [{ name: '前 10 檔', nav: V0.nav.t10, color: CS[0], width: 2.2 }, { name: '前 5 檔', nav: V0.nav.t5, color: CS[1] },
+        { name: '全部合格股票', nav: V0.nav.ew, color: CEW }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]),
+      'score_decile.png': decile,
+      'compare_versions.png': div => navLines(div, B.d, [...B.versions.map((v, i) => ({ name: `${v.name}｜前 10 檔`, nav: v.nav.t10, color: CV[i], width: v.key === 'q2' ? 2.2 : 1.5 })),
+        { name: '0050 買進持有', nav: B.b0050, color: C0050 }]),
+    });
     el.querySelector('.twr-ver').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { ver = b.dataset.v; draw(); } };
     $('#twrGrp').onchange = () => { grp = $('#twrGrp').value; draw(); };
     $('#twrScale').onchange = draw;
@@ -243,6 +279,13 @@
         yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: s.name, nav: s.nav, ts: s.ts, main: s.key === k })), Sx);
     }
+    const sk = n => B.strats.find(s => s.key === n);
+    drawFigs(el, {
+      'cum_return.png': div => navLines(div, B.d, [{ name: '日內｜全部', nav: sk('日內｜全部').nav, color: CS[0], width: 2.2 }, { name: 'T+1｜全部', nav: sk('T+1｜全部').nav, color: CS[1] },
+        { name: '日內｜均額 ≥ 1 千萬', nav: sk('日內｜均額 ≥ 1 千萬').nav, color: CS[3] }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]),
+      'yearly_return.png': div => yearBars(div, B.d, [{ name: '日內｜全部', nav: sk('日內｜全部').nav, color: CS[0] }, { name: 'T+1｜全部', nav: sk('T+1｜全部').nav, color: CS[1] },
+        { name: '0050', nav: B.b0050, color: C0050 }], B.b0050),
+    });
     $('#twrS').onchange = () => { k = $('#twrS').value; draw(); };
     $('#twrScale').onchange = draw;
     draw();
@@ -312,15 +355,24 @@
     // 事件研究：衰退組用綠色系(越深衰退越多)，成長組用紅色系(越深成長越多)，台股慣例紅漲綠跌
     const CAR_C = ['#0f6b3c', '#14965A', '#2ECC71', '#8be0ad', '#f5a3a5', '#F0565B', '#D92D33', '#8f1d21'];
     const cs = Object.keys(B.car.series);
-    LTChart.line($('#twrCar'), { x: B.car.x, xType: 'num', label: '累積超額報酬', height: 280, xFmt: v => (v > 0 ? '+' : '') + v, yFmt: v => v.toFixed(1) + '%',
+    const carChart = div => LTChart.line(div, { x: B.car.x, xType: 'num', label: '累積超額報酬', height: 280, xFmt: v => (v > 0 ? '+' : '') + v, yFmt: v => v.toFixed(1) + '%',
       tipFmt: (s, v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%', refX: [{ x: 0, label: 'T0 公告日' }], refY: [{ y: 0 }],
       series: cs.map((c, i) => ({ name: c, y: B.car.series[c], color: CAR_C[i], width: 1.8 })) });
-    $('#twrCarLegend').innerHTML = LTChart.legend(cs.map((c, i) => ({ name: c, color: CAR_C[i] })));
+    const carLegend = LTChart.legend(cs.map((c, i) => ({ name: c, color: CAR_C[i] })));
+    carChart($('#twrCar')); $('#twrCarLegend').innerHTML = carLegend;
     const ic = B.ic.slice().sort((a, b) => Math.abs(b.h['5日']) - Math.abs(a.h['5日']));
     const tCell = v => { const c = v >= 0 ? 'var(--up)' : 'var(--down)', a = Math.min(50, Math.abs(v) * 3.5);
       return `<td style="background:color-mix(in srgb, ${c} ${a.toFixed(0)}%, transparent)${Math.abs(v) > 2 ? ';font-weight:700' : ''}">${v.toFixed(1)}</td>`; };
-    $('#twrIc').innerHTML = `<div class="tablewrap"><table class="stattable"><thead><tr><th style="text-align:left">特徵</th>${HS.map(x => `<th>${esc(HN[x] || x)}</th>`).join('')}</tr></thead><tbody>
+    const icTable = `<div class="tablewrap"><table class="stattable"><thead><tr><th style="text-align:left">特徵</th>${HS.map(x => `<th>${esc(HN[x] || x)}</th>`).join('')}</tr></thead><tbody>
       ${ic.map(r => `<tr><td style="text-align:left">${esc(FN[r.f] || r.f)}</td>${HS.map(x => tCell(r.h[x])).join('')}</tr>`).join('')}</tbody></table></div>`;
+    $('#twrIc').innerHTML = icTable;
+    const sg = (hh, gg) => B.strats.find(x => x.h === hh && x.g === gg).nav;
+    drawFigs(el, {
+      'event_car.png': div => { carChart(div); div.insertAdjacentHTML('afterend', carLegend); },
+      'feature_ic.png': div => { div.innerHTML = icTable; },
+      'strategy_return.png': div => navLines(div, B.d, [{ name: '5 日｜分數 = 3', nav: sg('5日', '分數 = 3'), color: CS[0], width: 2.2 }, { name: '5 日｜分數 >= 2', nav: sg('5日', '分數 >= 2'), color: CS[3] },
+        { name: '5 日｜全部事件', nav: sg('5日', '全部事件'), color: CS[1] }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]),
+    });
     $('#twrH').value = h; $('#twrG').value = g;
     $('#twrH').onchange = () => { h = $('#twrH').value; draw(); };
     $('#twrG').onchange = () => { g = $('#twrG').value; draw(); };
