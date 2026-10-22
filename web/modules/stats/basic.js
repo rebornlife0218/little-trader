@@ -416,40 +416,31 @@
   const CLT_DISTS = {
     dice: { name: '骰子點數(1～6 等機率)', draw: () => 1 + Math.floor(Math.random() * 6), pmf: [1, 2, 3, 4, 5, 6].map(v => [v, 1 / 6]),
       m: 3.5, s: Math.sqrt(35 / 12), skew: 0, lo: 0.5, hi: 6.5, note: '對稱、沒有極端值' },
-    unif: { name: '均勻 U(0, 1)', draw: Math.random, pdf: x => (x >= 0 && x <= 1 ? 1 : 0), m: 0.5, s: Math.sqrt(1 / 12), skew: 0, lo: -0.1, hi: 1.1, note: '對稱、沒有極端值' },
-    arc: { name: 'U 形 Beta(0.5, 0.5)', draw: () => Math.sin(Math.random() * Math.PI / 2) ** 2, pdf: x => (x > 0 && x < 1 ? 1 / (Math.PI * Math.sqrt(x * (1 - x))) : 0),
-      m: 0.5, s: Math.sqrt(1 / 8), skew: 0, lo: 0, hi: 1, note: '兩端多、中間少，但對稱' },
-    exp: { name: '指數 Exp(1)', draw: () => -Math.log(1 - Math.random()), pdf: x => (x >= 0 ? Math.exp(-x) : 0), m: 1, s: 1, skew: 2, lo: 0, hi: 6, note: '右偏(等待時間)' },
-    bern: { name: '伯努利 p = 0.1', draw: () => (Math.random() < 0.1 ? 1 : 0), pmf: [[0, 0.9], [1, 0.1]], m: 0.1, s: 0.3, skew: 0.8 / 0.3, lo: -0.5, hi: 1.5,
-      note: '很偏(例如勝率 10% 的交易是否獲利)' },
-    lnorm: { name: '對數常態(σ = 1)', draw: () => Math.exp(gauss()), pdf: x => (x > 0 ? Math.exp(-(Math.log(x) ** 2) / 2) / (x * Math.sqrt(2 * Math.PI)) : 0),
+    exp: { name: '指數分配 Exp(1)', draw: () => -Math.log(1 - Math.random()), pdf: x => (x >= 0 ? Math.exp(-x) : 0), m: 1, s: 1, skew: 2, lo: 0, hi: 6, note: '右偏(等待時間)' },
+    lnorm: { name: '對數常態分配(σ = 1)', draw: () => Math.exp(gauss()), pdf: x => (x > 0 ? Math.exp(-(Math.log(x) ** 2) / 2) / (x * Math.sqrt(2 * Math.PI)) : 0),
       m: Math.exp(0.5), s: Math.sqrt((Math.E - 1) * Math.E), skew: (Math.E + 2) * Math.sqrt(Math.E - 1), lo: 0, hi: 8, note: '嚴重右偏、長右尾(像所得、股價)' },
-    cauchy: { name: '柯西 Cauchy(0, 1)', draw: () => Math.tan(Math.PI * (Math.random() - 0.5)), pdf: x => 1 / (Math.PI * (1 + x * x)),
-      m: NaN, mid: 0, s: NaN, skew: NaN, lo: -8, hi: 8, note: '平均數、變異數都不存在：中央極限定理的反例' },
   };
-  // 原分配圖：離散畫長條、連續畫密度曲線；橘色虛線是平均數(柯西為中位數)
+  const CLT_N = [5, 30, 100], CLT_REPS = 10000;   // 每次抽幾個取平均、固定模擬次數
+  // 原分配圖：離散畫長條、連續畫密度曲線；橘色虛線是平均數
   function distSVG(d) {
     const W = 640, H = 170, padL = 8, padB = 22, top = 22, X = x => padL + (x - d.lo) / (d.hi - d.lo) * (W - padL * 2);
-    let g, maxY;
+    let g;
     if (d.pmf) {
-      maxY = Math.max(...d.pmf.map(p => p[1]));
+      const maxY = Math.max(...d.pmf.map(p => p[1]));
       const Y = p => H - padB - (H - padB - top) * p / maxY, bw = Math.min(60, (W - padL * 2) / (d.hi - d.lo) * 0.5);
       g = d.pmf.map(([v, p]) => `<rect x="${X(v) - bw / 2}" y="${Y(p)}" width="${bw}" height="${H - padB - Y(p)}" fill="var(--ma20)" opacity=".75"/>
-        <text x="${X(v)}" y="${Y(p) - 4}" font-size="10" text-anchor="middle" fill="var(--text)">${(p * 100).toFixed(p < 0.2 ? 1 : 0)}%</text>`).join('');
+        <text x="${X(v)}" y="${Y(p) - 4}" font-size="10" text-anchor="middle" fill="var(--text)">${(p * 100).toFixed(1)}%</text>`).join('');
     } else {
-      const xs = Array.from({ length: 241 }, (_, k) => d.lo + (d.hi - d.lo) * k / 240), ys = xs.map(d.pdf);
-      maxY = Math.min(Math.max(...ys), d.key === 'arc' ? 2.5 : Infinity);
-      const Y = p => H - padB - (H - padB - top) * Math.min(p, maxY) / maxY;
-      g = `<polygon points="${X(d.lo)},${H - padB} ${xs.map((x, k) => `${X(x)},${Y(ys[k])}`).join(' ')} ${X(d.hi)},${H - padB}" fill="var(--ma20)" opacity=".35"/>
-        <polyline points="${xs.map((x, k) => `${X(x)},${Y(ys[k])}`).join(' ')}" fill="none" stroke="var(--ma20)" stroke-width="2"/>`;
+      const xs = Array.from({ length: 241 }, (_, k) => d.lo + (d.hi - d.lo) * k / 240), ys = xs.map(d.pdf), maxY = Math.max(...ys);
+      const Y = p => H - padB - (H - padB - top) * p / maxY, line = xs.map((x, k) => `${X(x)},${Y(ys[k])}`).join(' ');
+      g = `<polygon points="${X(d.lo)},${H - padB} ${line} ${X(d.hi)},${H - padB}" fill="var(--ma20)" opacity=".35"/>
+        <polyline points="${line}" fill="none" stroke="var(--ma20)" stroke-width="2"/>`;
     }
-    const c = Number.isFinite(d.m) ? d.m : d.mid;   // 柯西沒有平均數，畫中位數
-    g += `<line x1="${X(c)}" x2="${X(c)}" y1="${top}" y2="${H - padB}" stroke="var(--amber)" stroke-dasharray="4 3"/>`;
+    g += `<line x1="${X(d.m)}" x2="${X(d.m)}" y1="${top}" y2="${H - padB}" stroke="var(--amber)" stroke-dasharray="4 3"/>`;
     const ticks = d.pmf ? d.pmf.map(p => p[0]) : Array.from({ length: 7 }, (_, k) => d.lo + (d.hi - d.lo) * k / 6);
     g += ticks.map(x => `<text x="${X(x)}" y="${H - 6}" font-size="10" text-anchor="middle" fill="var(--mute)">${+x.toFixed(2)}</text>`).join('');
     return `<svg viewBox="0 0 ${W} ${H}" class="chart-svg" role="img" aria-label="母體分配">${g}</svg>`;
   }
-  Object.entries(CLT_DISTS).forEach(([k, d]) => { d.key = k; });
   const DEMOS = {
     dice: {
       html: `<h3>互動模擬 · 擲骰子</h3>
@@ -463,10 +454,10 @@
     },
     clt: {
       html: `<h3>互動模擬 · 中央極限定理(從不同母體抽樣取平均)</h3>
-        <div class="btnrow-l">母體 <select id="cltD" onchange="LTStat.clt(0)">${Object.entries(CLT_DISTS).map(([k, d]) => `<option value="${k}">${d.name}</option>`).join('')}</select>
-          每次抽 <select id="cltN" onchange="LTStat.clt(0)">${[1, 2, 5, 10, 30, 100].map(n => `<option${n === 5 ? ' selected' : ''}>${n}</option>`).join('')}</select> 個取平均</div>
+        <div class="btnrow-l">母體 <select id="cltD" onchange="LTStat.clt()">${Object.entries(CLT_DISTS).map(([k, d]) => `<option value="${k}">${d.name}</option>`).join('')}</select>
+          每次抽 <select id="cltN" onchange="LTStat.clt()">${CLT_N.map(n => `<option>${n}</option>`).join('')}</select> 個取平均
+          <button onclick="LTStat.clt()">重新模擬</button></div>
         <div id="cltPop" style="margin-top:10px;"></div>
-        <div class="btnrow-l" style="margin-top:10px;">重複 <button onclick="LTStat.clt(100)">100 次</button><button onclick="LTStat.clt(1000)">1000 次</button><button onclick="LTStat.clt(10000)">10000 次</button><button onclick="LTStat.clt(0)">重來</button></div>
         <div id="cltOut" style="margin-top:10px;"></div>`,
     },
   };
@@ -477,7 +468,6 @@
   const coinSVG = (h, size = 40) => `<svg width="${size}" height="${size}" viewBox="0 0 40 40" role="img" aria-label="${h ? '正面' : '反面'}"><circle cx="20" cy="20" r="18" fill="${h ? 'var(--amber)' : 'var(--dim)'}" stroke="var(--border-strong)" stroke-width="1.5"/><circle cx="20" cy="20" r="14" fill="none" stroke="var(--panel)" stroke-width="1" opacity=".6"/><text x="20" y="25.5" font-size="15" font-weight="700" text-anchor="middle" fill="var(--panel)">${h ? '正' : '反'}</text></svg>`;
   let diceRolls = [];
   let coinFlips = [];
-  let cltMeans = [];
   window.LTStat = {
     dice(k) {
       if (k === 0) diceRolls = []; else for (let i = 0; i < k; i++) diceRolls.push(1 + Math.floor(Math.random() * 6));
@@ -512,38 +502,31 @@
         <svg viewBox="0 0 ${W} ${H}" class="chart-svg">${bars}<line x1="0" x2="${W}" y1="${y(n / 2)}" y2="${y(n / 2)}" stroke="var(--blue)" stroke-dasharray="4 3"/></svg>
         <div class="note">上方顯示這次擲出的錢幣(最多 12 枚，最右邊較大的是最新一枚)。長條為正面、反面出現的次數，藍色虛線為期望次數 n × 1/2 = ${(n / 2).toFixed(1)}。擲越多次，兩邊的比例越接近各 50%(大數法則)。</div>`;
     },
-    // 中央極限定理：換母體或樣本數 n 時自動重來；上方是母體分配，下方是樣本平均數的直方圖＋理論常態曲線 N(μ, σ²/n)
-    clt(k) {
+    // 中央極限定理：每次抽 n 個取平均、固定模擬 CLT_REPS 次；上方是母體分配，下方是樣本平均數的直方圖＋理論常態曲線 N(μ, σ²/n)
+    clt() {
       const dEl = document.getElementById('cltD'), pop = document.getElementById('cltPop'), el = document.getElementById('cltOut');
       if (!dEl || !el) return;
-      const d = CLT_DISTS[dEl.value], n = +document.getElementById('cltN').value, fin = Number.isFinite(d.s);
-      if (k === 0) cltMeans = []; else for (let i = 0; i < k; i++) { let sum = 0; for (let j = 0; j < n; j++) sum += d.draw(); cltMeans.push(sum / n); }
-      const f = (v, nd = 3) => (Number.isFinite(v) ? v.toFixed(nd) : '不存在');
+      const d = CLT_DISTS[dEl.value], n = +document.getElementById('cltN').value;
+      const means = []; for (let i = 0; i < CLT_REPS; i++) { let sum = 0; for (let j = 0; j < n; j++) sum += d.draw(); means.push(sum / n); }
       const skewN = d.skew / Math.sqrt(n), need = Math.max(1, Math.ceil((d.skew / 0.2) ** 2));
-      pop.innerHTML = `<div><b>母體：${d.name}</b>(${d.note})　平均數 μ = ${f(d.m)}、標準差 σ = ${f(d.s)}、偏態 = ${f(d.skew, 2)}</div>
+      pop.innerHTML = `<div><b>母體：${d.name}</b>(${d.note})　平均數 μ = ${d.m.toFixed(3)}、標準差 σ = ${d.s.toFixed(3)}、偏態 = ${d.skew.toFixed(2)}</div>
         ${distSVG(d)}
-        <div class="note">${fin
-          ? `樣本平均數的平均數 = μ、標準差 = σ ÷ √n、偏態 = 母體偏態 ÷ √n。每次抽 ${n} 個時，平均數的偏態約 ${skewN.toFixed(2)}；${d.skew
-            ? `粗略以偏態 < 0.2 視為接近常態，這個母體大約要 n ≥ ${need.toLocaleString()}(偏態越大，需要的 n 越多)。`
-            : '母體對稱，n 很小就接近常態。'}`
-          : '柯西分配的平均數與變異數都不存在：不論 n 多大，n 個樣本的平均數仍然是同一個柯西分配，不會接近常態。'}</div>`;
-      if (!cltMeans.length) { el.innerHTML = '<span class="mute">按「重複」開始抽樣</span>'; return; }
-      const N = cltMeans.length, se = d.s / Math.sqrt(n);
+        <div class="note">樣本平均數的平均數 = μ、標準差 = σ ÷ √n、偏態 = 母體偏態 ÷ √n。每次抽 ${n} 個時，平均數的偏態約 ${skewN.toFixed(2)}；${d.skew
+          ? `粗略以偏態 < 0.2 視為接近常態，這個母體大約要 n ≥ ${need.toLocaleString()}(偏態越大，需要的 n 越多)。`
+          : '母體對稱，n 很小就接近常態。'}</div>`;
+      const se = d.s / Math.sqrt(n);
       let lo, hi, step;
-      if (!fin) { lo = -8; step = 16 / 48; hi = 8; }
-      else if (d.pmf && n * 8 * se <= 60) { step = 1 / n; lo = Math.floor((d.m - 4 * se) * n) / n - step / 2; hi = Math.ceil((d.m + 4 * se) * n) / n + step / 2; }   // 離散：每個可能的平均數一根長條
+      if (d.pmf && n * 8 * se <= 60) { step = 1 / n; lo = Math.floor((d.m - 4 * se) * n) / n - step / 2; hi = Math.ceil((d.m + 4 * se) * n) / n + step / 2; }   // 離散：每個可能的平均數一根長條
       else { lo = d.m - 4 * se; hi = d.m + 4 * se; step = (hi - lo) / 48; }
-      const m = mean(cltMeans), s = N > 1 ? sd(cltMeans) : NaN;
-      const sk = N > 2 ? cltMeans.reduce((a, v) => a + ((v - m) / s) ** 3, 0) / N : NaN;
-      const z = fin ? cltMeans.map(v => (v - d.m) / se) : [];
-      const up = z.filter(v => v > 1.96).length / N, dn = z.filter(v => v < -1.96).length / N;
-      const out = cltMeans.filter(v => v < lo || v >= hi).length;
+      const m = mean(means), s = sd(means), sk = means.reduce((a, v) => a + ((v - m) / s) ** 3, 0) / CLT_REPS;
+      const z = means.map(v => (v - d.m) / se);
+      const up = z.filter(v => v > 1.96).length / CLT_REPS, dn = z.filter(v => v < -1.96).length / CLT_REPS;
+      const out = means.filter(v => v < lo || v >= hi).length;
       const pct = v => (v * 100).toFixed(1) + '%';
-      el.innerHTML = `<div>已模擬 <b>${N.toLocaleString()}</b> 次(每次 ${n} 個取平均)　平均數的平均 <b>${f(m)}</b>(理論 ${f(d.m)})、標準差 <b>${f(s)}</b>(理論 ${f(se)})、偏態 <b>${f(sk, 2)}</b>(理論 ${f(skewN, 2)})</div>
-        ${fin ? `<div>標準化後超出 ±1.96 的比例：右尾 <b>${pct(up)}</b>、左尾 <b>${pct(dn)}</b>(常態各 2.5%)</div>` : ''}
-        ${histogramSVG(cltMeans, { lo, hi: hi + 1e-9, step, normal: fin ? { m: d.m, s: se } : null, tick: x => +x.toFixed(2) })}
-        <div class="note">藍色長條是樣本平均數的分布${fin ? '，橘色曲線是中央極限定理給的常態近似 N(μ, σ²/n)：長條越貼近曲線、兩尾越接近各 2.5%，代表越接近常態' : ''}。${out ? `有 ${out.toLocaleString()} 次(${pct(out / N)})落在圖的範圍外。` : ''}
-          ${d.pmf && n <= 2 ? '離散母體在 n 小時，平均數只有少數幾個可能值，長條之間會有空隙。' : ''}換母體或 n 會自動重來。</div>`;
+      el.innerHTML = `<div>模擬 <b>${CLT_REPS.toLocaleString()}</b> 次(每次抽 ${n} 個取平均)　平均數的平均 <b>${m.toFixed(3)}</b>(理論 ${d.m.toFixed(3)})、標準差 <b>${s.toFixed(3)}</b>(理論 ${se.toFixed(3)})、偏態 <b>${sk.toFixed(2)}</b>(理論 ${skewN.toFixed(2)})</div>
+        <div>標準化後超出 ±1.96 的比例：右尾 <b>${pct(up)}</b>、左尾 <b>${pct(dn)}</b>(常態各 2.5%)</div>
+        ${histogramSVG(means, { lo, hi: hi + 1e-9, step, normal: { m: d.m, s: se }, tick: x => +x.toFixed(2) })}
+        <div class="note">藍色長條是 ${CLT_REPS.toLocaleString()} 個樣本平均數的分布，橘色曲線是中央極限定理給的常態近似 N(μ, σ²/n)：長條越貼近曲線、兩尾越接近各 2.5%，代表越接近常態。${out ? `有 ${out.toLocaleString()} 次(${pct(out / CLT_REPS)})落在圖的範圍外。` : ''}換母體或 n 會自動重新模擬。</div>`;
     },
   };
 
@@ -590,7 +573,7 @@
       const demos = [].concat(ch.demo || []);
       if (demos.includes('dice')) diceRolls = [];
       if (demos.includes('coin')) coinFlips = [];
-      if (demos.includes('clt')) { cltMeans = []; window.LTStat.clt(0); }
+      if (demos.includes('clt')) window.LTStat.clt();
       if (ch.md) {
         const box = document.getElementById('chapBody');
         try {
@@ -606,7 +589,7 @@
               d.innerHTML = DEMOS[name].html;
               if (name === 'dice') diceRolls = [];
               if (name === 'coin') coinFlips = [];
-              if (name === 'clt') { cltMeans = []; window.LTStat.clt(0); }
+              if (name === 'clt') window.LTStat.clt();
             } else d.textContent = `找不到互動動畫：${name}`;
           });
           scrollToSec(box, decodeURIComponent(location.hash.split('/')[4] || ''));
