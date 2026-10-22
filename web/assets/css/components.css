@@ -440,6 +440,8 @@
   details.pk-more{margin-top:10px;}
   details.pk-more summary{cursor:pointer;color:var(--amber);font-size:13px;font-weight:600;}
   table.pk-kind td:first-child{white-space:nowrap;}
+  table.pk-kind td.pk-ex{text-align:left;white-space:normal;min-width:150px;}
+  table.pk-kind td.pk-note{text-align:left;white-space:normal;min-width:280px;font-family:'Inter',sans-serif;line-height:1.6;}
   /* 機率模型關係圖(modules/stats/demos.js 的 dist-map) */
   .dm-wrap{overflow-x:auto;}
   .dm-svg{width:100%;min-width:720px;height:auto;display:block;}

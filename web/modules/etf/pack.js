@@ -300,7 +300,7 @@
         <div class="pk-pane" data-pane="intro">
           <div class="panel doc">
             <h3>什麼是 ETF</h3>
-            <p><b>ETF</b>(Exchange Traded Fund，指數股票型基金)是把一籃子股票或債券包成一檔基金，在證券交易所掛牌，可以像股票一樣隨時買賣。大多數 ETF 是<b>被動追蹤指數</b>：例如 0050 追蹤「臺灣 50 指數」，買一張 0050 就等於同時持有台灣市值最大的 50 家公司。</p>
+            <p><b>ETF</b>(Exchange Traded Fund，指數股票型基金)是把一籃子股票或債券包成一檔基金，在證券交易所掛牌，可以像股票一樣隨時買賣。</p>
             <ul>
               <li><b>分散風險</b>：一次買進很多檔股票，單一公司出問題的影響較小。</li>
               <li><b>成本低</b>：被動追蹤指數，管理費通常比主動型基金低；交易稅也比個股低(下方說明)。</li>
@@ -309,41 +309,29 @@
             </ul>
           </div>
           <div class="panel">
-            <h3>常見種類</h3>
-            <div class="tablewrap"><table class="stattable pk-kind">
-              <thead><tr><th>種類</th><th>例子</th><th>特色</th><th>要注意</th></tr></thead>
-              <tbody>
-                <tr><td>市值型</td><td>0050、006208</td><td style="text-align:left">依市值挑選大型股，跟著大盤走，最適合長期持有、定期定額</td><td style="text-align:left">台股權值集中在少數大型股(如台積電)，產業集中度高</td></tr>
-                <tr><td>高股息</td><td>0056、00878、00713、00919、00929、00918、00939、00940</td><td style="text-align:left">挑選殖利率高的股票，配息較多、部分月配或季配</td><td style="text-align:left">配息不等於多賺(見下方總報酬)；選股規則、換股頻率各檔差異大</td></tr>
-                <tr><td>債券型</td><td>美國公債、投資等級公司債 ETF</td><td style="text-align:left">價格波動通常比股票小，與股市的相關性較低，可用來平衡資產</td><td style="text-align:left">利率上升時債券價格下跌，長天期債券波動並不小</td></tr>
-                <tr><td>主題／產業型</td><td>半導體、電動車、創新科技(如美股 ARKK)</td><td style="text-align:left">集中投資某個產業或題材</td><td style="text-align:left">題材熱門時容易追高，產業集中、波動大(見「怎麼存ETF」的 ARKK 研究)</td></tr>
-                <tr><td>槓桿／反向</td><td>台灣50正2、台灣50反1</td><td style="text-align:left">追蹤指數單日漲跌的 2 倍或反向，適合短線操作</td><td style="text-align:left">每日重新平衡，長期持有的報酬不等於指數的 2 倍或 −1 倍，盤整時會耗損</td></tr>
-              </tbody>
-            </table></div>
-          </div>
-          <div class="panel">
-            <h3>台股 ETF 的分類</h3>
+            <h3>ETF 的種類與分類</h3>
             <div class="doc">
-              <p>台股 ETF 可以從三個角度分類：<b>管理方式</b>(被動或主動)、<b>投資標的</b>(股票、債券、期貨、槓桿反向、股債平衡)、<b>成分證券在國內或國外</b>。證券代號的第六碼(尾碼)就能看出前兩項：</p>
+              <p>台股 ETF 可以從三個角度分類：<b>管理方式</b>(被動或主動)、<b>投資標的</b>(股票、債券、期貨、槓桿反向、股債平衡)、<b>成分證券在國內或國外</b>。證券代號的第六碼(尾碼)就能看出前兩項；股票型再依指數的選股規則分成市值型、高股息、主題／產業等：</p>
             </div>
             <div class="tablewrap"><table class="stattable pk-kind">
-              <thead><tr><th>管理方式</th><th>類型</th><th>代號尾碼(台幣 / 外幣)</th><th>例子</th></tr></thead>
+              <thead><tr><th>管理方式</th><th>類型</th><th>代號尾碼(台幣 / 外幣)</th><th>例子</th><th>特色與要注意</th></tr></thead>
               <tbody>
-                <tr><td rowspan="6" class="pk-mgmt">被動式<br><small class="mute">追蹤指數</small></td><td class="pk-type">股票型</td><td>全數字 / K</td><td style="text-align:left">0050、0056、00878；00625K</td></tr>
-                <tr><td class="pk-type">債券型</td><td>B / C</td><td style="text-align:left">00679B；00687C</td></tr>
-                <tr><td class="pk-type">槓桿型</td><td>L</td><td style="text-align:left">00631L</td></tr>
-                <tr><td class="pk-type">反向型</td><td>R</td><td style="text-align:left">00632R</td></tr>
-                <tr><td class="pk-type">期貨型</td><td>U</td><td style="text-align:left">00635U</td></tr>
-                <tr><td class="pk-type">平衡型(股債多資產)</td><td>T</td><td style="text-align:left">00980T</td></tr>
-                <tr><td rowspan="2" class="pk-mgmt">主動式<br><small class="mute">經理人選股</small></td><td class="pk-type">股票型</td><td>A</td><td style="text-align:left">00981A</td></tr>
-                <tr><td class="pk-type">債券型</td><td>D</td><td style="text-align:left">00980D</td></tr>
+                <tr><td rowspan="8" class="pk-mgmt">被動式<br><small class="mute">追蹤指數</small></td><td class="pk-type">股票型｜市值型</td><td>全數字 / K</td><td class="pk-ex">0050、006208</td><td class="pk-note">依市值挑選大型股，跟著大盤走，最適合長期持有、定期定額；台股權值集中在少數大型股(如台積電)，產業集中度高</td></tr>
+                <tr><td class="pk-type">股票型｜高股息</td><td>全數字</td><td class="pk-ex">0056、00878、00713、00919、00929、00918、00939、00940</td><td class="pk-note">挑選殖利率高的股票，配息較多、部分月配或季配；配息不等於多賺(見下方「配息與總報酬」)，選股規則、換股頻率各檔差異大</td></tr>
+                <tr><td class="pk-type">股票型｜主題、產業、因子</td><td>全數字 / K</td><td class="pk-ex">半導體、AI、ESG、低波動；00625K(國外成分)</td><td class="pk-note">集中投資某個產業、題材或因子；題材熱門時容易追高，產業集中、波動大(見「怎麼存ETF」的 ARKK 研究)</td></tr>
+                <tr><td class="pk-type">債券型</td><td>B / C</td><td class="pk-ex">00679B；00687C</td><td class="pk-note">價格波動通常比股票小，與股市的相關性較低，可用來平衡資產；利率上升時債券價格下跌，長天期債券波動並不小。交易稅目前為 0(見下方「持有 ETF 的成本」)</td></tr>
+                <tr><td class="pk-type">槓桿型</td><td>L</td><td class="pk-ex">00631L(台灣50正2)</td><td class="pk-note" rowspan="2">追蹤指數單日漲跌的 2 倍或反向，適合短線操作；每日重新平衡，長期持有的報酬不等於指數的 2 倍或 −1 倍，盤整時會耗損</td></tr>
+                <tr><td class="pk-type">反向型</td><td>R</td><td class="pk-ex">00632R(台灣50反1)</td></tr>
+                <tr><td class="pk-type">期貨型</td><td>U</td><td class="pk-ex">00635U</td><td class="pk-note">用期貨追蹤商品或指數；有轉倉成本，期貨價格與現貨會有價差</td></tr>
+                <tr><td class="pk-type">平衡型(股債多資產)</td><td>T</td><td class="pk-ex">00980T</td><td class="pk-note">同時持有股票、債券等多種資產</td></tr>
+                <tr><td rowspan="2" class="pk-mgmt">主動式<br><small class="mute">經理人選股</small></td><td class="pk-type">股票型</td><td>A</td><td class="pk-ex">00981A</td><td class="pk-note" rowspan="2">經理人主動選股或選債、目標是打敗指數；費用通常較高，持股會揭露但可能隨時調整(見「ETF研究」的主動式 ETF 跟單)</td></tr>
+                <tr><td class="pk-type">債券型</td><td>D</td><td class="pk-ex">00980D</td></tr>
               </tbody>
             </table></div>
             <div class="doc" style="margin-top:12px;">
               <ul>
-                <li><b>被動式 vs 主動式</b>：被動式 ETF 依指數規則持股，費用較低；主動式 ETF 由經理人選股、目標是打敗指數，費用通常較高，持股也會揭露但可能隨時調整。</li>
+                <li><b>被動式 vs 主動式</b>：被動式 ETF 依指數規則持股，費用較低；主動式 ETF 由經理人選股、目標是打敗指數，費用通常較高。</li>
                 <li><b>國內成分 vs 國外成分</b>：尾碼看不出來，要看追蹤的指數或投資範圍。國外成分 ETF(例如美國股票、美國公債)多了<b>匯率風險</b>與時差，淨值以國外收盤計算，台股盤中的價格比較容易出現折溢價。</li>
-                <li><b>股票型再細分</b>(依指數的選股策略)：市值型、高股息、ESG、產業/主題(半導體、AI)、因子(低波動、品質)等。</li>
                 <li><b>風險由低到高</b>(證交所投資人教育的排列)：一般台股 ETF → 海外股債 ETF(跨市場、匯率) → 期貨 ETF(期現貨價差、轉倉風險) → 槓桿/反向 ETF(長期報酬偏離倍數，限制較多)。期貨與槓反 ETF 屬於需要簽署風險預告書的商品。</li>
               </ul>
               <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.twse.com.tw/zh/products/securities/etf/products/li.html" target="_blank" rel="noopener">臺灣證券交易所 · 槓桿型及反向型ETF</a>；尾碼分類整理自<a href="https://tw.stock.yahoo.com/news/00980a%E3%80%8100980d%E3%80%8100980t%E4%B8%8D%E4%B8%80%E6%A8%A3%EF%BC%9F%E7%9C%8B%E6%87%8213%E7%A8%AEetf%E5%B0%BE%E7%A2%BC-%E5%BF%AB%E9%80%9F%E8%BE%A8%E8%AD%98%E6%8A%95%E8%B3%87%E9%A1%9E%E5%9E%8B-034928443.html" target="_blank" rel="noopener">Yahoo股市(2025-08-07，依證交所分類)</a>。新類型持續推出，以證交所公告為準。</p>
@@ -371,7 +359,7 @@
             <h3>持有 ETF 的成本</h3>
             <ul>
               <li><b>內扣費用</b>：經理費、保管費等直接從基金資產扣除，反映在淨值裡，不會另外收費。費用率每年差 0.3%，存 20 年後的差距就很明顯，同樣追蹤臺灣 50 指數的 0050 與 006208 就常被拿來比較費用。</li>
-              <li><b>交易成本</b>：買賣時的券商手續費(上限 0.1425%，通常有折扣)；賣出時的證券交易稅，股票型 ETF 為 0.1%，比個股的 0.3% 低。</li>
+              <li><b>交易成本</b>：買賣時的券商手續費(上限 0.1425%，通常有折扣)；賣出時的證券交易稅，股票型 ETF 為 0.1%，比個股的 0.3% 低。<b>債券型 ETF</b>(被動式，尾碼 B、C)目前停徵證券交易稅，交易稅為 0；但<b>主動式債券 ETF</b>(尾碼 D)不適用停徵，賣出時仍要繳 0.1%。</li>
               <li><b>追蹤誤差</b>：ETF 的報酬與指數的差距，來自費用、現金部位、換股時點等，越小越好。</li>
             </ul>
           </div>
