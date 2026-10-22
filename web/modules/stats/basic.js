@@ -173,6 +173,17 @@
     const retag = (sel, tag, cls) => box.querySelectorAll(sel).forEach(h => { const e = document.createElement(tag); e.className = cls; e.innerHTML = h.innerHTML; h.replaceWith(e); });
     retag('h3', 'h4', 'md-h3');
     retag('h2', 'h3', 'md-h2');
+    // 標題最後寫 [重點]：整節(到下一個同級或更大的標題為止)用重點框標出
+    box.querySelectorAll('h3.md-h2, h4.md-h3').forEach(h => {
+      if (!/\s*\[重點\]\s*$/.test(h.innerHTML)) return;
+      h.innerHTML = h.innerHTML.replace(/\s*\[重點\]\s*$/, '');
+      h.classList.add('md-key-h');
+      const sec = document.createElement('section');
+      sec.className = 'md-key';
+      h.before(sec);
+      const stop = h.tagName === 'H4' ? 'H3,H4' : 'H3';
+      for (let n = h; n && !(n !== h && n.nodeType === 1 && stop.split(',').includes(n.tagName));) { const next = n.nextSibling; sec.append(n); n = next; }
+    });
     crossLinks(box, +name.replace(/\D/g, ''));
     return box.innerHTML;
   }

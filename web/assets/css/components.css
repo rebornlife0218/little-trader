@@ -284,6 +284,12 @@
   .doc #chapBody > h3.md-h2:first-child{margin-top:4px;}
   .doc h4.md-h3{font-size:15px;margin:22px 0 8px;color:var(--text);}
   .doc h3.md-h2, .doc h4.md-h3{scroll-margin-top:16px;}
+  /* 重點節(標題寫 [重點])：整節加框，標題旁標「重點」 */
+  .doc .md-key{border:1.5px solid var(--amber);background:var(--amber-soft);border-radius:10px;padding:2px 16px 8px;margin:22px 0;}
+  .doc .md-key > .md-key-h:first-child{margin-top:14px;}
+  .doc .md-key-h::after{content:'重點';display:inline-block;margin-left:8px;padding:1px 8px;border-radius:999px;background:var(--amber);color:var(--on-amber);font-size:11.5px;font-weight:700;vertical-align:2px;}
+  .doc .md-key .callout{background:var(--panel);}
+  @media (max-width:600px){ .doc .md-key{padding:2px 10px 6px;} }
   .doc a.xref{color:var(--amber);text-decoration:none;border-bottom:1px dotted currentColor;}
   .doc a.xref:hover{border-bottom-style:solid;}
   .doc table.md-table{width:auto;max-width:100%;}
