@@ -13,6 +13,7 @@
       { key: 'rev_pre', name: '營收公告前布局', series: 'rev', desc: '月底先買進預期營收會好的股票，營收公告後隔天開盤賣出', run: (...a) => revPre(...a) },
       { key: 'rev_growth', name: '營收成長特徵', series: 'rev', desc: '營收年增率 > 10% 公告後，哪些特徵最能區分後續報酬', run: (...a) => revGrowth(...a) },
       { key: 'rev_drop', name: '營收衰退開低', series: 'rev', desc: '營收衰退公告後隔天開低 5% 以上，開盤買進', run: (...a) => revDrop(...a) },
+      { key: 'rev_turn', name: '營收由負轉正', series: 'rev', desc: '營收年增率由負轉正公告後做多，和持續成長、持續衰退比較', run: (...a) => revTurn(...a) },
     ] },
     { key: 'factor', name: '因子', desc: '橫斷面因子選股', studies: [] },
     { key: 'event', name: '事件', desc: '特定事件前後的股價表現', studies: [] },
@@ -375,6 +376,90 @@
     });
     $('#twrH').value = h; $('#twrG').value = g;
     $('#twrH').onchange = () => { h = $('#twrH').value; draw(); };
+    $('#twrG').onchange = () => { g = $('#twrG').value; draw(); };
+    $('#twrScale').onchange = draw;
+    draw();
+  }
+
+  async function revTurn(el, ctx, S) {
+    const B = await load(el, ctx, 'rev_turn');
+    if (!B) return;
+    const HS = [...new Set(B.strats.map(s => s.h))];
+    let h = '20日', g = '由負轉正';
+    const HN = { '5日': '5 日(T5 收盤賣)', '10日': '10 日(T10 收盤賣)', '20日': '20 日(T20 收盤賣)' };
+    const gs = hh => B.strats.filter(s => s.h === hh).map(s => s.g);
+    el.innerHTML = `
+      <div class="panel">
+        <h3>${esc(S.name)} ${tag(S.series)}</h3>
+        <div class="doc">
+          <p><b>事件</b>：月營收年增率上個月 < 0、這個月 > 0 的公告(月底後 15 天內的首次公告)，事前 10 日平均成交金額 ≥ 1 千萬；公告後第一個交易日(T1)開盤買進，持有 5、10 或 20 個交易日(T1 算第 1 天)後收盤賣出。另測轉正前連續負成長的月數、本月年增率的門檻，並以「持續成長」(上月、本月都 > 0)當對照組。</p>
+          <p><b>資金分配</b>：先算出整段期間平均一天持有幾檔(只算有部位的日子)，每檔上限 = 前一天收盤總資產 ÷ 平均持有檔數；有新股票進場的那天，所有部位調整到 min(上限, 1 ÷ 持有檔數)(先減碼、再進場、最後補足，都以整數股調整)；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
+        </div>
+        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
+          <div class="paramitem"><label for="twrH">持有期</label><select id="twrH">${HS.map(x => `<option value="${esc(x)}">${esc(HN[x] || x)}</option>`).join('')}</select></div>
+          <div class="paramitem"><label for="twrG">條件</label><select id="twrG"></select></div>
+          ${scaleSel('twrScale')}
+        </div>
+        <p class="note">${W().COST_NOTE}${RULES}</p>
+      </div>
+      <div id="twrView"></div>
+      <div class="panel"><h3>所有條件比較</h3><div id="twrAll"></div></div>
+      <div class="panel">
+        <h3>四種營收變化：公告前後的累積超額報酬</h3>
+        <div id="twrCar"></div><div id="twrCarLegend"></div>
+        <p class="note">第 -10 日 = 0；超額報酬 = 個股收盤到收盤報酬 − 市值加權市場報酬。描述性的事件研究，<b>未扣交易成本</b>。</p>
+        <h4>每筆交易報酬(T1 開盤買進，扣成本；每個事件獨立計算，不受資金限制)</h4>
+        <div class="tablewrap"><table class="stattable"><thead><tr><th>營收變化</th><th>筆數</th><th>T+1 平均 / 勝率</th><th>5 日平均 / 勝率</th><th>10 日平均 / 勝率</th><th>20 日平均 / 勝率</th></tr></thead><tbody>
+          ${B.groups.map(r => `<tr class="${r.g === '由負轉正' ? 'allrow' : ''}"><td>${esc(r.g)}</td><td>${r.n.toLocaleString()}</td>${['T+1', '5日', '10日', '20日'].map(x => `<td class="${W().cls(r[x].mean)}">${W().pct(r[x].mean, 2)} / ${(r[x].win * 100).toFixed(0)}%</td>`).join('')}</tr>`).join('')}
+        </tbody></table></div>
+      </div>
+      ${reportPanel(S, B.report)}`;
+    const $ = s => el.querySelector(s);
+    const fillG = () => {
+      $('#twrG').innerHTML = gs(h).map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
+      if (!gs(h).includes(g)) g = gs(h)[0];
+      $('#twrG').value = g;
+    };
+    function draw() {
+      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts, STAT_NOTE } = W();
+      const T = B.strats.find(s => s.h === h && s.g === g), x = stats(T.nav), Sx = stats(B.b0050);
+      const name = `${HN[h] || h}｜${g}`;
+      $('#twrView').innerHTML = `
+        <div class="panel">
+          <h3>${esc(name)}</h3>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
+          <p class="note">${STAT_NOTE}</p>
+          <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
+          <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
+          <div id="twrChart"></div><div id="twrLegend"></div>
+          <h4>每日持有檔數</h4><div id="twrPos"></div>
+          <h4>每年報酬</h4>
+          ${yearTableHtml(B.d, [{ name: g, nav: T.nav, cmp: true }], B.b0050)}
+        </div>`;
+      navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: C0050 } },
+        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
+      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: (d, tip) => tip ? d : d.slice(0, 4), yMin: 0,
+        yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
+      $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: `${HN[s.h] || s.h}｜${s.g}`, nav: s.nav, ts: s.ts, main: s === T })), Sx);
+    }
+    // 事件研究：由負轉正用系列色，其餘依方向配色(成長紅、衰退綠，台股慣例)
+    const CC = { 由負轉正: SERIES[S.series].color, 持續成長: 'var(--up)', 持續衰退: '#94a3b8', 由正轉負: 'var(--down)' };
+    const cs = Object.keys(B.car.series);
+    const carChart = div => LTChart.line(div, { x: B.car.x, xType: 'num', label: '累積超額報酬', height: 280, xFmt: v => (v > 0 ? '+' : '') + v, yFmt: v => v.toFixed(1) + '%',
+      tipFmt: (s, v) => (v > 0 ? '+' : '') + v.toFixed(2) + '%', refX: [{ x: 0, label: 'T0 公告日' }], refY: [{ y: 0 }],
+      series: cs.map(c => ({ name: c, y: B.car.series[c], color: CC[c] || CEW, width: c === '由負轉正' ? 2.4 : 1.6 })) });
+    const carLegend = LTChart.legend(cs.map(c => ({ name: c, color: CC[c] || CEW })));
+    carChart($('#twrCar')); $('#twrCarLegend').innerHTML = carLegend;
+    const sg = gg => B.strats.find(x => x.h === '20日' && x.g === gg).nav;
+    drawFigs(el, {
+      'event_car.png': div => { carChart(div); div.insertAdjacentHTML('afterend', carLegend); },
+      'cum_return.png': div => navLines(div, B.d, [{ name: '由負轉正', nav: sg('由負轉正'), color: CS[0], width: 2.2 }, { name: '負成長 ≥ 3 個月後轉正', nav: sg('負成長 ≥ 3 個月後轉正'), color: CS[3] },
+        { name: '轉正且年增 > 30%', nav: sg('轉正且年增 > 30%'), color: CS[4] }, { name: '持續成長（對照）', nav: sg('持續成長（對照）'), color: CEW }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]),
+      'yearly_return.png': div => yearBars(div, B.d, [{ name: '由負轉正', nav: sg('由負轉正'), color: CS[0] }, { name: '持續成長（對照）', nav: sg('持續成長（對照）'), color: CEW },
+        { name: '0050', nav: B.b0050, color: C0050 }], B.b0050),
+    });
+    $('#twrH').value = h; fillG();
+    $('#twrH').onchange = () => { h = $('#twrH').value; fillG(); draw(); };
     $('#twrG').onchange = () => { g = $('#twrG').value; draw(); };
     $('#twrScale').onchange = draw;
     draw();

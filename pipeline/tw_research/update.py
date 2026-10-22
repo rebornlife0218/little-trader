@@ -9,6 +9,7 @@
   rev_pre    營收公告前布局：每月 21 日進場買進綜合分數最高的 10 檔 / 5 檔，營收公告後隔天開盤賣出；不限市值與市值四分位
   rev_growth 營收成長特徵：營收年增率 > 10% 公告後 T1 開盤買進，特徵 IC、分數組合與公告前後的事件研究
   rev_drop   營收衰退開低：營收年增率 < -10% 公告後 T1 開盤跳空 ≤ -5%，開盤買進，日內 / T+1 出場
+  rev_turn   營收由負轉正：營收年增率上月 < 0、本月 > 0 公告後 T1 開盤買進，持有 5、10、20 日；門檻敏感度、四種營收變化的事件研究
 共用定義：
   - 月營收只用月底後 15 天內的公告；年增率用單月合併營收，缺值時用單月營收
   - T0 = 公告日(非交易日則為之前最後一個交易日)，T1 = T0 的下一個交易日
@@ -612,7 +613,146 @@ def rev_drop(X):
     return out, F
 
 
-STUDIES = {'rev_pre': rev_pre, 'rev_growth': rev_growth, 'rev_drop': rev_drop}
+# ---------- 營收由負轉正 ----------
+TURN = ['由負轉正', '持續成長', '持續衰退', '由正轉負']
+HOLD_TURN = {'T+1': (1, 'open'), '5日': (5, 'close'), '10日': (10, 'close'), '20日': (20, 'close')}
+PRE, POST = 10, 20
+
+
+def event_trade(X, j, s, n, when):
+    """一筆做多(和資金、其他訊號無關；分組統計用)：規則同 events.backtest。s 收盤選股，s+1 開盤買(漲停或沒成交延後一天)；
+    持有 n 天後開盤(open：第 e+n 日)或收盤(close：第 e+n-1 日)賣，跌停或沒成交往後延；下市櫃以最後收盤價轉現金"""
+    for e in (s + 1, s + 2):
+        if e < X.nd and X.TR[e, j] and X.RO[e, j] < X.LU[e, j] - E.EPS:
+            break
+    else:
+        return None
+    t = e + n if when == 'open' else e + n - 1
+    R = X.RO if when == 'open' else X.RC
+    while t < X.nd and t <= X.LAST[j] and (not X.TR[t, j] or R[t, j] <= X.LD[t, j] + E.EPS):
+        t += 1
+    if t > X.LAST[j] and X.LAST[j] < X.nd - 1:
+        return (j, s, e, int(X.LAST[j]), X.O[e, j], X.C[X.LAST[j], j], 'delist', 0, e - s - 1, 'close')
+    if t >= X.nd:
+        return (j, s, e, None, X.O[e, j], None, 'open', 0, e - s - 1, when)
+    return (j, s, e, t, X.O[e, j], (X.O if when == 'open' else X.C)[t, j], 'time', 0, e - s - 1, when)
+
+
+def rev_turn(X):
+    R = X.rev.copy()
+    # 截至上月，連續年增 < 0 的月數(月份要連續)
+    neg, run_ = (R['yoy'] < 0).to_numpy(), np.zeros(len(R), int)
+    same = (R['s'] == R['s'].shift(1)).to_numpy() & (R.groupby('s')['ym'].shift(1) == R['ym'] - pd.offsets.MonthBegin(1)).to_numpy()
+    for i in range(len(R)):
+        run_[i] = (run_[i - 1] + 1 if i and same[i] else 1) if neg[i] else 0
+    R['negm'] = pd.Series(run_).groupby(R['s']).shift(1).where(same, 0).fillna(0).to_numpy()
+    R = R[(R['lag'] <= LAG) & R['yoy'].notna() & R['prev_yoy'].notna() & (R['yoy'] != 0) & (R['prev_yoy'] != 0)].copy()
+    R['g'] = np.select([(R['prev_yoy'] < 0) & (R['yoy'] > 0), (R['prev_yoy'] > 0) & (R['yoy'] > 0), (R['prev_yoy'] < 0) & (R['yoy'] < 0)], TURN[:3], TURN[3])
+    F = {'n_all': intc(len(R)), 'n_all_turn': intc((R['g'] == '由負轉正').sum())}
+    R = R[(R['t0'] >= PRE + 1) & (R['t0'] + 1 < X.nd)]
+    t0, j = R['t0'].to_numpy(), R['j'].to_numpy()
+    ok = np.isfinite(X.RC[t0, j]) & (X.A10[t0, j] >= LIQ)
+    R, t0, j = R[ok].copy(), t0[ok], j[ok]
+    F['n_liq'] = intc(len(R))
+    # 每筆交易報酬(扣成本；每個事件獨立計算，不受資金與其他訊號影響)
+    for h, (n, x) in HOLD_TURN.items():
+        R[h] = [np.nan if (tr := event_trade(X, b, a, n, x)) is None else net_return(X, tr) for a, b in zip(t0, j)]
+    ok = np.array([event_trade(X, b, a, 1, 'open') is not None for a, b in zip(t0, j)])      # T1 或 T2 開盤買得到
+    R, t0, j = R[ok].copy(), t0[ok], j[ok]
+    F['n_final'], F['n_turn'] = intc(len(R)), intc((R['g'] == '由負轉正').sum())
+
+    def tt(x):
+        x = x.dropna()
+        return x.mean() / x.std(ddof=1) * np.sqrt(len(x))
+
+    groups, rows = [], []
+    for g in TURN:
+        x = R[R['g'] == g]
+        groups.append({'g': g, 'n': len(x), **{h: {'mean': rnd(x[h].mean()), 'win': rnd((x[h].dropna() > 0).mean())} for h in HOLD_TURN}})
+        rows.append(f"| {'**' + g + '**' if g == '由負轉正' else g} | {intc(len(x))} | {pc(x['T+1'].mean(), 2)} | {pc(x['5日'].mean(), 2)} | {pc(x['10日'].mean(), 2)} | "
+                    f"{pc((x['10日'].dropna() > 0).mean(), 1, False)} | {tt(x['10日']):.1f} | {pc(x['20日'].mean(), 2)} | {pc((x['20日'].dropna() > 0).mean(), 1, False)} | {tt(x['20日']):.1f} |")
+        for h in HOLD_TURN:
+            F[f'm_{g}_{h}'] = pc(x[h].mean(), 2)
+        F[f'med_{g}_20日'], F[f't_{g}_10日'], F[f't_{g}_20日'] = pc(x['20日'].median(), 2), num(tt(x['10日']), 1), num(tt(x['20日']), 1)
+    F['group_rows'] = '\n'.join(rows)
+    T_ = R[R['g'] == '由負轉正']
+    rows = []
+    for name, lo, hi in [('1 個月', 1, 1), ('2 個月', 2, 2), ('3 ～ 5 個月', 3, 5), ('6 ～ 11 個月', 6, 11), ('12 個月以上', 12, 9999)]:
+        x = T_[(T_['negm'] >= lo) & (T_['negm'] <= hi)]
+        rows.append(f"| {name} | {intc(len(x))} | {pc(x['10日'].mean(), 2)} | {pc(x['20日'].mean(), 2)} | {pc((x['20日'].dropna() > 0).mean(), 1, False)} | {tt(x['20日']):.1f} |")
+    F['neg_rows'] = '\n'.join(rows)
+    rows = []
+    for name, lo, hi in [('0% ～ 10%', 0, 10), ('10% ～ 30%', 10, 30), ('30% ～ 50%', 30, 50), ('50% ～ 100%', 50, 100), ('> 100%', 100, np.inf)]:
+        x = T_[(T_['yoy'] > lo) & (T_['yoy'] <= hi)]
+        rows.append(f"| {name} | {intc(len(x))} | {pc(x['10日'].mean(), 2)} | {pc(x['20日'].mean(), 2)} | {pc((x['20日'].dropna() > 0).mean(), 1, False)} | {tt(x['20日']):.1f} |")
+    F['yoy_rows'] = '\n'.join(rows)
+    yr = T_.groupby(X.D[T_['t0'].to_numpy()].year)['20日'].mean()
+    F['turn_years'] = '、'.join(f'{y} 年 {pc(v, 2)}' for y, v in yr.items())
+    F['turn_pos_years'], F['n_years'] = int((yr > 0).sum()), len(yr)
+    # 事件研究：公告前 10 日到公告後 20 日的累積超額報酬(市值加權市場，不扣成本)
+    ret = np.vstack([np.full(X.C.shape[1], np.nan), X.C[1:] / X.C[:-1] - 1])
+    w = np.where((X.A10 >= LIQ) & np.isfinite(X.mcap), X.mcap, 0.0)
+    w[:, X.jx[E.BENCH]] = 0
+    wp = np.vstack([np.zeros(w.shape[1]), w[:-1]])
+    mkt = (wp * np.nan_to_num(ret)).sum(1) / np.where(wp.sum(1) > 0, wp.sum(1), np.nan)
+    ex = ret - mkt[:, None]
+    m = t0 + POST < X.nd
+    path = np.array([ex[t0[m] + k, j[m]] for k in range(-PRE + 1, POST + 1)])      # 第 -9 ～ +20 日
+    good = np.isfinite(path).all(0)
+    path, gg = path[:, good], R['g'].to_numpy()[m][good]
+    cum = np.vstack([np.zeros(path.shape[1]), np.cumsum(path, 0)])                   # 第 -10 日 = 0
+    car = {'x': list(range(-PRE, POST + 1)), 'series': {}}
+    rows = []
+    for g in TURN:
+        k = gg == g
+        car['series'][g] = [round(float(v) * 100, 3) for v in cum[:, k].mean(1)]
+        win = {'pre': cum[PRE, k], 'react': cum[PRE + 1, k] - cum[PRE, k], 'p5': cum[PRE + 6, k] - cum[PRE + 1, k], 'p20': cum[PRE + POST, k] - cum[PRE + 1, k]}
+        ts = {a: b.mean() / b.std(ddof=1) * np.sqrt(len(b)) for a, b in win.items()}
+        rows.append(f"| {'**' + g + '**' if g == '由負轉正' else g} | {intc(k.sum())} | {pc(win['pre'].mean(), 2)} | {pc(win['react'].mean(), 2)} | {ts['react']:.1f} | "
+                    f"{pc(win['p5'].mean(), 2)} | {pc(win['p20'].mean(), 2)} | {ts['p20']:.1f} |")
+        F[f'car_{g}'] = {a: pc(b.mean(), 2) for a, b in win.items()}
+        F[f'car_{g}_t'] = {a: num(b, 1) for a, b in ts.items()}
+    F['car_rows'] = '\n'.join(rows)
+    # 策略：門檻敏感度，持有 5、10、20 日(資金規則同台股策略)
+    COND = {'由負轉正': R['g'] == '由負轉正',
+            '負成長 ≥ 3 個月後轉正': (R['g'] == '由負轉正') & (R['negm'] >= 3),
+            '負成長 ≥ 6 個月後轉正': (R['g'] == '由負轉正') & (R['negm'] >= 6),
+            '轉正且年增 > 10%': (R['g'] == '由負轉正') & (R['yoy'] > 10),
+            '轉正且年增 > 30%': (R['g'] == '由負轉正') & (R['yoy'] > 30),
+            '持續成長（對照）': R['g'] == '持續成長'}
+    i0 = int(t0.min())
+    d = [x.strftime('%Y-%m-%d') for x in X.D[i0:]]
+    strats, rows = [], []
+    for h in ['20日', '10日', '5日']:
+        n, x = HOLD_TURN[h]
+        for g, mk in COND.items():
+            mk = mk.to_numpy()
+            T, skipped = E.backtest(X.W, sig_frame(X, zip(t0[mk], j[mk])), {'side': 'long', 'tp': None, 'sl': None, 'hold': n, 'exit': x})
+            nav, npos, ts = run(X, T, i0, fails=len(skipped))
+            strats.append({'key': f'{h}｜{g}', 'h': h, 'g': g, 'nav': navlist(nav), 'ts': ts, 'npos': npos.tolist()})
+            xs = stats(nav)
+            k = f'{h}｜{g}'
+            F[k] = xs | {'ts': ts}
+            F[k + '_ret'], F[k + '_cagr'], F[k + '_sharpe'] = pc(xs['ret'], 0), pc(xs['cagr']), num(xs['sharpe'])
+            F[k + '_pos'], F[k + '_cap'] = num(ts['pos'], 0), f"{ts['cap'] * 100:.1f}%"
+            rows.append(f"| {h.replace('日', ' 日')} | {'**' + g + '**' if g == '由負轉正' else g} | {pc(xs['ret'], 0)} | {pc(xs['cagr'])} | {pc(xs['vol'], 1, False)} | {num(xs['sharpe'])} | "
+                        f"{num(xs['sortino'])} | {pc(xs['mdd'], 1, False)} | {intc(ts['n'])} | {pc(ts['mean'], 2)} | {intc(ts['nocash'])} |")
+    S0 = stats(E.bench_nav(X.W, i0))
+    rows.append(f"| – | 0050 買進持有 | {pc(S0['ret'], 0)} | {pc(S0['cagr'])} | {pc(S0['vol'], 1, False)} | {num(S0['sharpe'])} | {num(S0['sortino'])} | {pc(S0['mdd'], 1, False)} | – | – | – |")
+    F['strat_rows'] = '\n'.join(rows)
+    F['b_ret'], F['b_sharpe'] = pc(S0['ret'], 0), num(S0['sharpe'])
+    sh20 = [F[f'20日｜{g}']['sharpe'] for g in COND if g != '持續成長（對照）']
+    F['sh20_lo'], F['sh20_hi'] = num(min(sh20)), num(max(sh20))
+    b = E.bench_nav(X.W, i0)
+    yt, yc, yb = (yearly(d, s) for s in (strats[0]['nav'], strats[5]['nav'], b))
+    F['beat_cont'], F['beat_0050'], F['n_yr'] = sum(yt[y] > yc[y] for y in yt), sum(yt[y] > yb[y] for y in yt), len(yt)
+    F['start'], F['end'] = d[1], d[-1]
+    out = {'d': d, 'asof': d[-1], 'b0050': navlist(b), 'strats': strats, 'car': car, 'groups': groups}
+    out['report'] = report('rev_turn', F)
+    return out, F
+
+
+STUDIES = {'rev_pre': rev_pre, 'rev_growth': rev_growth, 'rev_drop': rev_drop, 'rev_turn': rev_turn}
 
 
 def main(keys=None, data=None, write=True):
