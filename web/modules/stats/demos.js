@@ -360,5 +360,69 @@ window.LTStatDemos = (() => {
     draw();
   }
 
-  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, targets, 'dist-map': distMap };
+  /* ---------- 標準常態的尾點：選右尾、左尾或雙尾與 α，畫出尾巴面積與臨界值 ---------- */
+  const Z_CRIT = [[0.10, 1.2816], [0.05, 1.6449], [0.025, 1.9600], [0.01, 2.3263], [0.005, 2.5758]];   // [右尾面積, z]
+  function zTail(el) {
+    const H = 250, padX = 16, padT = 22, padB = 34, LO = -4, HI = 4;
+    let W = 560;   // 手機寬度改用較窄的畫布，文字才不會縮得太小
+    const pdf = z => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
+    const sx = z => padX + (z - LO) / (HI - LO) * (W - padX * 2), sy = d => H - padB - d / pdf(0) * (H - padT - padB - 30);
+    const num = v => String(+v.toFixed(3));
+    let mode = 'right', k = 1;   // k = Z_CRIT 的位置；切換單、雙尾時臨界值不變(右尾 0.05 ↔ 雙尾 0.10)
+    el.innerHTML = `
+      <h3>互動圖 · 標準常態的尾點</h3>
+      <div class="btnrow-l zt-mode">${[['right', '右尾'], ['left', '左尾'], ['two', '雙尾']].map(([m, t]) => `<button data-m="${m}">${t}</button>`).join('')}</div>
+      <div class="btnrow-l zt-alpha" style="margin-top:8px;"></div>
+      <svg class="part-svg zt-svg" role="img" aria-label="標準常態密度曲線與尾巴面積" style="max-width:640px;margin-top:8px;"></svg>
+      <div class="zt-text" style="margin-top:6px;font-size:13.5px;line-height:1.9;"></div>`;
+    const svg = el.querySelector('.zt-svg'), text = el.querySelector('.zt-text');
+    const area = (a, b) => {   // a 到 b 之間曲線下的面積(多邊形)
+      const pts = []; for (let i = 0; i <= 80; i++) { const z = a + (b - a) * i / 80; pts.push(`${sx(z).toFixed(1)},${sy(pdf(z)).toFixed(1)}`); }
+      return `<polygon points="${sx(a).toFixed(1)},${sy(0)} ${pts.join(' ')} ${sx(b).toFixed(1)},${sy(0)}" fill="var(--amber)" fill-opacity=".45"/>`;
+    };
+    const zName = (neg, a, rest) => `${neg ? '−' : ''}z<tspan font-size="11" dy="4">${a}</tspan><tspan dy="-4">${rest}</tspan>`;   // z 加下標
+    function draw() {
+      W = (el.clientWidth || 600) < 520 ? 380 : 560;
+      svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+      const two = mode === 'two', [a1, z] = Z_CRIT[k], alpha = two ? a1 * 2 : a1, tail = two ? alpha / 2 : alpha;
+      el.querySelectorAll('.zt-mode button').forEach(b => b.classList.toggle('active', b.dataset.m === mode));
+      el.querySelector('.zt-alpha').innerHTML = '<span class="mute" style="align-self:center;">α =</span>'
+        + Z_CRIT.map(([a], i) => `<button data-k="${i}" class="${i === k ? 'active' : ''}">${num(two ? a * 2 : a)}</button>`).join('');
+      const curve = []; for (let i = 0; i <= 160; i++) { const x = LO + (HI - LO) * i / 160; curve.push(`${sx(x).toFixed(1)},${sy(pdf(x)).toFixed(1)}`); }
+      const cuts = mode === 'right' ? [z] : mode === 'left' ? [-z] : [-z, z];
+      let g = (mode !== 'left' ? area(z, HI) : '') + (mode !== 'right' ? area(LO, -z) : '');
+      g += `<line x1="${padX}" y1="${sy(0)}" x2="${W - padX}" y2="${sy(0)}" stroke="var(--border-strong)"/>`;
+      g += `<polyline points="${curve.join(' ')}" fill="none" stroke="var(--blue)" stroke-width="2.2"/>`;
+      // 刻度：整數 z，和臨界值太近的不標，避免重疊
+      for (let t = -3; t <= 3; t++) if (cuts.every(c => Math.abs(c - t) > (W < 500 ? 0.65 : 0.45)))
+        g += `<text x="${sx(t)}" y="${sy(0) + 18}" font-size="13" text-anchor="middle" fill="var(--mute)">${t < 0 ? '−' + -t : t}</text>`;
+      cuts.forEach(c => {
+        const x = sx(c), label = (c < 0 ? '−' : '') + z.toFixed(3);
+        g += `<line x1="${x}" y1="${sy(0)}" x2="${x}" y2="${sy(pdf(0)) - 18}" stroke="var(--amber)" stroke-width="1.6" stroke-dasharray="4 3"/>
+          <text x="${x}" y="${sy(0) + 18}" font-size="13" font-weight="700" text-anchor="middle" fill="var(--amber)">${label}</text>
+          <text x="${Math.min(Math.max(x, padX + (two ? 24 : 62)), W - padX - (two ? 24 : 62))}" y="${sy(pdf(0)) - 24}" font-size="14" font-weight="700" text-anchor="middle" fill="var(--amber)">${zName(c < 0, num(tail), two ? '' : ' = ' + label)}</text>
+          <text x="${sx(c + Math.sign(c) * 0.75)}" y="${sy(pdf(c + Math.sign(c) * 0.75)) - 12}" font-size="13" text-anchor="middle" fill="var(--text)">${num(tail)}</text>`;
+      });
+      const mid = mode === 'right' ? [LO, z] : mode === 'left' ? [-z, HI] : [-z, z];
+      g += `<text x="${sx((mid[0] + mid[1]) / 2 + (mode === 'right' ? 1 : mode === 'left' ? -1 : 0))}" y="${sy(pdf(0) * 0.35)}" font-size="14" text-anchor="middle" fill="var(--text)">${num(1 - alpha)}</text>`;
+      svg.innerHTML = g;
+      const tex = s => katex.renderToString(s, { throwOnError: false }), zs = z.toFixed(3), ts = num(tail);
+      const use = { 0.10: '單尾 10%', 0.05: '單尾 5%', 0.025: '單尾 2.5%', 0.01: '單尾 1%', 0.005: '單尾 0.5%' };
+      text.innerHTML = mode === 'right'
+        ? `${tex(`z_{${ts}} = ${zs}`)}：${tex(`P(Z > ${zs}) = ${ts}`)}，查表找 ${tex(`\\Phi(z) = ${num(1 - tail)}`)}。用在${use[a1]}的右尾檢定。`
+        : mode === 'left'
+        ? `${tex(`-z_{${ts}} = -${zs}`)}：${tex(`P(Z < -${zs}) = ${ts}`)}，由對稱性等於右尾的 ${tex(`P(Z > ${zs})`)}。用在${use[a1]}的左尾檢定。`
+        : `${tex(`\\pm z_{${ts}} = \\pm ${zs}`)}：兩邊各 ${tex(`\\alpha/2 = ${ts}`)}，${tex(`P(-${zs} < Z < ${zs}) = ${num(1 - alpha)}`)}。用在 ${num((1 - alpha) * 100)}% 信賴區間與雙尾 ${num(alpha * 100)}% 檢定。`;
+    }
+    let narrow = (el.clientWidth || 600) < 520;
+    new ResizeObserver(() => { const n = el.clientWidth < 520; if (n !== narrow) { narrow = n; draw(); } }).observe(el);
+    el.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.m) mode = b.dataset.m; else if (b.dataset.k) k = +b.dataset.k; else return;
+      draw();
+    });
+    draw();
+  }
+
+  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, targets, 'dist-map': distMap, 'z-tail': zTail };
 })();
