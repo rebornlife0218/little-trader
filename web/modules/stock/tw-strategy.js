@@ -79,13 +79,13 @@
     }
     return rows;
   }
-  /* 累積報酬(上)與回撤(下)畫在同一張圖：navs = { key: 淨值 }，meta = { key: { name, color } }，main = 主角(線條較粗) */
-  function navCharts({ d, i0, navs, meta, main, log, chart, legend }) {
+  /* 累積報酬(上)與回撤(下)畫在同一張圖：navs = { key: 淨值 }，meta = { key: { name, color } }，main = 主角(線條較粗)；xFmt 可省略(預設只標年份) */
+  function navCharts({ d, i0, navs, meta, main, log, chart, legend, xFmt: xf }) {
     const keys = Object.keys(meta), n = navs[keys[0]].length;
     const step = Math.max(1, Math.floor(n / 700)), idx = [];
     for (let i = 0; i < n; i += step) idx.push(i);
     if (idx[idx.length - 1] !== n - 1) idx.push(n - 1);
-    const xs = idx.map(i => d[i0 + i]), xFmt = (v, tip) => tip ? v : v.slice(0, 4);
+    const xs = idx.map(i => d[i0 + i]), xFmt = xf || ((v, tip) => tip ? v : v.slice(0, 4));
     const D = Object.fromEntries(keys.map(k => { let pk = -Infinity; return [k, navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; })]; }));
     LTChart.line(chart, { x: xs, xType: 'date', label: '累積報酬與回撤', height: 320, xFmt,
       yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),

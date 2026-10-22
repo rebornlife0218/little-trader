@@ -24,6 +24,7 @@ const LT = (() => {
     { key: 'disposition', name: '台股處置股' },
     { key: 'tw_strategy', name: '台股策略回測' },
     { key: 'tw_research', name: '台股其他研究' },
+    { key: 'etf_research', name: 'ETF研究' },
   ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
   // 加上 group(例如 '台股')，側欄與首頁會在區塊內再分小組，同組頁面請連續註冊
