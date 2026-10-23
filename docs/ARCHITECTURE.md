@@ -75,7 +75,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 
 | 網址 | 角色 | 部署方式 |
 |---|---|---|
-| Cloudflare Pages(`<專案名稱>.pages.dev`) | 主要網址 | `deploy.yml` 的 `cloudflare-pages` 工作，用 wrangler 直接上傳(Direct Upload) |
+| https://little-trader.pages.dev/ (Cloudflare Pages，專案 `little-trader`) | 主要網址 | `deploy.yml` 的 `cloudflare-pages` 工作，用 wrangler 直接上傳(Direct Upload) |
 | https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪 | `deploy.yml` 的 `github-pages` 工作 |
 
 - 觸發點不變：推送到 main、資料集排程、`run_local.py`(`gh workflow run deploy.yml`)都會一次部署兩邊。只改網站內容的話，照舊 commit + push 即可，不用碰 Cloudflare。
@@ -91,6 +91,8 @@ pipeline/                           資料抓取，一個資料集一個資料�
 3. GitHub repo → Settings → Secrets and variables → Actions：新增 secrets `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。也可以用 `gh secret set CLOUDFLARE_API_TOKEN`(會提示貼上，不會留在指令紀錄)。
 4. (選填)專案名稱預設 `little-trader`，要改就新增 variable `CLOUDFLARE_PROJECT`。
 5. Actions → 部署網站 → Run workflow。第一次會自動建立 Cloudflare Pages 專案，完成後網址顯示在 Cloudflare 的 Workers & Pages。
+
+目前已設定完成(2026-10-23)：token 名稱 `little-trader-pages`，權限 Account › Cloudflare Pages › Edit。
 
 **日後維護**
 

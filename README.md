@@ -1,6 +1,6 @@
 # Little Trader 小交易員的研究室
 
-**網站：Cloudflare Pages(主要)、https://rebornlife0218.github.io/little-trader/ (備援)**
+**網站：https://little-trader.pages.dev/**(備援：https://rebornlife0218.github.io/little-trader/)
 
 用公開資料研究台股與全球市場，把研究結果整理成圖表與統計，並收錄統計學教材。
 
