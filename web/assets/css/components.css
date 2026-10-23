@@ -484,3 +484,32 @@
   /* 台股其他研究：系列標記(同一系列同一個顏色) */
   .series-tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:var(--dim);vertical-align:middle;margin-right:4px;}
   .series-tag i{display:inline-block;width:9px;height:9px;border-radius:50%;}
+
+  /* ---------- 股價查詢(modules/stock/query.js)、後台(modules/admin/admin.js) ---------- */
+  .pq-form{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 14px;}
+  .pq-form label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--dim);}
+  .pq-form input{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:'IBM Plex Mono',monospace;font-size:13px;}
+  .pq-form .pq-sym{flex:1 1 220px;}
+  .pq-form .pq-sym input{font-family:'Inter',sans-serif;}
+  .pq-form input[type=date]{color-scheme:dark;}
+  :root[data-theme="light"] .pq-form input[type=date]{color-scheme:light;}
+  .pq-range{margin:0;}
+  .pq-table-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
+  .pq-table td{font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
+  @media (max-width:640px){ .pq-form label:not(.pq-sym){flex:1 1 40%;} .pq-form input{width:100%;box-sizing:border-box;} }
+  .adm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
+  .adm-grid .panel{margin:0;}
+  .pq-title{margin-top:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;}
+  .pq-code{font-family:'IBM Plex Mono',monospace;color:var(--amber);}
+  .pq-tag{font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;border:1px solid var(--border-strong);color:var(--dim);}
+  .pq-cap{font-size:12.5px;font-weight:500;color:var(--dim);}
+  .pq-toolbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px;margin:4px 0 8px;}
+  .pq-toolbar .pq-mode{margin:0;}
+  .pq-legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11.5px;color:var(--dim);}
+  .pq-legend span{display:inline-flex;align-items:center;gap:4px;}
+  .pq-panels{margin:0 0 8px;}
+  .pq-panels button{padding:4px 10px;font-size:12px;}
+  .pq-info{min-height:22px;}
+  .pq-info .pq-ev{color:var(--amber);}
+  .pq-chart{width:100%;}
+  .pq-canvas{cursor:crosshair;touch-action:pan-y;outline:none;}

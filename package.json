@@ -1,0 +1,20 @@
+{
+  "name": "little-trader",
+  "private": true,
+  "description": "Cloudflare Pages Functions(股價查詢 API)與本機開發工具；網站本身是 web/ 底下的靜態檔",
+  "scripts": {
+    "dev": "wrangler pages dev web --port 8788",
+    "db:migrate:local": "wrangler d1 migrations apply little-trader --local",
+    "db:migrate:remote": "wrangler d1 migrations apply little-trader --remote"
+  },
+  "dependencies": {
+    "jose": "^5.9.6"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261019.1": true
+  }
+}

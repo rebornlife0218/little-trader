@@ -33,6 +33,69 @@ const LT = (() => {
   let current = null;
   let routeSeq = 0; // 換頁計數：非同步載入完成時用來確認使用者還在同一頁
 
+  /* ---------- 會員：訪客看不到的區塊(由後端 functions/_lib/access.json 決定，經 api/me 傳回) ----------
+     會員區塊的頁面程式不寫在 index.html，登入的會員才由 api/me 拿到清單、在這裡載入；
+     伺服器也會擋訪客直接下載這些程式與資料，所以畫面上的鎖只是提示 */
+  let auth = { kind: 'guest', memberSections: [], scripts: [], api: false, canLogin: false };
+  const locked = secKey => auth.kind !== 'member' && auth.memberSections.includes(secKey);
+  function loadScripts(list) {
+    return Promise.all(list.map(src => new Promise(done => {
+      const s = document.createElement('script');
+      s.src = src; s.async = false;            // 依清單順序執行(頁面的註冊順序 = 側欄順序)
+      s.onload = done; s.onerror = () => { console.error('載入失敗：' + src); done(); };
+      document.head.appendChild(s);
+    })));
+  }
+  const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  // 登入按鈕(訪客)或「到主站登入」(備援站沒有後端)
+  function loginButton(label = '用 Google 登入') {
+    if (auth.canLogin) return `<button type="button" class="login-btn" onclick="LTAuth.login()">${label}</button>`;
+    if (!auth.api) return `<a class="login-btn" href="${LTAuth.MAIN_SITE}${location.hash}">到主站登入 ↗</a>`;
+    return '<span class="mute">登入功能尚未開放</span>';
+  }
+  function lockedPanel(sec) {
+    return `<header class="top"><div><h1>${esc(sec.name)}</h1><p>${esc(sec.desc || '')}</p></div></header>
+      <div class="panel lock-panel">
+        <div class="lock-ico">🔒</div>
+        <h2>登入 Google 看更多</h2>
+        <p class="mute">用 Google 帳號登入後，就能看 ETF、股票、選擇權的所有內容；設有密碼的策略仍需要另外輸入密碼。</p>
+        ${loginButton()}
+        ${LTAuth.error ? `<p class="lock-err">${esc(LTAuth.error)}</p>` : ''}
+      </div>`;
+  }
+  function renderAccount() {
+    const el = document.getElementById('sideAccount');
+    if (!el) return;
+    el.innerHTML = auth.kind === 'member'
+      ? `<div class="acct-who" title="${esc(auth.email || '')}">👤 ${esc(auth.email || 'Google 帳號')}</div>
+         ${auth.admin ? '<a class="acct-link" href="#/other/admin">後台</a>' : ''}<button type="button" class="acct-link" onclick="LTAuth.logout()">登出</button>`
+      : `<div class="acct-who mute">訪客</div>${loginButton('Google 登入')}${LTAuth.error ? `<div class="acct-err">${esc(LTAuth.error)}</div>` : ''}`;
+  }
+  // 瀏覽紀錄：每次換頁送一筆到 api/track(後台的「最受歡迎的主題」)；備援站沒有後端就不送
+  function track(section, page, title, isLocked) {
+    if (!auth.api) return;
+    try {
+      navigator.sendBeacon('api/track', new Blob([JSON.stringify({ section, page, title, locked: !!isLocked })], { type: 'application/json' }));
+    } catch (e) {}
+  }
+  // 第一次來訪：選擇用 Google 登入或以訪客身分繼續(記住選擇，不再詢問)
+  function welcome() {
+    let seen = false;
+    try { seen = localStorage.getItem('lt.guest') === '1'; } catch (e) {}
+    if (auth.kind === 'member' || !auth.canLogin || seen) return;
+    const box = document.createElement('div');
+    box.className = 'welcome-mask';
+    box.innerHTML = `<div class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+        <img src="assets/img/logo.svg" alt="" class="welcome-logo">
+        <h2 id="welcomeTitle">歡迎來到 Little Trader</h2>
+        <p class="mute">訪客可以看指數、統計學與其他；登入 Google 看更多：ETF、股票、選擇權。</p>
+        ${loginButton()}
+        <button type="button" class="welcome-guest">以訪客身分繼續瀏覽</button>
+      </div>`;
+    box.querySelector('.welcome-guest').onclick = () => { try { localStorage.setItem('lt.guest', '1'); } catch (e) {} box.remove(); };
+    document.body.appendChild(box);
+  }
+
   function register(page) {
     if (!SECTIONS.find(s => s.key === page.section)) {
       console.error('未知區塊：' + page.section); return;
@@ -62,19 +125,21 @@ const LT = (() => {
   function renderSidebar(active) {
     const nav = document.getElementById('sideNav');
     nav.innerHTML = SECTIONS.map(sec => {
-      const list = pages.filter(p => p.section === sec.key);
+      const list = pages.filter(p => p.section === sec.key && !p.hidden);
       const isActive = p => active && active.section === sec.key && active.key === p.key;
       const link = p => p.href
         ? `<a href="${p.href}" target="_blank" rel="noopener" class="side-link ext" title="在新分頁開啟外部網站">${p.name}<span class="ext-ico">↗</span></a>`
         : `<a href="#/${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`;
-      const items = list.length
+      const items = locked(sec.key)
+        ? `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key ? 'active' : ''}">🔒 登入 Google 看更多</a>`
+        : list.length
         ? groupPages(list).map(([g, ps]) => (g ? `<div class="side-sub">${g}</div>` : '') + ps.map(link).join('')).join('')
         : `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
       const here = active && active.section === sec.key;
       const open = here || openSections.has(sec.key);
       return `<div class="side-group ${open ? 'open' : ''} ${here ? 'here' : ''}">
         <button class="side-title" onclick="LT.toggleSection('${sec.key}')" aria-expanded="${open}">
-          <span>${sec.name}</span><span class="side-count">${list.length || ''}</span><span class="side-chev">▸</span>
+          <span>${sec.name}</span><span class="side-count">${locked(sec.key) ? '🔒' : list.length || ''}</span><span class="side-chev">▸</span>
         </button>
         <div class="side-items">${items}</div>
       </div>`;
@@ -98,7 +163,8 @@ const LT = (() => {
     const internal = pages.filter(p => !p.href);
     let page = internal.find(p => p.section === section && p.key === key);
     const sec = SECTIONS.find(s => s.key === section);
-    if (!page && sec) page = internal.find(p => p.section === section) || null; // 區塊預設第一頁
+    if (sec && locked(sec.key)) page = null;                                     // 訪客：會員區塊顯示登入提示
+    else if (!page && sec) page = internal.find(p => p.section === section && !p.hidden) || null; // 區塊預設第一頁
     if (!page && !sec) page = internal[0];                                        // 網站預設首頁
     if (current && current.unmount) { try { current.unmount(); } catch (e) {} }
     const main = document.getElementById('content');
@@ -113,12 +179,14 @@ const LT = (() => {
       const seq = ++routeSeq;
       if (page.mount) page.mount(main, { alive: () => seq === routeSeq });
       else mountPlaceholder(page, main);
+      if (!page.hidden) track(page.section, page.key, page.name, false);
     } else {
       current = null;
       routeSeq++;
       renderSidebar({ section: sec.key });
       document.title = `${sec.name} · Little Trader`;
-      main.innerHTML = UNDER_CONSTRUCTION;
+      main.innerHTML = locked(sec.key) ? lockedPanel(sec) : UNDER_CONSTRUCTION;
+      track(sec.key, '', sec.name, locked(sec.key));
     }
     document.body.classList.remove('nav-open');
   }
@@ -134,6 +202,7 @@ const LT = (() => {
     document.title = 'Little Trader 小交易員的研究室';
     clearSources();
     home.mount(main, { alive: () => seq === routeSeq });
+    track('home', '', '首頁', false);
     // 首頁頁尾列出所有資料集的更新狀態
     DATASETS.forEach(d => dataset(d.key).then(m => { if (seq === routeSeq) addSource(m, d.name); }).catch(() => {}));
     document.body.classList.remove('nav-open');
@@ -256,9 +325,14 @@ const LT = (() => {
     document.querySelectorAll('.theme-toggle').forEach(b => b.onclick = toggleTheme);
     syncCollapseButton();
     syncThemeButton();
-    window.addEventListener('hashchange', route);
-    route();
+    // 先確認身分(會員才載入會員區塊的程式)，再顯示頁面
+    LTAuth.load().then(me => { auth = me; return loadScripts(me.scripts || []); }).then(() => {
+      renderAccount();
+      window.addEventListener('hashchange', route);
+      route();
+      welcome();
+    });
   }
 
-  return { UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();

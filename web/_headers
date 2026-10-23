@@ -1,0 +1,6 @@
+# Cloudflare Pages 的靜態檔安全標頭(API 的標頭在 functions/_lib/security.ts；GitHub Pages 不支援這個檔案)
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()

@@ -1,0 +1,15 @@
+# Cloudflare Pages 設定：網站檔案 + functions/(後端 API 與權限)+ D1 資料庫
+# 部署由 .github/workflows/deploy.yml 執行；本機開發：npm run dev(http://localhost:8788)
+name = "little-trader"
+pages_build_output_dir = "_site"
+compatibility_date = "2026-10-01"
+
+[vars]
+FIREBASE_PROJECT_ID = "little-trader-bbf1c"          # Firebase 專案 ID(公開資訊)；空白時登入功能停用
+ALLOWED_ORIGINS = "https://little-trader.pages.dev,http://localhost:8788,http://127.0.0.1:8788"   # 允許呼叫 API 的網頁來源(CORS)；綁自己的網域時加上去
+
+[[d1_databases]]
+binding = "DB"
+database_name = "little-trader"
+database_id = "cc1d9b90-f22c-49fa-aeaa-3b9e72ea4cbb"
+migrations_dir = "migrations"
