@@ -6,12 +6,13 @@
     ev 事件 [[日期, 種類, 說明, 結束日期]]：rev 月營收公告(年成長)、div 除權息、split 分割或減資(由還原與原始股價的比例變化推算)、
        halt 暫停交易、disp 處置(到結束日期)
   查 10 年只要讀約 11 列，不會用掉 D1 的讀取額度。
-  股票清單(symbols)：名稱、上市/上櫃/創新板、股本(億元，實收資本額)、資料期間、是否已下市櫃。
+  股票清單(symbols)：名稱、上市/上櫃/創新板、股本(億元，實收資本額)、資料期間、是否已下市櫃；整份清單另存在 meta 的 symbols_gz(查詢頁只讀這 1 列)。
   每次都在本機重算全部，但只上傳內容有變的(新的交易日、除權息後還原股價整段改變、資料修正)；
   上傳過的內容記在 ~/.cache/little-trader/d1_prices.json，刪掉這個檔就會全部重傳。
 用法：python pipeline/price_query/sync.py [--local]   (--local：寫進 wrangler pages dev 用的本機 D1)
 需要：本機 PostgreSQL；正式 D1 要先 npx wrangler login(run_local.py 每天同步後會自動執行)
 """
+import base64
 import gzip
 import hashlib
 import io
@@ -201,15 +202,25 @@ def main():
     stmts += [f"DELETE FROM price_chunks WHERE symbol = {sql_str(k.split(':')[0])} AND year = {int(k.split(':')[1])};" for k in gone]
     n_chunks = len(stmts)
 
+    sym_rows = []
     for s, r in span.iterrows():
         name, market, cap = info.get(s) or (etf.get(s, [None, ''])[0], etf.get(s, [None, ''])[1], None)
         row = (name or delisted.get(s) or '', r['min'], r['max'], int(s in delisted and r['max'] < last), market or None, cap)
+        sym_rows.append((s, row))
         key, h = f'sym:{s}', hashlib.md5(json.dumps(row, ensure_ascii=False).encode()).hexdigest()
         new_state[key] = h
         if state.get(key) != h:
             stmts.append('INSERT OR REPLACE INTO symbols (symbol, name, first_date, last_date, delisted, market, capital) VALUES '
                          f'({sql_str(s)}, {sql_str(row[0])}, {sql_str(row[1])}, {sql_str(row[2])}, {row[3]}, {sql_str(row[4])}, '
                          f'{"NULL" if row[5] is None else row[5]});')
+    # 整份股票清單另存成一列(gzip＋base64)：查詢頁每次打開只讀 1 列，不用讀 2,500 多列
+    sym_list = [{'symbol': s, 'name': r[0], 'first_date': r[1], 'last_date': r[2], 'delisted': r[3], 'market': r[4], 'capital': r[5]}
+                for s, r in sym_rows]
+    raw = json.dumps(sym_list, ensure_ascii=False, separators=(',', ':')).encode()
+    h = hashlib.md5(raw).hexdigest()
+    if state.get('symbols_gz') != h:
+        stmts.append(f"INSERT OR REPLACE INTO meta (k, v) VALUES ('symbols_gz', '{base64.b64encode(gzip.compress(raw, 9, mtime=0)).decode()}');")
+    new_state['symbols_gz'] = h
     stmts.append(f"INSERT OR REPLACE INTO meta (k, v) VALUES ('last_date', {sql_str(last)});")
 
     total = sum(len(gz) for _, gz, _ in C.values())
