@@ -1,6 +1,6 @@
 /* 登入：Google → Firebase → 本站的 session cookie(30 天，HttpOnly)
    不用 Firebase SDK(它會從 Google 載入外部腳本，本站 CSP 只允許同源)，改走三步：
-     1. login() 轉到 Google 登入頁(response_type=id_token)，回來時網址的 # 帶著 id_token
+     1. login() 轉到 Google 登入頁(response_type=id_token)，回到網站根目錄時網址的 # 帶著 id_token，再換回登入前的頁面
      2. 用 Firebase REST API(accounts:signInWithIdp)換成 Firebase ID token
      3. POST api/session，後端驗證後發 cookie；之後頁面程式、資料、API 都靠這個 cookie 判斷是不是會員
    設定在 assets/js/firebase-config.js；權限(哪些區塊要登入)由後端 functions/_lib/access.json 決定，經 api/me 傳回 */
@@ -10,14 +10,14 @@ const LTAuth = (() => {
   const KEY = 'lt.oauth';
   const MAIN_SITE = 'https://little-trader.pages.dev/';
   const FALLBACK_LOCKED = ['etf', 'stock', 'option'];   // 連不到 api/me(例如 GitHub Pages 備援站)時當作訪客
-  const redirectUri = () => location.origin + location.pathname;
+  const redirectUri = () => new URL('./', document.baseURI).href;   // 一律回到網站根目錄(Google 後台登記的網址)，不管從哪一頁登入
   const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
   const jwtPayload = t => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))));
   let me = null, error = '';
 
   function login() {
     if (!ready) return;
-    const st = { state: hex(16), nonce: hex(16), back: location.hash };
+    const st = { state: hex(16), nonce: hex(16), back: location.pathname + location.search };
     try { sessionStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
     const q = new URLSearchParams({ client_id: CFG.clientId, redirect_uri: redirectUri(), response_type: 'id_token',
                                     scope: 'openid email profile', nonce: st.nonce, state: st.state, prompt: 'select_account' });
@@ -31,7 +31,8 @@ const LTAuth = (() => {
     const p = new URLSearchParams(h.slice(1));
     let st = null;
     try { st = JSON.parse(sessionStorage.getItem(KEY)); sessionStorage.removeItem(KEY); } catch (e) {}
-    history.replaceState(null, '', location.pathname + location.search + ((st && st.back) || ''));
+    const back = st && st.back ? (st.back.startsWith('#/') ? st.back.slice(2) : st.back) : './';   // #/… 是改版前存的
+    history.replaceState(null, '', back || './');
     if (p.get('error')) return Promise.reject(new Error('Google 登入已取消'));
     const idt = p.get('id_token');
     if (!st || p.get('state') !== st.state || jwtPayload(idt).nonce !== st.nonce) return Promise.reject(new Error('登入驗證失敗，請再試一次'));

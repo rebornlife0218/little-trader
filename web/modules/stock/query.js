@@ -232,12 +232,12 @@
     async mount(el, ctx) {
       let last = '2330', range = '1y';
       try { last = localStorage.getItem('lt.query.symbol') || last; range = localStorage.getItem('lt.query.range') || range; } catch (e) {}
-      // 從其他頁面的代號連結過來(#/stock/query/<代號>)：直接查這一檔，並顯示「返回」按鈕
-      const fromLink = decodeURIComponent(location.hash.split('/')[3] || '').toUpperCase();
+      // 從其他頁面的代號連結過來(stock/query/<代號>)：直接查這一檔，並顯示「返回」按鈕
+      const fromLink = (LT.path()[2] || '').toUpperCase();
       if (/^[0-9A-Z]{4,6}$/.test(fromLink)) last = fromLink;
       let back = null;
       try { back = JSON.parse(sessionStorage.getItem('lt.query.back') || 'null'); } catch (e) {}
-      if (!fromLink || !back || back.hash.startsWith('#/stock/query')) back = null;
+      if (!fromLink || !back || typeof back.url !== 'string' || back.url.startsWith('stock/query')) back = null;
       if (!RANGES.some(r => r[0] === range)) range = '1y';
       const opts = { mode: 'raw', panels: new Set(PANELS.map(p => p.key)), onCursor: () => {} };
       try { opts.mode = localStorage.getItem('lt.query.mode') === 'adj' ? 'adj' : 'raw'; } catch (e) {}
@@ -290,7 +290,8 @@
         const symbol = toSymbol($('#pqSym').value);
         $('#pqSym').value = symbol;
         try { localStorage.setItem('lt.query.symbol', symbol); localStorage.setItem('lt.query.range', range); } catch (e) {}
-        if (fromLink) history.replaceState(null, '', `#/stock/query/${encodeURIComponent(symbol)}`);   // 重新整理時查同一檔
+        history.replaceState(null, '', `stock/query/${encodeURIComponent(symbol)}`);   // 網址帶代號：重新整理、分享時查同一檔
+        LT.crumbs(symbol);
         if (chart) { chart.destroy(); chart = null; }
         $('#pqOut').innerHTML = '<div class="panel"><p class="mute"><span class="spinner"></span>查詢中…</p></div>';
         const from = $('#pqFrom').value, to = $('#pqTo').value;

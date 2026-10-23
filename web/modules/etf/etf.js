@@ -1,4 +1,4 @@
-/* ETF 區塊(ETF大禮包在 pack.js)
+/* ETF 區塊(ETF介紹、怎麼存ETF、ETF研究在 lib.js、intro.js、save.js、research.js)
    · 即將發行ETF：資料集 data/etf_upcoming/(pipeline/etf_upcoming/update.py，排程見 .github/workflows/data-etf_upcoming.yml) */
 (() => {
   const DATASET = 'etf_upcoming';

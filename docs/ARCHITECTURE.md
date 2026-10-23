@@ -6,20 +6,26 @@
 
 ```
 web/                                網站(部署時整個資料夾就是網站根目錄)
-  index.html                        外框，在此依序載入框架與訪客也能看的模組 <script defer>(平行下載、依序執行)；會員區塊的程式登入後才由 app.js 載入
+  index.html                        外框，在此依序載入框架與訪客也能看的模組 <script defer>(平行下載、依序執行)；會員區塊的程式登入後才由 app.js 載入。
+                                    <base href="/"> 是網站根目錄(所有網址都寫相對路徑)；標題、說明、分享預覽(og:)是部署時產生各頁 HTML 的範本
   assets/
-    js/app.js                       框架：側欄區塊 SECTIONS、頁面註冊、路由、資料載入、會員區塊的鎖與登入畫面
+    js/app.js                       框架：側欄區塊 SECTIONS、頁面註冊、路由(一般網址，見「網址」)、麵包屑、分頁元件 LT.tabs、目錄頁 LT.catalog、資料載入、會員區塊的鎖與登入畫面
     js/auth.js                      Google 登入(不用 Firebase SDK)：Google OAuth → Firebase REST → api/session 發 cookie；api/me 取得身分
     js/firebase-config.js           Firebase 與 Google 登入的設定(apiKey、projectId、clientId，都是公開資訊)
     js/chart.js                     共用 SVG 圖表 LTChart.line / LTChart.bars(跟隨主題與寬度、滑鼠提示)
     css/components.css、layout.css  色彩變數(暗色/淺色)與元件樣式、版型
     vendor/                         第三方套件(放在本站以符合 CSP)：marked(Markdown)、KaTeX(公式)
-    img/logo.svg                    吉祥物「小K」
+    img/logo.svg                    吉祥物「小K」；img/og.png 是分享到 LINE、FB 時的預覽圖(1200×630)
   modules/
     home/home.js                    首頁：各區塊入口、各資料集更新狀態
-    indices/indices.js              指數：大盤漲跌分析、K棒型態
+    indices/core.js … render.js     指數：大盤漲跌分析、K棒型態分析，拆成 7 個檔、共用全域變數(順序不能換，見 index.html)：
+                                    core(常數、state、均線、多空定義)、patterns(K棒型態偵測)、events(急跌反彈偵測、資料載入)、
+                                    kchart(K 線圖)、myth(常見迷思)、cycle(週期性分析)、render(畫面與註冊)
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
-    etf/pack.js                     ETF：ETF介紹、怎麼存ETF 兩個頁面，與 ETF研究(目錄頁：投資方式、主動式 ETF 分組的研究卡片；A 系列 ETF 跟單用資料集 etf_research，績效統計共用 tw-strategy.js 的 LTTW)；舊網址 #/etf/pack 轉到新頁面
+    etf/lib.js                      ETF 共用(window.LTETF)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料(etf_compare)
+    etf/intro.js                    ETF：ETF介紹
+    etf/save.js                     ETF：怎麼存ETF(常存 ETF 比較、配息課稅試算、0050 vs 勞退基金)
+    etf/research.js                 ETF：ETF研究(目錄頁：投資方式、主動式 ETF 分組的研究卡片；A 系列 ETF 跟單用資料集 etf_research，績效統計共用 tw-strategy.js 的 LTTW)；舊網址 etf/pack 轉到新頁面
     etf/etf.js                      ETF：即將發行ETF
     stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
     stock/tw.js                     股票 · 台股：隔日沖(建置中)
@@ -28,7 +34,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：策略(目錄頁)；S&P500 季度換股策略回測(單一策略頁裡選總覽或單一策略；資料集 sp500)
     stock/query.js                  股票 · 台股：股票查詢(不列在側欄，從 LOGO 下方的搜尋框或代號連結進入；K 線圖、法人、融資券、借券、月營收與除權息等事件；api/prices，資料在 Cloudflare D1)
-    admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能
+    admin/admin.js                  後台(other/admin，只給管理員，不列在側欄)：最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
     option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
@@ -53,7 +59,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的台股日資料；只在本機執行)，最後呼叫 events.py
   tw_strategy/events.py             台股事件型策略的共用引擎(每天選股、隔天開盤進場、持有幾天出場；漲跌停進不了場或出不了場；本金 100 萬的整數股資金模擬與交易成本，低波動也共用)：融資都沒退(做多)、大盤跌個股逆勢漲(做空)，每個策略一個 JSON
   tw_strategy/private_strategies.py 不公開的策略(條件、網頁說明、密碼；不進版控，只在本機，要自己備份)：輸出時整份加密，網頁輸入密碼後解密
-  run_local.py                      本機資料集(tw_strategy、disposition、etf_compare)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
+  run_local.py                      本機資料集(tw_strategy、disposition、etf_compare)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署；失敗時跳 Windows 通知
   tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
   etf_research/update.py            「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
@@ -68,13 +74,17 @@ functions/                          Cloudflare Pages Functions(後端，只在 C
   data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
 migrations/                         D1 資料表(users、guest_links、query_logs、page_views、usage_daily、rate_minute、symbols、price_chunks、meta)
-scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)與 GitHub Pages 的公開版
-wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose)
+scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)、各頁面的 HTML(標題與分享預覽)、sitemap.xml、GitHub Pages 的公開版
+scripts/site-map.mjs                在 Node 裡載入頁面程式，列出所有頁面與網址(build-site.mjs 與自動測試共用)
+scripts/check-freshness.mjs         本機排程的資料多久沒更新(check-local.yml 呼叫)
+tests/                              自動測試(npm test，node:test)：site(頁面註冊、權限清單、defer、外部腳本、#/ 舊網址)、build(部署流程)、functions(來源檢查、會員權限)
+wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose；esbuild 給自動測試打包 functions/)
 
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
   data-<資料集>.yml                  各資料集的排程，只呼叫 _dataset.yml
-  deploy.yml                        組合 web/ 與 data 分支 → Cloudflare Pages(完整版＋functions/)＋ GitHub Pages(公開版)
+  deploy.yml                        自動測試 → 組合 web/ 與 data 分支 → Cloudflare Pages(完整版＋functions/)＋ GitHub Pages(公開版)；測試沒過就不部署
+  check-local.yml                   本機排程檢查：台北週二~六 14:00 檢查本機資料集與股票查詢的更新時間，停更就失敗(GitHub 寄信)
 ```
 
 ## 資料怎麼流動
@@ -84,7 +94,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
 4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 Cloudflare Pages 與 GitHub Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
-網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料、ETF大禮包的資料來源除外；頁尾固定寫「資料來源：臺灣證券交易所、證券櫃檯買賣中心、臺灣期貨交易所、公開資訊觀測站、臺灣集中保管結算所」，在 `index.html`)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
+網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料、ETF介紹、怎麼存ETF、ETF研究的資料來源除外；頁尾固定寫「資料來源：臺灣證券交易所、證券櫃檯買賣中心、臺灣期貨交易所、公開資訊觀測站、臺灣集中保管結算所」，在 `index.html`)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
 
 ## 部署
 
@@ -96,6 +106,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 | https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪：公開版(沒有後端、不能登入，會員區塊顯示「到主站登入」) | `deploy.yml` 的 `github-pages` 工作，用 `scripts/build-site.mjs` 拿掉會員限定的程式與資料 |
 
 - 觸發點不變：推送到 main、資料集排程、`run_local.py`(`gh workflow run deploy.yml`)都會一次部署兩邊。只改網站內容的話，照舊 commit + push 即可，不用碰 Cloudflare。
+- 部署前先跑自動測試(`deploy.yml` 的 `test` 工作，同本機的 `npm test`)，沒過就不部署；改程式後 push 前請先在本機跑 `npm test`。
 - 不用 Cloudflare 的「連接 GitHub 自動建置」：網站是 main 的 `web/` 加上 data 分支組合而成，資料更新只推 data 分支，用 Git 連接會漏掉資料更新。
 - Cloudflare 沒設定好(缺 secrets)時，`cloudflare-pages` 會顯示警告並略過，不影響 GitHub Pages。
 - 網頁一律用相對路徑(GitHub Pages 在 `/little-trader/` 子路徑、Cloudflare 在根目錄，兩邊都能用)；新增檔案或連結時不要寫 `/` 開頭的絕對路徑。
@@ -124,7 +135,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 |---|---|
 | 訪客 | 指數、統計學、其他 |
 | 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
-| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin`；後台統計不含管理員自己的紀錄(管理員帳號，以及登入前在同一個瀏覽器用訪客身分的紀錄：登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`) |
+| 管理員(`users.role = 'admin'`) | 另外有後台 `other/admin`；後台統計不含管理員自己的紀錄(管理員帳號，以及登入前在同一個瀏覽器用訪客身分的紀錄：登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`) |
 
 **怎麼運作**
 
@@ -168,13 +179,13 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 ## 股票查詢
 
-- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `#/stock/query/<代號>`(`modules/stock/query.js`，登入 Google 才能用；不列在側欄)。查詢頁也可以改代號、選期間：
+- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `stock/query/<代號>`(`modules/stock/query.js`，登入 Google 才能用；不列在側欄)。查詢頁也可以改代號、選期間：
   - 標題列：代號、名稱、上市／上櫃／創新板、股本(億元，實收資本額；ETF 沒有股本)。
   - K 線圖(canvas)：左上角切換原始價、還原價(開高低乘上當天的還原收盤價 ÷ 收盤價)；5、20、60MA；點一下出現十字線(左側價格軸標收盤價)，資訊列列出開高低收、各 MA(後面 ↑↓ 是當天斜率)、成交量、外資與投信買賣超、融資券餘額、借券賣出餘額、當天的事件；滾輪縮放、拖曳平移、← → 移動。為了讓 60MA 從第一天就有值，查詢時多抓前 120 個日曆天(圖一開始只顯示查詢期間)。
   - 事件：月營收在公告日的 K 棒上方畫小菱形(紅色 = 單月營收年成長、綠色 = 年衰退，點 K 棒在資訊列看年成長 %)；「息」除權息、「分割」分割或減資、「停」暫停交易標在 K 棒下方；處置期間畫淡色底。
   - 下方小圖(可隱藏)：成交量、外資買賣超、投信買賣超、融資餘額、融券餘額、借券賣出餘額(都是張)。
   - 統計卡(最新收盤、含息報酬、年化、外資與投信累計買賣超)。
-  - 從其他頁面連過來：網址 `#/stock/query/<代號>` 會直接查這一檔，上方出現「← 返回(原頁面)」按鈕，按了回到原本的頁面與捲動位置。
+  - 從其他頁面連過來：網址 `stock/query/<代號>` 會直接查這一檔(換代號時網址跟著改，可以分享)，上方出現「← 返回(原頁面)」按鈕，按了回到原本的頁面與捲動位置。
 - 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價、成交量、外資與投信買賣超、融資(`資餘`)與融券(`券餘`)餘額、借券賣出餘額，單位都已用 2330 核對(都是張)。事件來自 `cm.tw_monthly_revenue`(公告日、單月合併營收年成長，沒有合併數字時用單月營收)、`cm.tw_trading_halt`、`cm.tw_disposition`；除權息、分割或減資沒有現成欄位，由「還原收盤價 ÷ 收盤價」的跳動推算(超過四捨五入誤差才算；跳動超過 25% 視為分割或減資)，日期對到該股票的交易日(公告日沒交易就放在下一個交易日)。名稱、市場、股本來自 `cm.tw_company_info`(上市上櫃代碼：1 上市、2 上櫃、7 創新板)；資料庫沒有 ETF，改用證交所(上市)、櫃買中心(上櫃)當天的收盤行情補名稱與市場(累積在 `~/.cache/little-trader/etf_names.json`)。
 - 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON，欄位與事件都在裡面)，全部約 2.2 萬筆、92 MB；查 10 年只讀約 11 列。
 - 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳(約 4 分鐘)。`run_local.py` 每天在 cm 同步後執行。
@@ -199,6 +210,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 本機資料集(tw_strategy、disposition、etf_compare)：
 - 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-<資料集>.yml`；由 Windows 工作排程器「LittleTrader_local」在 cm 同步(`CM_PostgreSQL_Sync`：週一~五 23:30、週二~六 12:00；台股日資料約 21:30 進 repo)之後以 `pythonw.exe` 執行 `pipeline/run_local.py`，cm 同步還在跑會先等它結束。不能用 Git Bash：電腦睡眠(新式待命)時排程會在背景執行，msys 的 bash.exe 在這個狀態下啟動失敗(0xC0000142)，所以發佈步驟(同 `publish_data.sh`)在 run_local.py 裡用 Python 呼叫 git.exe。輸出記錄在 `~/.cache/little-trader/local.log`。
+- 失敗通知：run_local.py 有資料集失敗時跳出 Windows 通知(睡眠中錯過的留在通知中心)；電腦沒開、排程根本沒跑時，由 GitHub 的「本機排程檢查」(`check-local.yml`，台北週二~六 14:00)發現：本機資料集的 `updated_at` 超過 20 小時沒更新，或股票查詢 D1 的 `meta.last_date` 比 tw_strategy 的 `asof` 舊，workflow 就失敗，GitHub 會寄信(帳號 Settings › Notifications › Actions 要開失敗通知)。Cloudflare 金鑰沒有 D1 讀取權限時，股票查詢那項只顯示警告、不算失敗。
 - 兩個排程都設定「喚醒電腦執行」與「錯過時間就補跑」(2026-10-17 實測)：插電睡眠時會在背景準時執行、螢幕不會亮，執行完自動回到睡眠；用電池時，從開始功能表選「睡眠」後排程不會執行，要等下次喚醒電腦才補跑(補跑正常)；但閒置自動關閉螢幕(Windows 記為「閒置逾時」進入新式待命)時，程式與排程都照常執行。所以本機的電源設定為：睡眠「永不」、閒置關閉螢幕(電池 5 分鐘、插電 10 分鐘)、電源鍵 =「關閉顯示器」、闔上螢幕 =「不執行任何動作」；離開時按電源鍵或放著讓螢幕自己關，不要選睡眠。建立排程時要取消「只在插電時才啟動」(`New-ScheduledTaskSettingsSet` 預設是勾選的)。
 - 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
 - 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(證交所資料，GitHub Actions 每天 15:30 更新)。
@@ -223,7 +235,7 @@ LT.register({ section: 'stock', key: 'disposition', name: '處置股', desc: '�
 
 LT.register({
   section: 'stock',            // 區塊 key(app.js 的 SECTIONS)
-  key: 'my-study',             // 網址：#/stock/my-study
+  key: 'my-study',             // 網址：stock/my-study
   name: '我的研究',             // 側欄顯示名稱
   async mount(el, ctx) {       // el 是內容區；ctx.alive() 為 false 代表使用者已切到別頁
     const { meta, data } = await LT.loadJSON('my_dataset', 'items.json');
@@ -250,14 +262,30 @@ LT.register({
   });
   ```
 
-  `#/<區塊>/<頁面>` 是分組的卡片列表，`#/<區塊>/<頁面>/<項目>` 是單一內容(上方有「← 返回」，可分享、加書籤)；`run(el, ctx)` 畫內容，`ctx.alive()` 同一般頁面，內容裡還有分頁時呼叫 `ctx.view('分頁名稱')`。後台的熱門主題自動記到「分組 › 項目」。目前用在 ETF研究、台股其他研究、台股策略、美股策略。
+  `<區塊>/<頁面>` 是分組的卡片列表，`<區塊>/<頁面>/<項目>` 是單一內容(上方的麵包屑可以回到列表，可分享、加書籤)；`run(el, ctx)` 畫內容，`ctx.alive()` 同一般頁面，內容裡還有分頁時呼叫 `ctx.view('分頁名稱')`。後台的熱門主題自動記到「分組 › 項目」。目前用在 ETF研究、台股其他研究、台股策略、美股策略。
 - **股票代號連結**：表格裡的台股代號用 `LT.stockLink(代號, 顯示文字)`，點了跳到股票查詢並直接查那一檔，查詢頁有按鈕可以跳回來(目前用在處置股、策略)。
 - **後台熱門主題的完整清單**：後台的「最受歡迎的主題」會先列出網站上所有主題(還沒人看過的顯示 0)，來源是側欄的頁面、目錄頁的分組與項目，以及註冊時的 `topics`(頁面裡的分頁、指數、章節等子項目，字串或 `{ name, items }`，名稱要和 `LT.view` 記錄的一樣；目錄頁的項目也可以加 `topics`)。新增分頁或子項目時記得一起加。
 - **後台的熱門主題細項**：頁面裡有分頁、下拉選單時，在切換的地方呼叫 `LT.view('分頁名稱', '類別', '研究名稱')`(最多三層，名稱用畫面上看到的文字)，後台就能一層一層看各細項的瀏覽次數。目錄頁會自動記錄；其他頁面目前用在選擇權市場概況(分頁)、大盤漲跌分析與 K棒型態分析(模式 › 指數)、初級統計學(章)，以及目錄頁裡的低波動選股、美股策略(分頁)。
+- **頁面裡的分頁**：用 `LT.tabs`，不要自己寫按鈕：`const tabs = LT.tabs({ items: [{ key, name, desc }], remember: 'lt.xxx', view: ctx.view, onChange: key => … })`，模板放 `${tabs.html}`，畫面放好後 `tabs.bind(el)`(套用上次的分頁並呼叫一次 onChange)，程式裡切換用 `tabs.set(key, { scroll: true })`。切換時自動記到後台熱門主題(目錄頁裡傳 `view: ctx.view`)。目前用在選擇權市場概況、低波動選股、美股策略。
+- **麵包屑**：每頁上方自動顯示「首頁 › 區塊 › (小組) › 頁面」，每一層都能點；頁面裡還有更深一層時呼叫 `LT.crumbs('名稱')` 補上(目錄頁的單一內容自動補；股票查詢補代號、統計學補章)。
+- **網址**：一般網址(不用 #)，例如 `stock/tw-strategy/lowvol`。站內連結一律寫相對網址(`href="stock/query/2330"`、首頁 `href="./"`，不要以 `/` 或 `#/` 開頭)，點了由 app.js 攔下來換頁、不重新載入；頁面讀網址用 `LT.path()`(例如 `['stock', 'query', '2330']`)，程式換頁用 `LT.go('etf/intro')`。舊的 `#/…` 網址(書籤、分享出去的連結)會自動轉成新網址。
+  - 部署時 `scripts/build-site.mjs` 依頁面清單產生每頁一份 HTML(例如 `stock/tw-strategy/lowvol.html`，內容同 index.html，只換標題、說明、canonical、og: 分享預覽)，搜尋引擎與 LINE、FB 的預覽才看得到各頁的標題；清單包含側欄頁面、目錄頁的項目，以及註冊時的 `routes`(例如統計學各章：`routes: [{ path: '1', name: '第 1 章 …' }]`)。沒有列出的網址(例如 `stock/query/2330`)由 Cloudflare Pages 回傳 index.html。
+  - GitHub Pages 備援站放在 `/little-trader/` 子目錄：部署時把 `<base href="/">` 改成子目錄，並複製一份 `404.html`。
+  - 頁面的 key 不要和網站資料夾撞名(`api`、`assets`、`content`、`data`、`modules`)，自動測試會檢查。
 - **不列在側欄的頁面**：註冊時加 `hidden: true`(例如後台)，只能用網址開。
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
+
+## 自動測試
+
+`npm test`(Node 內建的 node:test，第一次先 `npm install`)，部署前 GitHub Actions 也會跑，沒過就不部署：
+
+- `tests/site.test.mjs`：在 Node 裡載入全部頁面程式(`scripts/site-map.mjs`，假的瀏覽器環境)，檢查都註冊得起來、網址不重複、目錄頁的項目有 `run()`、`topics` 格式；`access.json` 的會員與後台程式都存在且不寫在 index.html、訪客載入的程式只註冊訪客區塊、每個頁面程式都有被載入；`<script>` 都加 defer、沒有 CDN 與外部腳本、沒有殘留的 `#/` 舊網址。
+- `tests/build.test.mjs`：在暫存資料夾跑一次 `build-site.mjs`，檢查 `_routes.json`、各頁 HTML 的標題與分享預覽、公開版拿掉會員檔案並改成子目錄。
+- `tests/functions.test.mjs`：用 esbuild 把 `functions/` 打包後直接呼叫：別的網站來的請求 403、不回 `Access-Control-Allow-Origin: *`、會員程式與資料集訪客 401(meta.json 公開)、登入後可下載、簽章不對的 cookie 視同訪客、後台程式一般會員不能下載。
+
+新增頁面或改權限時通常不用改測試；新的規則(例如 CLAUDE.md 新增的網站原則)能自動檢查的，就加一個 test。
 
 ## 新增資料集
 
@@ -289,7 +317,7 @@ python pipeline/options/update.py
 python -m http.server 8000 -d web
 ```
 
-開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(會員區塊顯示「到主站登入」)；要測登入、會員區塊與股票查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
+開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(會員區塊顯示「到主站登入」)，而且只能從首頁點進去(http.server 不認得 `stats/basic/8` 這類網址，在子頁面重新整理會 404)；要測登入、會員區塊與股票查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
 
 ## 手動更新資料
 

@@ -52,7 +52,7 @@
       topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
     { key: 'more', name: '其他策略', desc: '更多美股策略', soon: true },
   ];
-  // 目錄頁(LT.catalog)：策略卡片，點進去是單一策略(網址 #/stock/us-strategy/<策略>)
+  // 目錄頁(LT.catalog)：策略卡片，點進去是單一策略(網址 stock/us-strategy/<策略>)
   LT.catalog({
     section: 'stock', group: '美股', key: 'us-strategy', name: '策略', title: '美股策略',
     desc: '選擇要看的策略，與買進持有 SPY 比較報酬與風險',
@@ -69,14 +69,12 @@
       const years = [...new Set(B.q.map(q => +q.q.slice(0, 4)))].filter(y => y % 5 === 0 || y === 2008);
       const cur = B.q[B.q.length - 1];
       let view = 'all';
-      try { const v = localStorage.getItem(VIEW_KEY); if (v === 'all' || STRATS.some(s => s.key === v)) view = v; } catch (e) { /* 無法使用 localStorage */ }
+      const tabs = LT.tabs({ cls: 'us-tabs', remember: VIEW_KEY, view: ctx.view, onChange: k => { view = k; draw(); },
+        items: [{ key: 'all', name: '總覽比較', desc: '四種策略與 SPY 並列' }, ...STRATS.map(s => ({ key: s.key, name: s.name, desc: s.idea }))] });
 
       el.querySelector('#usBody').innerHTML = `
         <div class="panel">
-          <div class="mode-tabs us-tabs">
-            <button class="mode-tab" data-k="all"><b>總覽比較</b><small>四種策略與 SPY 並列</small></button>
-            ${STRATS.map(s => `<button class="mode-tab" data-k="${s.key}"><b>${esc(s.name)}</b><small>${esc(s.idea)}</small></button>`).join('')}
-          </div>
+          ${tabs.html}
           <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
             <div class="paramitem"><label for="usFrom">回測起點</label><select id="usFrom">${years.map(y => `<option value="${y}" ${y === 2000 ? 'selected' : ''}>${y} 年初</option>`).join('')}</select></div>
             <div class="paramitem"><label for="usCost">交易成本(單邊，%)</label><input id="usCost" type="number" min="0" max="2" step="0.05" value="0.1"></div>
@@ -199,7 +197,7 @@
             </tbody></table></div>
           </div>`;
         charts(C, [...STRATS.map(s => s.key), 'spy'], [...STRATS.map(s => s.key), 'spy'], 'spy');
-        el.querySelectorAll('#usView tr[data-go]').forEach(tr => { tr.onclick = () => setView(tr.dataset.go, true); });
+        el.querySelectorAll('#usView tr[data-go]').forEach(tr => { tr.onclick = () => tabs.set(tr.dataset.go, { scroll: true }); });
       }
 
       /* ---------- 單一策略 ---------- */
@@ -248,22 +246,13 @@
       }
 
       function draw() {
-        if (ctx.view) ctx.view((el.querySelector(`.us-tabs [data-k="${view}"] b`) || {}).textContent);
         const C = calc();
-        el.querySelectorAll('.us-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.k === view));
         if (view === 'all') renderAll(C); else renderOne(C, view);
         LTChart.bars($('#usCov'), { x: C.Q.map(q => q.q), label: '可取得股價的成分股比例', height: 180, yMin: 0, yMax: 1,
           xFmt: (v, tip) => tip ? v : v.endsWith('Q1') && +v.slice(0, 4) % 5 === 0 ? v.slice(0, 4) : '', yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v, i) => `${(v * 100).toFixed(0)}%(${C.Q[i].usable} / ${C.Q[i].members} 檔)`,
           series: [{ name: '覆蓋率', y: C.Q.map(q => q.usable / q.members), color: 'var(--blue)' }] });
       }
-      function setView(v, scroll) {
-        view = v;
-        try { localStorage.setItem(VIEW_KEY, v); } catch (e) { /* 無法使用 localStorage */ }
-        draw();
-        if (scroll) $('.us-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-      $('.us-tabs').onclick = e => { const b = e.target.closest('[data-k]'); if (b) setView(b.dataset.k); };
       $('#usFrom').onchange = draw; $('#usCost').oninput = draw; $('#usScale').onchange = draw;
-      draw();
+      tabs.bind(el);   // 套用上次看的分頁並畫出來
   }
 })();

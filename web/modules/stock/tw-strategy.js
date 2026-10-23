@@ -107,10 +107,8 @@
       { key: 'against', name: '大盤跌個股逆勢漲就是欠踹', desc: '大盤大跌時逆勢大漲、借券賣出創新高的股票，隔天開盤放空、當天收盤回補', run: eventStrat('against') },
     ] },
   ];
-  const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 無法使用 localStorage */ } };
-  const recall = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 
-  // 目錄頁(LT.catalog)：依做多、做空分組的策略卡片，點進去是單一策略(網址 #/stock/tw-strategy/<策略>)
+  // 目錄頁(LT.catalog)：依做多、做空分組的策略卡片，點進去是單一策略(網址 stock/tw-strategy/<策略>)
   LT.catalog({
     section: 'stock', group: '台股', key: 'tw-strategy', name: '策略', title: '台股策略',
     desc: '依做多、做空分組的策略，一律與買進持有 0050 比較報酬與風險',
@@ -128,14 +126,12 @@
     if (!ctx.alive()) return;
     const P = B.params;
     let view = 'all';
-    { const v = recall(VIEW_KEY); if (v === 'all' || STRATS.some(s => s.key === v)) view = v; }
+    const tabs = LT.tabs({ cls: 'tw-tabs', remember: VIEW_KEY, view: ctx.view, onChange: k => { view = k; draw(); },
+      items: [{ key: 'all', name: '總覽比較', desc: '兩種低波動組合與 0050 並列' }, ...STRATS.map(s => ({ key: s.key, name: s.name, desc: s.short }))] });
 
     el.querySelector('#twBody').innerHTML = `
       <div class="panel">
-        <div class="mode-tabs tw-tabs">
-          <button class="mode-tab" data-k="all"><b>總覽比較</b><small>兩種低波動組合與 0050 並列</small></button>
-          ${STRATS.map(s => `<button class="mode-tab" data-k="${s.key}"><b>${esc(s.name)}</b><small>${esc(s.short)}</small></button>`).join('')}
-        </div>
+        ${tabs.html}
         <div class="doc">
           <p><b>選股規則</b>：</p>
           <ul>
@@ -256,7 +252,7 @@
           <p class="note">紅色越深代表漲越多、綠色越深代表跌越多；粗體底線表示當年贏過 0050。</p>
         </div>`;
       charts(C, [...STRATS.map(s => s.key), 'b0050', 'ew'], [...STRATS.map(s => s.key), 'b0050'], 'b0050');
-      el.querySelectorAll('#twView tr[data-go]').forEach(tr => { tr.onclick = () => setView(tr.dataset.go, true); });
+      el.querySelectorAll('#twView tr[data-go]').forEach(tr => { tr.onclick = () => tabs.set(tr.dataset.go, { scroll: true }); });
     }
 
     /* ---------- 單一策略 ---------- */
@@ -307,21 +303,13 @@
 
     function draw() {
       const C = calc();
-      el.querySelectorAll('.tw-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.k === view));
-      if (ctx.view) ctx.view(el.querySelector(`.tw-tabs [data-k="${view}"] b`).textContent);
       if (view === 'all') renderAll(C); else renderOne(C, view);
       LTChart.bars($('#twCov'), { x: C.M.map(m => m.m), label: '合格股票數', height: 180, yMin: 0,
         xFmt: (v, tip) => tip ? v : v.endsWith('-01') ? v.slice(0, 4) : '', yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`,
         series: [{ name: '合格股票數', y: C.M.map(m => m.n), color: 'var(--blue)' }] });
     }
-    function setView(v, scroll) {
-      view = v; store(VIEW_KEY, v);
-      draw();
-      if (scroll) $('.tw-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-    $('.tw-tabs').onclick = e => { const b = e.target.closest('[data-k]'); if (b) setView(b.dataset.k); };
     $('#twScale').onchange = draw;
-    draw();
+    tabs.bind(el);   // 套用上次看的分頁並畫出來
   }
 
   /* ---------- 事件型策略(資料集 tw_strategy 的 <key>.json，pipeline/tw_strategy/events.py)：每天收盤選股、隔天開盤進場、持有幾天出場 ----------

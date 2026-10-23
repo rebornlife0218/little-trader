@@ -37,6 +37,25 @@ def run(cmd, cwd=None, env=None, check=True):
     return p.returncode, out
 
 
+TOAST = r"""
+[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+[void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
+$e = { param($s) [Security.SecurityElement]::Escape($s) }
+$x = New-Object Windows.Data.Xml.Dom.XmlDocument
+$x.LoadXml("<toast><visual><binding template='ToastGeneric'><text>$(& $e $env:LT_TITLE)</text><text>$(& $e $env:LT_MSG)</text></binding></visual></toast>")
+$app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($x))
+"""
+
+
+def notify(msg):
+    """失敗時跳出 Windows 通知(睡眠中錯過的會留在通知中心)；電腦沒開時由 GitHub 的「本機排程檢查」寄信"""
+    env = {**os.environ, 'LT_TITLE': 'Little Trader 本機排程失敗', 'LT_MSG': f'{msg}\n記錄：{LOG}'}
+    code, out = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', TOAST], env=env, check=False)
+    if code:
+        log.warning('Windows 通知失敗：%s', out[-300:])
+
+
 def wait_cm_sync(max_min=60):
     """cm 同步還在跑就等它，避免讀到一半的資料"""
     for i in range(max_min * 2):
@@ -122,11 +141,13 @@ def main():
         if published:
             run(['gh', 'workflow', 'run', 'deploy.yml', '--ref', 'main', '--repo', REPO])
             log.info('已觸發重新部署')
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
         log.exception('執行失敗')
+        notify(f'執行失敗：{str(e)[:150]}')
         sys.exit(1)
     if failed:
         log.error('失敗：%s', '、'.join(failed))
+        notify(f'更新失敗：{"、".join(failed)}')
         sys.exit(1)
     log.info('完成')
 

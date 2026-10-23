@@ -27,8 +27,14 @@
     return best && best.k;
   }
 
+  // 三個分頁(LT.tabs)；名稱也是後台熱門主題的子項目
+  const TABS = [
+    { key: 'metrics', name: '市場指標', desc: 'IV、P/C ratio、結算日曆' },
+    { key: 'chain', name: 'T 字報價與未平倉', desc: '各到期契約(含週選)' },
+    { key: 'calc', name: 'Black-Scholes 計算器', desc: '理論價格與 Greeks' },
+  ];
   LT.register({
-    topics: ['市場指標', 'T 字報價與未平倉', 'Black-Scholes 計算器'],   // 後台熱門主題列出的子項目(同下方三個分頁的名稱)
+    topics: TABS.map(t => t.name),
     section: 'option', key: 'market', name: '選擇權市場概況',
     async mount(el, ctx) {
       el.innerHTML = `<div class="panel"><div class="empty"><p>正在載入選擇權資料…</p></div></div>`;
@@ -49,21 +55,23 @@
       }
       const near = chain.expiries.find(e => !e.code[6]) || chain.expiries[0];
       const fut = LTOpt.futuresFor(futures, near.code);
+      // 分頁切換(記住上次的分頁)；計算器第一次切過去才畫
+      let calcReady = false;
+      const tabs = LT.tabs({ items: TABS, cls: 'mk-tabs', remember: 'lt.optTab', onChange: t => {
+        el.querySelectorAll('.mk-pane').forEach(p => { p.hidden = p.dataset.pane !== t; });
+        if (t === 'calc' && !calcReady) { calcReady = true; LTOpt.calculator(el.querySelector('[data-pane=calc]'), D); }
+      } });
       el.innerHTML = `
         <header class="top"><div>
           <h1>選擇權市場概況</h1>
           <p>臺指選擇權(TXO)：隱含波動率、P/C ratio、結算日曆、各履約價的報價與未平倉量，以及 Black-Scholes 計算器</p>
         </div></header>
-        <div class="mode-tabs mk-tabs">
-          <button class="mode-tab active" data-tab="metrics"><b>市場指標</b><small>IV、P/C ratio、結算日曆</small></button>
-          <button class="mode-tab" data-tab="chain"><b>T 字報價與未平倉</b><small>各到期契約(含週選)</small></button>
-          <button class="mode-tab" data-tab="calc"><b>Black-Scholes 計算器</b><small>理論價格與 Greeks</small></button>
-        </div>
+        ${tabs.html}
         <div class="mk-pane" data-pane="metrics">
         <div class="panel"><div class="statgrid">
           <div class="stat"><div class="v" style="font-size:18px;">${esc(chain.date)}</div><div class="l">最新交易日</div></div>
           <div class="stat"><div class="v">${spot ? fmt(spot.close, 0) : '—'}</div><div class="l">加權指數收盤${spot ? `(${esc(spot.date)})` : ''}</div></div>
-          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="#/index/futures">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
+          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="index/futures">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
           <div class="stat"><div class="v">${pct(hist.iv30[n])}</div><div class="l">30 天隱含波動率</div></div>
           <div class="stat"><div class="v">${pct(hv[n])}</div><div class="l">20 日歷史波動率</div></div>
           <div class="stat"><div class="v">${fmt(hist.pcoi[n], 1)}%</div><div class="l">P/C ratio(未平倉)</div></div>
@@ -82,7 +90,7 @@
         <div class="panel">
           <h3>結算日曆</h3>
           ${LTOpt.settlementTable(LTOpt.settlements(D, 10))}
-          <p class="note">臺指選擇權有<b>月選擇權</b>(每月第 3 個週三結算，與台指期同一天)與<b>週選擇權</b>(每週三、週五結算)。週選擇權到期時間短、時間價值流失快(Theta 大)，結算前最後幾天價格對指數變動非常敏感。月結算時期貨部位需要轉倉，見<a href="#/index/futures">台指期貨</a>。</p>
+          <p class="note">臺指選擇權有<b>月選擇權</b>(每月第 3 個週三結算，與台指期同一天)與<b>週選擇權</b>(每週三、週五結算)。週選擇權到期時間短、時間價值流失快(Theta 大)，結算前最後幾天價格對指數變動非常敏感。月結算時期貨部位需要轉倉，見<a href="index/futures">台指期貨</a>。</p>
         </div>
         </div>
         <div class="mk-pane" data-pane="chain" hidden>
@@ -176,18 +184,7 @@
           </tr>`).join('')}</tbody>`;
         document.getElementById('tqToggle').textContent = showAll ? '只顯示價平上下 15 檔' : '顯示全部履約價';
       }
-      // 分頁切換(記住上次的分頁)
-      let calcReady = false;
-      const showTab = t => {
-        LT.view(el.querySelector(`.mk-tabs [data-tab="${t}"] b`).textContent);   // 後台的熱門主題
-        el.querySelectorAll('.mk-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
-        el.querySelectorAll('.mk-pane').forEach(p => { p.hidden = p.dataset.pane !== t; });
-        if (t === 'calc' && !calcReady) { calcReady = true; LTOpt.calculator(el.querySelector('[data-pane=calc]'), D); }
-        try { localStorage.setItem('lt.optTab', t); } catch (e) {}
-      };
-      el.querySelector('.mk-tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
-      let saved = 'metrics'; try { saved = localStorage.getItem('lt.optTab') || 'metrics'; } catch (e) {}
-      showTab(['metrics', 'chain', 'calc'].includes(saved) ? saved : 'metrics');
+      tabs.bind(el);
       pick.onchange = drawExpiry;
       document.getElementById('tqToggle').onclick = () => { showAll = !showAll; drawExpiry(); };
       drawExpiry();

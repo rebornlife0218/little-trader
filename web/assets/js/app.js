@@ -1,7 +1,7 @@
 /* ==========================================================================
    Little Trader 網站框架：區塊(側欄)註冊、頁面路由
    新增研究內容：在 modules/<區塊>/ 新增 JS，呼叫 LT.register({...})(外部連結用 href)，
-   再到 index.html 加上 <script src="modules/..."></script> 即可。詳見 docs/ARCHITECTURE.md
+   再到 index.html 加上 <script defer src="modules/..."></script>(會員區塊改加到 functions/_lib/access.json)。詳見 docs/ARCHITECTURE.md
    ========================================================================== */
 const LT = (() => {
   // 側欄區塊(順序即側欄順序)；新增區塊直接在這裡加一筆，desc 顯示在首頁
@@ -20,6 +20,43 @@ const LT = (() => {
   let current = null;
   let routeSeq = 0; // 換頁計數：非同步載入完成時用來確認使用者還在同一頁
 
+  /* ---------- 網址：一般網址(不用 #)，例如 stock/tw-strategy/lowvol ----------
+     網站根目錄由 index.html 的 <base href> 決定(主站是 /；GitHub Pages 備援站是 /little-trader/，部署時由 scripts/build-site.mjs 改寫)，
+     所以站內連結、資料、API 一律寫相對網址(href="stock/query/2330"，首頁 href="./")。
+     點站內連結不重新載入網頁：click 攔下來用 history.pushState 換網址再 route()；舊的 #/… 網址(書籤、分享出去的連結)自動轉成新網址 */
+  const BASE = new URL(document.baseURI).pathname;
+  // 目前網址的各層(已解碼)：['stock', 'query', '2330']；首頁是 []
+  function path() {
+    const p = location.pathname.startsWith(BASE) ? location.pathname.slice(BASE.length) : location.pathname.replace(/^\//, '');
+    return p.split('/').filter(x => x && x !== 'index.html').map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });
+  }
+  const here = () => path().map(encodeURIComponent).join('/');   // 目前頁面的相對網址
+  // 換頁：LT.go('stock/query/2330')；replace: true 不留在上一頁的紀錄裡(例如舊網址轉新網址)
+  function go(url, opt = {}) {
+    url = String(url || '').replace(/^#?\/?/, '');
+    history[opt.replace ? 'replaceState' : 'pushState'](null, '', url || './');
+    route();
+  }
+  document.addEventListener('click', e => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    const a = e.target.closest && e.target.closest('a[href]');
+    if (!a || a.target || a.hasAttribute('download')) return;
+    const raw = a.getAttribute('href');
+    if (raw.startsWith('#') && !raw.startsWith('#/')) {          // 同一頁裡的錨點：只捲動，不換頁
+      e.preventDefault();
+      const t = raw.length > 1 && document.getElementById(decodeURIComponent(raw.slice(1)));
+      if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const u = new URL(a.href);
+    if (u.origin !== location.origin || !u.pathname.startsWith(BASE)) return;
+    const rel = raw.startsWith('#/') ? raw.slice(2) : u.pathname.slice(BASE.length);
+    const first = rel.split('/')[0];
+    if (first && !SECTIONS.some(sec => sec.key === first)) return;   // data/、assets/ 等檔案照常開啟
+    e.preventDefault();
+    if (rel !== here()) go(rel); else window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
   /* ---------- 會員：訪客看不到的區塊(由後端 functions/_lib/access.json 決定，經 api/me 傳回) ----------
      會員區塊的頁面程式不寫在 index.html，登入的會員才由 api/me 拿到清單、在這裡載入；
      伺服器也會擋訪客直接下載這些程式與資料，所以畫面上的鎖只是提示 */
@@ -37,7 +74,7 @@ const LT = (() => {
   // 登入按鈕(訪客)或「到主站登入」(備援站沒有後端)
   function loginButton(label = '用 Google 登入') {
     if (auth.canLogin) return `<button type="button" class="login-btn" onclick="LTAuth.login()">${label}</button>`;
-    if (!auth.api) return `<a class="login-btn" href="${LTAuth.MAIN_SITE}${location.hash}">到主站登入 ↗</a>`;
+    if (!auth.api) return `<a class="login-btn" href="${LTAuth.MAIN_SITE}${here()}">到主站登入 ↗</a>`;
     return '<span class="mute">登入功能尚未開放</span>';
   }
   function lockedPanel(sec) {
@@ -55,14 +92,14 @@ const LT = (() => {
     if (!el) return;
     el.innerHTML = auth.kind === 'member'
       ? `<div class="acct-who" title="${esc(auth.email || '')}">👤 ${esc(auth.email || 'Google 帳號')}</div>
-         ${auth.admin ? '<a class="acct-link" href="#/other/admin">後台</a>' : ''}<button type="button" class="acct-link" onclick="LTAuth.logout()">登出</button>`
+         ${auth.admin ? '<a class="acct-link" href="other/admin">後台</a>' : ''}<button type="button" class="acct-link" onclick="LTAuth.logout()">登出</button>`
       : `<div class="acct-who mute">訪客</div>${loginButton('Google 登入')}${LTAuth.error ? `<div class="acct-err">${esc(LTAuth.error)}</div>` : ''}`;
   }
   /* ---------- 股票代號連結：點了跳到股票查詢並直接查這一檔，查詢頁有按鈕可以跳回來 ----------
-     頁面裡用 LT.stockLink(代號, 顯示文字) 產生連結(#/stock/query/<代號>)；點的時候記住原本的頁面與捲動位置，
+     頁面裡用 LT.stockLink(代號, 顯示文字) 產生連結(stock/query/<代號>)；點的時候記住原本的頁面與捲動位置，
      按「返回」回到原本的頁面後，等內容載入再捲回原本的位置 */
   function stockLink(code, text) {
-    return `<a href="#/stock/query/${encodeURIComponent(code)}" class="stock-link" title="在股票查詢看 ${esc(code)}">${esc(text ?? code)}</a>`;
+    return `<a href="stock/query/${encodeURIComponent(code)}" class="stock-link" title="在股票查詢看 ${esc(code)}">${esc(text ?? code)}</a>`;
   }
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('a.stock-link');
@@ -71,7 +108,7 @@ const LT = (() => {
   // 記住從哪一頁去股票查詢(查詢頁上方的「返回」按鈕用)；本來就在股票查詢就不覆蓋
   function rememberBack() {
     if (!current || current.key === 'query') return;
-    try { sessionStorage.setItem('lt.query.back', JSON.stringify({ hash: location.hash || '#/', name: current.name, y: window.scrollY })); } catch (er) {}
+    try { sessionStorage.setItem('lt.query.back', JSON.stringify({ url: here(), name: current.name, y: window.scrollY })); } catch (er) {}
   }
   /* ---------- LOGO 下方的股票搜尋 ----------
      輸入代號或名稱(建議清單來自 api/symbols，第一次點搜尋框才載入)，Enter 或選了建議就跳到股票查詢；
@@ -96,7 +133,7 @@ const LT = (() => {
       input.value = ''; input.blur();
       document.body.classList.remove('nav-open');
       rememberBack();
-      location.hash = `#/stock/query/${encodeURIComponent(code)}`;
+      go(`stock/query/${encodeURIComponent(code)}`);
     };
     input.addEventListener('focus', loadList);
     // 從建議清單選了一檔(值是「代號 名稱」)就直接查
@@ -110,13 +147,13 @@ const LT = (() => {
   }
   function goBack(back) {
     try { sessionStorage.setItem('lt.restoreY', JSON.stringify(back)); sessionStorage.removeItem('lt.query.back'); } catch (e) {}
-    location.hash = back.hash;
+    go(back.url);
   }
   // 從股票查詢返回時捲回原本的位置：頁面內容是非同步載入的，等頁面夠高再捲(最多等 4 秒)
   function restoreScroll(seq) {
     let r = null;
     try { r = JSON.parse(sessionStorage.getItem('lt.restoreY') || 'null'); } catch (e) {}
-    if (!r || r.hash !== location.hash) return;
+    if (!r || r.url !== here()) return;
     try { sessionStorage.removeItem('lt.restoreY'); } catch (e) {}
     const t0 = Date.now();
     (function tryScroll() {
@@ -174,8 +211,8 @@ const LT = (() => {
 
   /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
      LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, tags, soon, run(el, ctx) }] }] })
-       - #/<區塊>/<頁面>          卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
-       - #/<區塊>/<頁面>/<項目>   單一內容：上方有「← 返回列表」，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
+       - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
+       - <區塊>/<頁面>/<項目>    單一內容：上方的麵包屑可以回到列表，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
                                   ctx.view(...) 可再記一層細項(例如策略裡的分頁)
      每個項目都有自己的網址(可分享、加書籤、上一頁回到列表)，後台的熱門主題自動記到「分組 › 項目」 */
   function catalog(def) {
@@ -183,9 +220,9 @@ const LT = (() => {
       section: def.section, group: def.group, key: def.key, name: def.name, catalog: def,
       mount(el, ctx) {
         const items = def.groups.flatMap(g => g.items.map(it => ({ ...it, groupName: g.name })));
-        const want = decodeURIComponent(location.hash.split('/')[3] || '');
+        const want = path()[2] || '';
         const it = items.find(x => x.key === want && !x.soon);
-        const base = `#/${def.section}/${def.key}`;
+        const base = `${def.section}/${def.key}`;
         if (!it) {
           if (want) history.replaceState(null, '', base);   // 找不到的項目：回到列表
           el.innerHTML = `<header class="top"><div><h1>${esc(def.title || def.name)}</h1>${def.desc ? `<p>${esc(def.desc)}</p>` : ''}</div></header>
@@ -199,8 +236,8 @@ const LT = (() => {
           return;
         }
         document.title = `${it.name} · Little Trader`;
-        el.innerHTML = `<a class="cat-back" href="${base}">← ${esc(def.name)}</a>
-          <header class="top"><div><h1>${esc(it.name)}</h1><p>${it.groupName ? `<span class="cat-crumb">${esc(it.groupName)}</span>` : ''}${esc(it.desc || '')}${it.tags ? ` ${it.tags}` : ''}</p></div></header>
+        crumbs(it.name);
+        el.innerHTML = `<header class="top"><div><h1>${esc(it.name)}</h1><p>${it.groupName ? `<span class="cat-crumb">${esc(it.groupName)}</span>` : ''}${esc(it.desc || '')}${it.tags ? ` ${it.tags}` : ''}</p></div></header>
           <div class="cat-body"></div>`;
         const label = [it.groupName, it.name].filter(Boolean);
         view(...label);
@@ -211,8 +248,64 @@ const LT = (() => {
   function listPages() { return pages.slice(); }
 
   function parseHash() {
-    const [section, key] = (location.hash || '').replace(/^#\/?/, '').split('/');
+    const [section, key] = path();
     return { section, key };
+  }
+
+  /* ---------- 麵包屑：首頁 › 區塊 › (小組) › 頁面 › 單一內容，每一層都能點(小組沒有自己的頁面，只顯示文字) ----------
+     換頁時自動產生到「頁面」這層；更深的一層(目錄頁的單一內容、股票查詢的代號、統計學的章)由頁面呼叫
+     LT.crumbs('名稱') 或 LT.crumbs(['名稱', '網址'], '最後一層') 補上 */
+  let crumbExtra = [];
+  function renderCrumbs(page, sec) {
+    const el = document.getElementById('crumbs');
+    if (!el) return;
+    sec = sec || (page && SECTIONS.find(s => s.key === page.section));
+    if (!sec) { el.innerHTML = ''; el.hidden = true; return; }
+    const first = pages.find(p => p.section === sec.key && !p.hidden && !p.href);
+    const items = [['首頁', './'], [sec.name, first && !locked(sec.key) ? `${sec.key}/${first.key}` : sec.key]];
+    if (page) {
+      if (page.group) items.push([page.group]);
+      items.push([page.name, `${page.section}/${page.key}`]);
+    }
+    items.push(...crumbExtra);
+    const last = items.length - 1;
+    el.innerHTML = items.map(([n, h], i) => i < last && h ? `<a href="${h}">${esc(n)}</a>` : `<span${i === last ? ' aria-current="page"' : ''}>${esc(n)}</span>`).join('<i aria-hidden="true">›</i>');
+    el.hidden = false;
+  }
+  function crumbs(...extra) {
+    crumbExtra = extra.filter(Boolean).map(c => [].concat(c));
+    renderCrumbs(current);
+  }
+
+  /* ---------- 頁面裡的分頁(一排 .mode-tab 按鈕) ----------
+       const tabs = LT.tabs({ items: [{ key, name, desc }], active, remember: 'lt.optTab', cls: 'mk-tabs', view: ctx.view, onChange: key => … });
+       模板裡放 ${tabs.html}，放進畫面後呼叫 tabs.bind(el)：綁定點擊、套用目前的分頁並呼叫一次 onChange；程式裡切換用 tabs.set(key, { scroll: true })
+     active：預設分頁；remember：localStorage 的鍵，記住上次看的分頁；view：記到後台熱門主題的函式(預設 LT.view，目錄頁裡傳 ctx.view)
+     後台的熱門主題記的是分頁名稱 name，所以頁面註冊時 topics 也要用同樣的名稱 */
+  let tabSeq = 0;
+  function tabs(o) {
+    const id = 'lt-tabs-' + (++tabSeq), items = o.items;
+    let active = o.active, box = null;
+    if (o.remember) try { const v = localStorage.getItem(o.remember); if (items.some(t => t.key === v)) active = v; } catch (e) {}
+    if (!items.some(t => t.key === active)) active = items[0].key;
+    const html = `<div class="mode-tabs ${o.cls || ''}" role="tablist" data-tabs="${id}">${items.map(t =>
+      `<button type="button" class="mode-tab" role="tab" data-tab="${esc(t.key)}"><b>${esc(t.name)}</b>${t.desc ? `<small>${esc(t.desc)}</small>` : ''}</button>`).join('')}</div>`;
+    function set(key, opt = {}) {
+      const t = items.find(x => x.key === key);
+      if (!t) return;
+      active = key;
+      if (o.remember) try { localStorage.setItem(o.remember, key); } catch (e) {}
+      if (box) box.querySelectorAll('.mode-tab').forEach(b => { const on = b.dataset.tab === key; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
+      (o.view || view)(t.name);
+      if (o.onChange) o.onChange(key, t);
+      if (opt.scroll && box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function bind(root) {
+      box = root.querySelector(`[data-tabs="${id}"]`);
+      box.onclick = e => { const b = e.target.closest('[data-tab]'); if (b) set(b.dataset.tab); };
+      set(active);
+    }
+    return { html, set, bind, get active() { return active; } };
   }
 
   // 側欄各區塊可展開/收合；目前所在的區塊一定展開，其餘記住使用者的選擇
@@ -234,12 +327,12 @@ const LT = (() => {
       const isActive = p => active && active.section === sec.key && active.key === p.key;
       const link = p => p.href
         ? `<a href="${p.href}" target="_blank" rel="noopener" class="side-link ext" title="在新分頁開啟外部網站">${p.name}<span class="ext-ico">↗</span></a>`
-        : `<a href="#/${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`;
+        : `<a href="${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`;
       const items = locked(sec.key)
-        ? `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key ? 'active' : ''}">🔒 登入 Google 看更多</a>`
+        ? `<a href="${sec.key}" class="side-link soon ${active && active.section === sec.key ? 'active' : ''}">🔒 登入 Google 看更多</a>`
         : list.length
         ? groupPages(list).map(([g, ps]) => (g ? `<div class="side-sub">${g}</div>` : '') + ps.map(link).join('')).join('')
-        : `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
+        : `<a href="${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
       const here = active && active.section === sec.key;
       const open = here || openSections.has(sec.key);
       return `<div class="side-group ${open ? 'open' : ''} ${here ? 'here' : ''}">
@@ -272,7 +365,7 @@ const LT = (() => {
     else if (!page && sec) page = internal.find(p => p.section === section && !p.hidden) || null; // 區塊預設第一頁
     if (!page && !sec) page = internal[0];                                        // 網站預設首頁
     if (current && current.unmount) { try { current.unmount(); } catch (e) {} }
-    clearTimeout(viewTimer); lastView = '';
+    clearTimeout(viewTimer); lastView = ''; crumbExtra = [];
     const main = document.getElementById('content');
     main.innerHTML = '';
     window.scrollTo(0, 0);
@@ -280,6 +373,7 @@ const LT = (() => {
       current = page;
       if (!openSections.has(page.section)) { openSections.add(page.section); saveOpenSections(); }
       renderSidebar(page);
+      renderCrumbs(page);
       document.title = `${page.name} · Little Trader`;
       const seq = ++routeSeq;
       if (page.mount) page.mount(main, { alive: () => seq === routeSeq });
@@ -290,6 +384,7 @@ const LT = (() => {
       current = null;
       routeSeq++;
       renderSidebar({ section: sec.key });
+      renderCrumbs(null, sec);
       document.title = `${sec.name} · Little Trader`;
       main.innerHTML = locked(sec.key) ? lockedPanel(sec) : UNDER_CONSTRUCTION;
       track(sec.key, '', sec.name, locked(sec.key));
@@ -305,6 +400,7 @@ const LT = (() => {
     main.innerHTML = '';
     window.scrollTo(0, 0);
     renderSidebar(null);
+    renderCrumbs(null);
     document.title = 'Little Trader 小交易員的研究室';
     home.mount(main, { alive: () => seq === routeSeq });
     track('home', '', '首頁', false);
@@ -411,11 +507,13 @@ const LT = (() => {
     // 先確認身分(會員才載入會員區塊的程式)，再顯示頁面
     LTAuth.load().then(me => { auth = me; return loadScripts(me.scripts || []); }).then(() => {
       renderAccount();
-      window.addEventListener('hashchange', route);
+      if (location.hash.startsWith('#/')) history.replaceState(null, '', location.hash.slice(2) || './');   // 舊網址 #/…
+      window.addEventListener('popstate', route);
+      window.addEventListener('hashchange', () => { if (location.hash.startsWith('#/')) go(location.hash, { replace: true }); });
       route();
       welcome();
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();

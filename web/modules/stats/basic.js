@@ -1,7 +1,7 @@
 /* 統計學 · 初級統計學
    給第一次修統計學的學生：13 章架構參考張翔《提綱挈領學統計》(編排略有調整)，
    並用本站的台股加權指數資料做「市場實例」，部分章節附互動模擬。
-   網址：#/stats/basic/<章節編號>[/<節名>](有節名時捲到該節)
+   網址：stats/basic/<章節編號>[/<節名>](有節名時捲到該節)
    章節內容可寫在 content/stats/basic/*.md(設定 md 欄位)，編輯方式見 docs/CONTENT.md */
 (() => {
   // 參考教材(章節最下方)
@@ -188,11 +188,11 @@
     return box.innerHTML;
   }
 
-  /* ---------- 章節互相連結：網址 #/stats/basic/<章>/<節名> 會捲到該節 ----------
+  /* ---------- 章節互相連結：網址 stats/basic/<章>/<節名> 會捲到該節 ----------
      文中的「第 N 章」連到該章；「第 N 章「節名」」連到該章的那一節；同一章裡「節名」與某個節標題相同(可省略標題最後的括號)也會變成連結。
      Markdown 連結寫 [文字](#節名) 代表本章的節 */
   const secKey = s => s.trim().replace(/\s*[(（][^)）]*[)）]\s*$/, '');
-  const secHref = (ch, sec) => `#/stats/basic/${ch}${sec ? '/' + encodeURIComponent(sec) : ''}`;
+  const secHref = (ch, sec) => `stats/basic/${ch}${sec ? '/' + encodeURIComponent(sec) : ''}`;
   function crossLinks(box, cur) {
     const heads = new Map();
     box.querySelectorAll('h3.md-h2, h4.md-h3').forEach(h => { const t = h.textContent.trim(); h.dataset.sec = t; heads.set(t, t); heads.set(secKey(t), t); });
@@ -555,20 +555,22 @@
   LT.register({
     section: 'stats', key: 'basic', name: '初級統計學',
     topics: CHAPTERS.map((c, i) => `第 ${i + 1} 章 ${c.title}`),   // 後台熱門主題列出的子項目(同 mount 裡 LT.view 記錄的名稱)
+    routes: CHAPTERS.map((c, i) => ({ path: String(i + 1), name: `第 ${i + 1} 章 ${c.title}` })),   // 每一章的網址(部署時產生各章的標題與分享預覽)
     async mount(el, ctx) {
-      const n = parseInt((location.hash.split('/')[3] || '1'), 10);
+      const n = parseInt(LT.path()[2] || '1', 10);
       const idx = Math.min(Math.max(1, n || 1), CHAPTERS.length) - 1;
       LT.view(`第 ${idx + 1} 章 ${CHAPTERS[idx].title}`);   // 後台的熱門主題
+      LT.crumbs(`第 ${idx + 1} 章 ${CHAPTERS[idx].title}`);
       const ch = CHAPTERS[idx];
       const nav = (i, label) => i < 0 || i >= CHAPTERS.length ? '<span></span>'
-        : `<a class="chap-nav" href="#/stats/basic/${i + 1}">${label}</a>`;
+        : `<a class="chap-nav" href="stats/basic/${i + 1}">${label}</a>`;
       el.innerHTML = `
         <header class="top"><div>
           <h1>初級統計學</h1>
           <p>給第一次修統計學的你：觀念、公式、市場實例與互動模擬</p>
         </div></header>
         <div class="chap-list">
-          ${CHAPTERS.map((c, i) => `<a href="#/stats/basic/${i + 1}" class="${i === idx ? 'active' : ''}"><span>${i + 1}</span>${c.title}</a>`).join('')}
+          ${CHAPTERS.map((c, i) => `<a href="stats/basic/${i + 1}" class="${i === idx ? 'active' : ''}"><span>${i + 1}</span>${c.title}</a>`).join('')}
         </div>
         <article class="panel doc chapter">
           <div class="chap-head">
@@ -605,7 +607,7 @@
               if (name === 'clt') window.LTStat.clt();
             } else d.textContent = `找不到互動動畫：${name}`;
           });
-          scrollToSec(box, decodeURIComponent(location.hash.split('/')[4] || ''));
+          scrollToSec(box, LT.path()[3] || '');
         } catch (err) {
           if (!ctx.alive()) return;
           box.innerHTML = `<span class="mute">章節內容載入失敗：${err.message}</span>`;

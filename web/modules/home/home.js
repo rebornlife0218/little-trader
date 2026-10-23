@@ -5,7 +5,7 @@ LT.setHome({
     const pages = LT.listPages();
     const link = p => p.href
       ? `<a href="${p.href}" target="_blank" rel="noopener">${p.name} ↗</a>`
-      : `<a href="#/${p.section}/${p.key}">${p.name}${p.mount ? '' : ' <span class="soon-tag">建置中</span>'}</a>`;
+      : `<a href="${p.section}/${p.key}">${p.name}${p.mount ? '' : ' <span class="soon-tag">建置中</span>'}</a>`;
     el.innerHTML = `
       <section class="hero">
         <img src="assets/img/logo.svg" alt="" class="hero-logo">

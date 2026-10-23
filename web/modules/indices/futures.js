@@ -73,7 +73,7 @@
         <div class="panel">
           <h3>結算日曆</h3>
           ${LTOpt.settlementTable(LTOpt.settlements(D, 8))}
-          <p class="note">台指期只有月契約；選擇權另有每週三、週五到期的週選擇權(見<a href="#/option/market">選擇權市場概況</a>)。月結算日期貨與月選擇權同時結算，成交量與波動通常較大。</p>
+          <p class="note">台指期只有月契約；選擇權另有每週三、週五到期的週選擇權(見<a href="option/market">選擇權市場概況</a>)。月結算日期貨與月選擇權同時結算，成交量與波動通常較大。</p>
         </div>
         <div class="panel">
           <h3>三大法人台指期淨未平倉(口)</h3>

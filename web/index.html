@@ -2,12 +2,24 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8" />
+<!-- 網站根目錄：頁面、資料、API 都用相對網址(GitHub Pages 備援站部署時改成 /little-trader/，見 scripts/build-site.mjs) -->
+<base href="/">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <!-- 資安：只允許載入本站與 Google Fonts 的資源、只連線回本站(登入時另外連 Firebase 驗證)，阻擋外部惡意腳本與資料外洩 -->
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
-<title>Little Trader</title>
+<!-- 標題、說明與分享預覽：部署時 scripts/build-site.mjs 依各頁面產生一份(例如 stock/tw-strategy/lowvol.html)，改這裡的格式要一起改 -->
+<title>Little Trader 小交易員的研究室</title>
 <meta name="description" content="Little Trader 小交易員：指數、ETF、股票、選擇權、統計學與市場研究" />
+<link rel="canonical" href="https://little-trader.pages.dev/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Little Trader">
+<meta property="og:title" content="Little Trader 小交易員的研究室">
+<meta property="og:description" content="Little Trader 小交易員：指數、ETF、股票、選擇權、統計學與市場研究">
+<meta property="og:url" content="https://little-trader.pages.dev/">
+<meta property="og:image" content="https://little-trader.pages.dev/assets/img/og.png">
+<meta property="og:locale" content="zh_TW">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -20,19 +32,19 @@
 </head>
 <body>
 <div class="topbar">
-  <a class="brand" href="#/" title="回到首頁"><img class="logo" src="assets/img/logo.svg" alt=""><div class="name">Little <span>Trader</span></div></a>
+  <a class="brand" href="./" title="回到首頁"><img class="logo" src="assets/img/logo.svg" alt=""><div class="name">Little <span>Trader</span></div></a>
   <div class="topbar-btns"><button id="topSearch" aria-label="搜尋股票" title="搜尋股票">🔍</button><button id="navToggle" aria-label="選單">☰ 選單</button></div>
 </div>
 <div class="shell">
   <aside class="sidebar">
     <div class="side-head">
-      <a class="brand" href="#/" title="回到首頁">
+      <a class="brand" href="./" title="回到首頁">
         <img class="logo" src="assets/img/logo.svg" alt="Little Trader">
         <div class="brand-text"><div class="name">Little <span>Trader</span></div><div class="tagline">小交易員的研究室</div></div>
       </a>
       <button id="sideCollapse" class="side-collapse" title="收起側欄" aria-label="收起側欄">«</button>
     </div>
-    <!-- 股票搜尋：輸入代號或名稱，跳到股票查詢(#/stock/query/<代號>) -->
+    <!-- 股票搜尋：輸入代號或名稱，跳到股票查詢(stock/query/<代號>) -->
     <form id="sideSearch" class="side-search" role="search" autocomplete="off">
       <button type="button" class="ss-ico" title="搜尋股票" aria-label="搜尋股票">🔍</button>
       <input id="sideSearchInput" type="search" list="sideSymList" placeholder="搜尋股票代號或名稱" aria-label="搜尋股票代號或名稱" enterkeyhint="search">
@@ -42,6 +54,7 @@
     <div class="side-foot"><div id="sideAccount" class="side-account"></div><button class="theme-toggle"></button></div>
   </aside>
   <div class="main">
+    <nav id="crumbs" class="crumbs" aria-label="目前位置" hidden></nav>
     <main id="content"><div class="page-loading"><span class="spinner"></span>載入中…</div></main>
     <footer class="copy">COPYRIGHT © <span id="copyYear"></span> Little Trader. All rights reserved.<br>內容僅供研究參考，不構成投資建議。<br><span class="foot-src">資料來源：臺灣證券交易所、證券櫃檯買賣中心、臺灣期貨交易所、公開資訊觀測站、臺灣集中保管結算所</span></footer>
   </div>
@@ -58,7 +71,13 @@
 <script defer src="assets/vendor/katex/katex.min.js"></script>
 <!-- 研究模組(訪客也能看的區塊)：新增研究內容時在此加入。
      會員區塊(ETF、股票、選擇權)的程式不寫在這裡：清單在 functions/_lib/access.json，登入後由 app.js 載入 -->
-<script defer src="modules/indices/indices.js"></script>
+<script defer src="modules/indices/core.js"></script>   <!-- 大盤漲跌分析、K棒型態分析：7 個檔共用全域變數，順序不能換 -->
+<script defer src="modules/indices/patterns.js"></script>
+<script defer src="modules/indices/events.js"></script>
+<script defer src="modules/indices/kchart.js"></script>
+<script defer src="modules/indices/myth.js"></script>
+<script defer src="modules/indices/cycle.js"></script>
+<script defer src="modules/indices/render.js"></script>
 <script defer src="modules/option/lib.js"></script>   <!-- 選擇權共用函式：台指期貨(指數區塊)與選擇權頁面都用到 -->
 <script defer src="modules/indices/futures.js"></script>
 <script defer src="modules/stats/demos.js"></script>

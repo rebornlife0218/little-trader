@@ -1,5 +1,5 @@
 /* 後台(只給管理員：users.role = 'admin'；這支程式本身也只有管理員下載得到)
-   網址 #/other/admin，不列在側欄與首頁；資料來自 api/admin/stats */
+   網址 other/admin，不列在側欄與首頁；資料來自 api/admin/stats */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const n0 = v => Number.isFinite(+v) ? (+v).toLocaleString() : '—';

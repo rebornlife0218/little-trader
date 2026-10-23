@@ -2,7 +2,7 @@ name: 部署網站
 
 # 網站程式(main 的 web/) + 最新資料(data 分支) → Cloudflare Pages(完整版＋functions/ 後端：登入、會員權限、股價查詢)
 #                                               → GitHub Pages(備援，公開版：沒有後端，拿掉會員限定的程式與資料)
-# 觸發：程式更新(push)、手動、或各資料集更新完成後呼叫
+# 觸發：程式更新(push)、手動、或各資料集更新完成後呼叫；自動測試(npm test)沒過就不部署
 # Cloudflare Pages 需要 repo secrets：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID(沒設定時只部署 GitHub Pages)；
 # 專案名稱用 repo variable CLOUDFLARE_PROJECT，未設定時為 little-trader，第一次部署會自動建立專案
 on:
@@ -17,7 +17,23 @@ permissions:
   id-token: write
 
 jobs:
+  # 自動測試(tests/)：每個頁面註冊得起來、權限設定一致、部署流程跑得完、後端的權限與來源檢查
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 自動測試
+        run: npm test
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       # 一律用 main 的最新程式：資料集更新是在較早的 commit 觸發的，若用觸發當下的版本，
@@ -38,11 +54,16 @@ jobs:
           fi
           ls -R _site/data | head -40
 
-      # _site/_routes.json(哪些路徑經過 functions)與 GitHub Pages 用的公開版 _site_public(依 functions/_lib/access.json)
-      - name: 產生路由設定與公開版
-        run: node scripts/build-site.mjs _site _site_public
-
+      # GitHub Pages 的網址(放在 /little-trader/ 子目錄)
       - uses: actions/configure-pages@v5
+        id: pages
+
+      # _site/_routes.json(哪些路徑經過 functions)、各頁面的 HTML 與 sitemap、GitHub Pages 用的公開版 _site_public(依 functions/_lib/access.json)
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 產生路由設定、各頁面的 HTML 與公開版
+        run: node scripts/build-site.mjs _site _site_public "${{ steps.pages.outputs.base_path }}/"
 
       # GitHub Pages 用的封裝(公開版)
       - uses: actions/upload-pages-artifact@v3

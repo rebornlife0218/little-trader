@@ -21,7 +21,7 @@
   ];
   const tag = s => `<span class="series-tag"><i style="background:${SERIES[s].color}"></i>${esc(SERIES[s].name)}</span>`;
 
-  // 目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究(網址 #/stock/tw-research/<研究>)
+  // 目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究(網址 stock/tw-research/<研究>)
   LT.catalog({
     section: 'stock', group: '台股', key: 'tw-research', name: '其他研究', title: '台股其他研究',
     desc: '依主題分類的研究；同一個顏色代表同一系列的研究。回測一律和買進持有 0050 比較',

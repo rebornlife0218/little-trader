@@ -8,13 +8,14 @@
 - 本機可逆的檢查可以直接做；正式資料寫入、破壞性操作及對外發布則需要明確授權。push 前先 fetch，遠端有新 commit 就 rebase，不覆蓋別人的修改。
 - 改寫 git 歷史、force push、刪除檔案或資料前，先說明影響並取得同意；能備份的先備份。
 - 改程式時，網頁上的說明文字與 `docs/ARCHITECTURE.md` 要一起更新，不能讓說明和實際作法不一致。
+- push 前在本機跑 `npm test`(部署前 GitHub Actions 也會跑，沒過就不部署)；能自動檢查的新規則就加進 `tests/`。
 
 ## 網站
 
 - 所有計算不是在 pipeline 先算好，就是在瀏覽器端算；後端(`functions/`)只負責登入、權限、查詢日誌與股票查詢。API 一律經過 `functions/_lib/security.ts` 的來源檢查、次數限制與安全標頭，不回 `Access-Control-Allow-Origin: *`。
 - 訪客只能看指數、統計學、其他；ETF、股票、選擇權要 Google 登入，設有密碼的策略仍要密碼。權限清單只寫在 `functions/_lib/access.json`：會員區塊的新頁面加到 `memberScripts`(不寫進 `index.html`)，會員限定的新資料集加到 `memberDatasets`。
 - CSP 只允許同源：第三方套件放 `web/assets/vendor/`，不用 CDN；新的 `<script>` 一律加 `defer`。唯一例外是登入時連 `identitytoolkit.googleapis.com`(只有 connect-src，不載入外部腳本)。
-- 新頁面用 `LT.register`，研究、策略這類一份一份的內容用目錄頁 `LT.catalog`(區塊 › 頁面 › 單一內容，最多三層，每份內容有自己的網址)，資料用 `LT.loadJSON`，圖表用 `LTChart`；顏色用 CSS 變數，暗色、淺色主題都要正常顯示，手機寬度也要能看。
+- 新頁面用 `LT.register`，研究、策略這類一份一份的內容用目錄頁 `LT.catalog`(區塊 › 頁面 › 單一內容，最多三層，每份內容有自己的網址)，頁面裡的分頁用 `LT.tabs`，資料用 `LT.loadJSON`，圖表用 `LTChart`；網址是一般網址(不用 #)，站內連結一律寫相對網址(例如 `href="stock/query/2330"`)；顏色用 CSS 變數，暗色、淺色主題都要正常顯示，手機寬度也要能看。
 - 每個資料集都要有 `meta.json`(更新時間、來源、排程、version)，網頁靠 version 更新快取。
 - 文字用繁體中文、台灣用語，和現有頁面的寫法一致。
 - 網頁不顯示資料來源與更新排程(頁尾、頁面說明、研究報告都不寫)，例外是統計學教材的參考資料、ETF介紹、怎麼存ETF、ETF研究(原 ETF大禮包)的資料來源，以及頁尾固定列出的官方資料來源(證交所、櫃買中心、期交所、公開資訊觀測站、集保結算所)。

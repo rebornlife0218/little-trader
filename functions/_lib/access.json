@@ -2,7 +2,10 @@
   "說明": "訪客與會員的權限(唯一的設定處)：後端擋檔案(functions/)、部署時產生 _routes.json 與 GitHub Pages 的公開版(scripts/build-site.mjs)、網頁載入程式(/api/me 回傳)都讀這裡",
   "memberSections": ["etf", "stock", "option"],
   "memberScripts": [
-    "modules/etf/pack.js",
+    "modules/etf/lib.js",
+    "modules/etf/intro.js",
+    "modules/etf/save.js",
+    "modules/etf/research.js",
     "modules/etf/etf.js",
     "modules/stock/disposition.js",
     "modules/stock/tw.js",
