@@ -64,6 +64,10 @@ async function readGuest(req: Request, secret: string) {
   const raw = getCookie(req, 'lt_gid');
   return raw ? unsign(secret, raw) : null;
 }
+// 這個瀏覽器的訪客代號(沒有或簽章不對時為 null)
+export async function guestIdOf(req: Request, env: Env) {
+  return env.SESSION_SECRET ? readGuest(req, env.SESSION_SECRET) : null;
+}
 async function guestCookie(secret: string, gid: string) {
   return cookie('lt_gid', `${gid}.${await hmac(secret, gid)}`, 365 * 86400);
 }

@@ -13,7 +13,7 @@
     async mount(el, ctx) {
       let days = 7;
       el.innerHTML = `
-        <header class="top"><div><h1>後台</h1><p>最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能(時間皆為台北時間)</p></div></header>
+        <header class="top"><div><h1>後台</h1><p>最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能(時間皆為台北時間；不含管理員自己的紀錄)</p></div></header>
         <div class="btnrow-l adm-days">${[1, 7, 30, 90].map(d => `<button type="button" data-d="${d}" class="${d === days ? 'active' : ''}">${d === 1 ? '24 小時' : `近 ${d} 天`}</button>`).join('')}</div>
         <div id="admOut" style="margin-top:14px;"><div class="panel"><p class="mute">載入中…</p></div></div>`;
       const out = el.querySelector('#admOut');

@@ -67,7 +67,7 @@ functions/                          Cloudflare Pages Functions(後端，只在 C
   api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、symbols、prices(股票查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
   data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
-migrations/                         D1 資料表(users、query_logs、page_views、usage_daily、rate_minute、symbols、price_chunks、meta)
+migrations/                         D1 資料表(users、guest_links、query_logs、page_views、usage_daily、rate_minute、symbols、price_chunks、meta)
 scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)與 GitHub Pages 的公開版
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose)
 
@@ -84,7 +84,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
 4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 Cloudflare Pages 與 GitHub Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
-網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料除外)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
+網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料、ETF大禮包的資料來源除外)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
 
 ## 部署
 
@@ -124,7 +124,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 |---|---|
 | 訪客 | 指數、統計學、其他 |
 | 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
-| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin` |
+| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin`；後台統計不含管理員自己的紀錄(管理員帳號，以及登入前在同一個瀏覽器用訪客身分的紀錄：登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`) |
 
 **怎麼運作**
 
