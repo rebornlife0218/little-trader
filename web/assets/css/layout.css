@@ -122,4 +122,5 @@ footer.copy .foot-src{display:inline-block;margin-top:6px;font-size:11px;color:v
 @media (max-width:860px){
   .side-collapsed .side-search{justify-content:flex-start;padding:0 10px;background:var(--panel2);border-color:var(--border);}
   .side-collapsed .side-search input{display:block;}
+  .side-search input{font-size:16px;}   /* 小於 16px 時 iPhone 一點輸入框就會放大畫面 */
 }

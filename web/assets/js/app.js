@@ -143,7 +143,8 @@ const LT = (() => {
       if (document.documentElement.classList.contains('side-collapsed') && window.innerWidth > 860) { toggleSidebar(); setTimeout(() => input.focus(), 250); }
       else if (input.value.trim()) go(); else input.focus();
     };
-    document.getElementById('topSearch').onclick = () => { document.body.classList.add('nav-open'); setTimeout(() => input.focus(), 220); };
+    // 手機：要在點擊的當下 focus(不能放在 setTimeout 裡)，手機瀏覽器才會跳出鍵盤
+    document.getElementById('topSearch').onclick = () => { document.body.classList.add('nav-open'); input.focus({ preventScroll: true }); };
   }
   function goBack(back) {
     try { sessionStorage.setItem('lt.restoreY', JSON.stringify(back)); sessionStorage.removeItem('lt.query.back'); } catch (e) {}
@@ -499,6 +500,11 @@ const LT = (() => {
     document.getElementById('copyYear').textContent = new Date().getFullYear();
     initScrollButtons();
     document.getElementById('navToggle').onclick = () => document.body.classList.toggle('nav-open');
+    // 手機選單打開時，點選單以外的地方(半透明遮罩)或按 Esc 就收回
+    document.addEventListener('click', e => {
+      if (document.body.classList.contains('nav-open') && !e.target.closest('.sidebar, #navToggle, #topSearch')) document.body.classList.remove('nav-open');
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') document.body.classList.remove('nav-open'); });
     document.getElementById('sideCollapse').onclick = toggleSidebar;
     initSearch();
     document.querySelectorAll('.theme-toggle').forEach(b => b.onclick = toggleTheme);
