@@ -464,7 +464,11 @@
           <div id="erBody"></div>
         </div>`;
 
+      // 後台的熱門主題：記到「分頁」，ETF研究再記到「研究類別 › 研究」
+      let tab = 'intro', research = [];
+      const report = () => LT.view(el.querySelector(`.pk-tabs [data-tab="${tab}"] b`).textContent, ...(tab === 'research' ? research : []));
       const showTab = t => {
+        tab = t; report();
         el.querySelectorAll('.pk-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
         el.querySelectorAll('.pk-pane').forEach(p => { p.hidden = p.dataset.pane !== t; });
         try { localStorage.setItem('lt.pkTab', t); } catch (e) {}
@@ -716,6 +720,7 @@
         const showStudy = k => {
           study = k; store(RSTUDY_KEY, k);
           const S = all.find(x => x.key === k);
+          research = [RCATS.find(c => c.key === cat).name, S.name]; report();
           sel.value = k; sel.style.color = RSERIES[S.series].color;
           desc.innerHTML = `${tagOf(S.series)} ${esc(S.desc)}`;
           const my = ++seq;

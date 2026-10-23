@@ -50,6 +50,7 @@
       const showStudy = k => {
         study = k; store(STUDY_KEY, k);
         const S = all.find(x => x.key === k);
+        LT.view(CATS.find(x => x.key === cat).name, S.name);   // 後台的熱門主題
         sel.value = k; sel.style.color = SERIES[S.series].color;
         desc.innerHTML = `${tag(S.series)} ${esc(S.desc)}`;
         const my = ++seq;

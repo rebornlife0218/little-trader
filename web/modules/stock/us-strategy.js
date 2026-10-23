@@ -72,7 +72,10 @@
         try { localStorage.setItem(FAMILY_KEY, f); } catch (e) { /* 無法使用 localStorage */ }
         el.querySelectorAll('.us-family .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.f === f));
         if (FAMILIES.find(x => x.key === f).soon) famEl.innerHTML = LT.UNDER_CONSTRUCTION;
-        else { const my = ++seq; sp500(famEl, { alive: () => ctx.alive() && seq === my }); }
+        const famName = FAMILIES.find(x => x.key === f).name, view = (...more) => LT.view(famName, ...more);   // 後台的熱門主題
+        view();
+        if (FAMILIES.find(x => x.key === f).soon) return;
+        const my = ++seq; sp500(famEl, { alive: () => ctx.alive() && seq === my, view });
       };
       el.querySelector('.us-family').onclick = e => { const b = e.target.closest('[data-f]'); if (b && b.dataset.f !== fam) showFam(b.dataset.f); };
       showFam(fam);
@@ -268,6 +271,7 @@
       }
 
       function draw() {
+        if (ctx.view) ctx.view((el.querySelector(`.us-tabs [data-k="${view}"] b`) || {}).textContent);
         const C = calc();
         el.querySelectorAll('.us-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.k === view));
         if (view === 'all') renderAll(C); else renderOne(C, view);

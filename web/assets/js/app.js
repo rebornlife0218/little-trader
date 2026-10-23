@@ -87,11 +87,25 @@ const LT = (() => {
     })();
   }
   // 瀏覽紀錄：每次換頁送一筆到 api/track(後台的「最受歡迎的主題」)；備援站沒有後端就不送
-  function track(section, page, title, isLocked) {
+  function track(section, page, title, isLocked, path) {
     if (!auth.api) return;
     try {
-      navigator.sendBeacon('api/track', new Blob([JSON.stringify({ section, page, title, locked: !!isLocked })], { type: 'application/json' }));
+      navigator.sendBeacon('api/track', new Blob([JSON.stringify({ section, page, title, locked: !!isLocked, path: path || [] })], { type: 'application/json' }));
     } catch (e) {}
+  }
+  /* 頁面裡的細項(分頁、下拉選單)：頁面在切換時呼叫 LT.view('ETF研究', '主動式ETF', 'A 系列 ETF 跟單')，最多三層。
+     連續切換(例如換類別會自動帶出第一個研究)只記最後停下來的畫面：0.6 秒內沒有再變才送；同一個細項不重複記 */
+  let viewTimer = null, lastView = '';
+  function view(...labels) {
+    const page = current;
+    const path = labels.filter(Boolean).map(s => String(s).trim().slice(0, 40)).slice(0, 3);
+    clearTimeout(viewTimer);
+    viewTimer = setTimeout(() => {
+      const key = path.join(' › ');
+      if (!page || page !== current || !path.length || key === lastView) return;
+      lastView = key;
+      track(page.section, page.key, page.name, false, path);
+    }, 600);
   }
   // 第一次來訪：選擇用 Google 登入或以訪客身分繼續(記住選擇，不再詢問)
   function welcome() {
@@ -182,6 +196,7 @@ const LT = (() => {
     else if (!page && sec) page = internal.find(p => p.section === section && !p.hidden) || null; // 區塊預設第一頁
     if (!page && !sec) page = internal[0];                                        // 網站預設首頁
     if (current && current.unmount) { try { current.unmount(); } catch (e) {} }
+    clearTimeout(viewTimer); lastView = '';
     const main = document.getElementById('content');
     main.innerHTML = '';
     window.scrollTo(0, 0);
@@ -325,5 +340,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();

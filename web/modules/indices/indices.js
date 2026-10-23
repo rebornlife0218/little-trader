@@ -1460,13 +1460,16 @@ function render(){
     return;
   }
 
+  const idxName = (state.indexList.find(c=>c.key===state.active)||{}).name || state.active;
   if (state.theme==='candle'){
+    LT.view(idxName);   // 後台的熱門主題
     html += renderCandleTheme();
     app.innerHTML = html;
     return;
   }
 
   const mode = MODES.find(m=>m.key===state.mode) || MODES[0];
+  LT.view(mode.name, idxName);   // 後台的熱門主題
   html += `
     <div class="mode-tabs">
       ${MODES.map(m=>`<button class="mode-tab ${m.key===mode.key?'active':''}" onclick="switchMode('${m.key}')"><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}

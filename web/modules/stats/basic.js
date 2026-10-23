@@ -557,6 +557,7 @@
     async mount(el, ctx) {
       const n = parseInt((location.hash.split('/')[3] || '1'), 10);
       const idx = Math.min(Math.max(1, n || 1), CHAPTERS.length) - 1;
+      LT.view(`第 ${idx + 1} 章 ${CHAPTERS[idx].title}`);   // 後台的熱門主題
       const ch = CHAPTERS[idx];
       const nav = (i, label) => i < 0 || i >= CHAPTERS.length ? '<span></span>'
         : `<a class="chap-nav" href="#/stats/basic/${i + 1}">${label}</a>`;

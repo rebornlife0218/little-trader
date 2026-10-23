@@ -8,6 +8,37 @@
   const who = r => `${r.kind === 'member' ? '👤 ' : ''}${esc(r.kind === 'guest' ? '訪客 ' + String(r.who).slice(0, 8) : r.who)}`;
   const secName = k => k === 'home' ? '首頁' : (LT.SECTIONS.find(s => s.key === k) || {}).name || k;
 
+  /* 最受歡迎的主題：區塊 › 頁面 › 細項(最多三層)，用 <details> 一層一層點開；同一層依瀏覽次數排序
+     區塊、頁面是「換頁」的次數；細項是切換到那個畫面的次數，上層 = 底下所有細項的加總 */
+  function topicTree(S) {
+    const kids = (rows, match) => rows.filter(match).sort((a, b) => b.n - a.n);
+    const cells = r => `<span class="tr-n">${n0(r.n)}</span><span class="tr-p">${n0(r.people)}</span><span class="tr-m">${n0(r.member)} / ${n0(r.guest)}</span>`;
+    const node = (name, r, children, extra = '') => children
+      ? `<details class="tr-node"><summary><span class="tr-name">${name}${extra}</span>${cells(r)}</summary><div class="tr-kids">${children}</div></details>`
+      : `<div class="tr-node tr-leaf"><span class="tr-name">${name}${extra}</span>${cells(r)}</div>`;
+    const [L1, L2, L3] = S.levels;
+    const level = (sec, page, depth, prefix) => {
+      const rows = [L1, L2, L3][depth];
+      if (!rows) return '';
+      const same = r => r.section === sec && r.page === page && [r.l1, r.l2].slice(0, depth).every((v, i) => v === prefix[i]);
+      const key = ['l1', 'l2', 'l3'][depth];
+      return kids(rows, same).map(r => {
+        const sub = level(sec, page, depth + 1, [...prefix, r[key]]);
+        return node(esc(r[key]), r, sub);
+      }).join('');
+    };
+    const html = kids(S.sections, () => true).filter(r => r.section !== 'home').map(sec => {
+      const pages = kids(S.pages, r => r.section === sec.section).map(pg => node(esc(pg.title || pg.page), pg, level(sec.section, pg.page, 0, []))).join('');
+      return node(esc(secName(sec.section)), sec, pages, sec.locked ? ` <small class="mute">訪客被擋 ${n0(sec.locked)}</small>` : '');
+    }).join('');
+    const home = S.sections.find(r => r.section === 'home');
+    return `<div class="adm-tree">
+      <div class="tr-head"><span class="tr-name">主題</span><span class="tr-n">瀏覽次數</span><span class="tr-p">人數</span><span class="tr-m">登入 / 訪客</span></div>
+      ${html || '<p class="mute">沒有資料</p>'}
+      ${home ? node('首頁', home, '') : ''}
+    </div>`;
+  }
+
   LT.register({
     section: 'other', key: 'admin', name: '後台', hidden: true,
     async mount(el, ctx) {
@@ -29,13 +60,9 @@
             <div class="stat"><div class="v">${n0(T.views)}</div><div class="l">頁面瀏覽次數</div></div>
             <div class="stat"><div class="v">${n0(T.viewers)}</div><div class="l">瀏覽人數(不重複)</div></div>
           </div>
-          <div class="adm-grid">
-            <div class="panel"><h3 style="margin-top:0;">最受歡迎的主題</h3>${table(['#', '主題', '瀏覽次數', '人數', '登入 / 訪客'],
-              S.pages.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(secName(r.section))}${r.page ? ' › ' + esc(r.title || r.page) : r.locked ? ' <span class="mute">(訪客被擋)</span>' : ''}</td><td>${n0(r.n)}</td><td>${n0(r.people)}</td><td>${n0(r.member)} / ${n0(r.guest)}</td></tr>`))}</div>
-            <div class="panel"><h3 style="margin-top:0;">各區塊</h3>${table(['區塊', '瀏覽次數', '人數', '訪客被擋'],
-              S.sections.map(r => `<tr><td>${esc(secName(r.section))}</td><td>${n0(r.n)}</td><td>${n0(r.people)}</td><td>${n0(r.locked)}</td></tr>`))}
-              <p class="note">「訪客被擋」：沒登入的人點進需要登入的區塊的次數，可以看出大家想看但被擋住的主題。</p></div>
-          </div>
+          <div class="panel"><h3 style="margin-top:0;">最受歡迎的主題 <small class="mute">(點 ▸ 一層一層展開)</small></h3>${topicTree(S)}
+            <p class="note">區塊、頁面的次數是進入那一頁的次數；頁面底下的細項(分頁、研究、下拉選單)是切換到那個畫面的次數，每一層是底下所有細項的加總，快速連續切換只算最後停下來的畫面。
+              「訪客被擋」：沒登入的人點進需要登入的區塊的次數，可以看出大家想看但被擋住的主題。</p></div>
           <div class="panel"><h3 style="margin-top:0;">每日請求數</h3><div id="admChart"></div></div>
           <div class="adm-grid">
             <div class="panel"><h3 style="margin-top:0;">熱門股票</h3>${table(['#', '股票', '查詢次數', '查詢人數', '登入 / 訪客'],

@@ -178,6 +178,7 @@
       // 分頁切換(記住上次的分頁)
       let calcReady = false;
       const showTab = t => {
+        LT.view(el.querySelector(`.mk-tabs [data-tab="${t}"] b`).textContent);   // 後台的熱門主題
         el.querySelectorAll('.mk-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
         el.querySelectorAll('.mk-pane').forEach(p => { p.hidden = p.dataset.pane !== t; });
         if (t === 'calc' && !calcReady) { calcReady = true; LTOpt.calculator(el.querySelector('[data-pane=calc]'), D); }

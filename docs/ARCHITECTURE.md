@@ -84,7 +84,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
 4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 Cloudflare Pages 與 GitHub Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
-網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料、ETF大禮包的資料來源除外)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
+網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料、ETF大禮包的資料來源除外；頁尾固定寫「資料來源：臺灣證券交易所、證券櫃檯買賣中心、臺灣期貨交易所、公開資訊觀測站、臺灣集中保管結算所」，在 `index.html`)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
 
 ## 部署
 
@@ -135,7 +135,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
   - **新增會員區塊的頁面**：程式放在 `web/modules/<區塊>/`，路徑加到 `memberScripts`(依側欄順序，同一小組要連續)，**不要**寫進 `index.html`。
   - **新增會員限定的資料集**：名稱加到 `memberDatasets`。
   - 要把整個區塊改成公開或會員限定：改 `memberSections`，並把該區塊的程式在 `index.html` 與 `memberScripts` 之間搬動。
-- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否被擋在需要登入的區塊)，存在 `page_views`；後台的「最受歡迎的主題」「各區塊」由此統計。只記到頁面層級，頁面裡的分頁或下拉選單不記；同一頁重新整理會再記一筆。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
+- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否被擋在需要登入的區塊)，存在 `page_views`；頁面裡切換分頁、研究、下拉選單時，頁面呼叫 `LT.view(第一層, 第二層, 第三層)` 再記一筆細項(`l1`～`l3`，例如 ETF研究 › 主動式ETF › A 系列 ETF 跟單)，0.6 秒內連續切換只記最後停下來的畫面。後台的「最受歡迎的主題」是可一層一層展開的樹狀表：區塊 › 頁面 › 細項，區塊與頁面算進入次數，細項算切換次數(上層是底下所有細項的加總)。同一頁重新整理會再記一筆。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
 - 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me`、`/api/track` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM page_views WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
 - API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
   - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。
@@ -239,6 +239,7 @@ LT.register({
 
 - **新增側欄區塊**：在 `app.js` 的 `SECTIONS` 加一筆(`desc` 會顯示在首頁)；會員限定的區塊另外加到 `access.json` 的 `memberSections`。
 - **股票代號連結**：表格裡的台股代號用 `LT.stockLink(代號, 顯示文字)`，點了跳到股票查詢並直接查那一檔，查詢頁有按鈕可以跳回來(目前用在處置股、策略)。
+- **後台的熱門主題細項**：頁面裡有分頁、下拉選單時，在切換的地方呼叫 `LT.view('分頁名稱', '類別', '研究名稱')`(最多三層，名稱用畫面上看到的文字)，後台就能一層一層看各細項的瀏覽次數。目前用在 ETF大禮包、台股其他研究、策略、美股策略、選擇權市場概況、大盤漲跌分析與 K棒型態分析、初級統計學(章)。
 - **不列在側欄的頁面**：註冊時加 `hidden: true`(例如後台)，只能用網址開。
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。

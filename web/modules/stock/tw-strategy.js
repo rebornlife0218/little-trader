@@ -135,8 +135,10 @@
         fam = f; store(FAMILY_KEY, f);
         const F = all.find(x => x.key === f);
         famSel.value = f; famDesc.textContent = F.desc;
-        const my = ++seq;
-        F.run(famEl, { alive: () => ctx.alive() && seq === my });
+        const my = ++seq, sideName = SIDES.find(x => x.key === side).name;
+        const view = (...more) => LT.view(sideName, F.name, ...more);   // 後台的熱門主題(策略裡有分頁的再多記一層)
+        view();
+        F.run(famEl, { alive: () => ctx.alive() && seq === my, view });
       };
       const showSide = sk => {
         side = sk; store(SIDE_KEY, sk);
@@ -342,6 +344,7 @@
     function draw() {
       const C = calc();
       el.querySelectorAll('.tw-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.k === view));
+      if (ctx.view) ctx.view(el.querySelector(`.tw-tabs [data-k="${view}"] b`).textContent);
       if (view === 'all') renderAll(C); else renderOne(C, view);
       LTChart.bars($('#twCov'), { x: C.M.map(m => m.m), label: '合格股票數', height: 180, yMin: 0,
         xFmt: (v, tip) => tip ? v : v.endsWith('-01') ? v.slice(0, 4) : '', yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`,

@@ -99,3 +99,4 @@ footer.copy{border-top:1px solid var(--border);color:var(--mute);font-size:12px;
 .welcome p{margin:0 0 18px;font-size:13.5px;line-height:1.8;}
 .welcome .login-btn{display:block;width:100%;box-sizing:border-box;}
 .welcome-guest{display:block;width:100%;margin-top:10px;color:var(--dim);background:transparent;}
+footer.copy .foot-src{display:inline-block;margin-top:6px;font-size:11px;color:var(--mute);}
