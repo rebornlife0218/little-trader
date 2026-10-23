@@ -11,7 +11,13 @@ LT.setHome({
         <img src="assets/img/logo.svg" alt="" class="hero-logo">
         <div>
           <h1>Little <span>Trader</span></h1>
-          <p>我是小小法人交易員，這裡是我的研究室，分享市場上有趣的研究。用公開資料與歷史回測，檢驗市場上常聽到的說法，整理成一目了然的圖表與統計。回測排除前視偏誤與倖存者偏差，並以扣除交易成本後的績效下結論。另外整理了統計學教材，作為看懂這些研究的基本功。</p>
+          <ul class="hero-intro">
+            <li>👀 用法人的眼睛看市場，用白話的語言聊發現。</li>
+            <li>🚫 沒有明牌！只聊市場上發現的酷東西。</li>
+            <li>🤝 交易是場大人的遊戲，一個人走得快，一群人走得遠。</li>
+            <li>💡 相信最厲害的洞見，常常藏在最意想不到的角落。</li>
+            <li>✉️ 有酷酷的想法或新發現？歡迎寄信交流：<a href="mailto:rebornlife0218@gmail.com">rebornlife0218@gmail.com</a></li>
+          </ul>
         </div>
       </section>
       <div class="home-grid">
