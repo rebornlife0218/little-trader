@@ -8,7 +8,7 @@
 web/                                網站(部署時整個資料夾就是網站根目錄)
   index.html                        外框，在此依序載入框架與訪客也能看的模組 <script defer>(平行下載、依序執行)；會員區塊的程式登入後才由 app.js 載入
   assets/
-    js/app.js                       框架：側欄區塊 SECTIONS、資料集清單 DATASETS、頁面註冊、路由、資料載入、會員區塊的鎖與登入畫面
+    js/app.js                       框架：側欄區塊 SECTIONS、頁面註冊、路由、資料載入、會員區塊的鎖與登入畫面
     js/auth.js                      Google 登入(不用 Firebase SDK)：Google OAuth → Firebase REST → api/session 發 cookie；api/me 取得身分
     js/firebase-config.js           Firebase 與 Google 登入的設定(apiKey、projectId、clientId，都是公開資訊)
     js/chart.js                     共用 SVG 圖表 LTChart.line / LTChart.bars(跟隨主題與寬度、滑鼠提示)
@@ -84,7 +84,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
 4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 Cloudflare Pages 與 GitHub Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
-網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。每頁用到的資料集會自動列在頁尾 COPYRIGHT 下方(「資料來源 · 更新時間 · 排程」，換頁時更新；首頁列出全部資料集)，頁面不用自己顯示。
+網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。網頁不顯示資料來源與更新排程(統計學教材的參考資料除外)；`meta.json` 的來源、更新時間、排程只留在資料裡供維護參考。
 
 ## 部署
 
@@ -248,7 +248,7 @@ LT.register({
 
 1. 建立 `pipeline/<資料集>/update.py`：用 `common.dataset_dir()` 取得輸出資料夾、`common.write_json()` 寫資料、最後 `common.write_meta(名稱, 來源名稱, 來源網址, 排程說明)`。
 2. 複製 `.github/workflows/data-options.yml` 為 `data-<資料集>.yml`，修改名稱、排程(cron 為 UTC，台北時間減 8 小時)與 `dataset:`。
-3. 在 `web/assets/js/app.js` 的 `DATASETS` 加一筆，首頁會顯示更新狀態。
+3. (網頁不顯示資料來源與更新時間，不用在網頁登記資料集。)
 4. 有新的 Python 套件就加到 `pipeline/requirements.txt`。
 
 ## 選擇權的計算

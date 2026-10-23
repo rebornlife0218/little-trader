@@ -274,7 +274,7 @@
         if (!ctx.alive()) return;
         list = s.symbols;
         $('#pqList').innerHTML = list.map(x => `<option value="${esc(x.symbol)}">${esc(x.name)}${x.delisted ? '(已下市櫃)' : ''}</option>`).join('');
-        $('#pqNote').textContent = `共 ${list.length.toLocaleString()} 檔，資料更新到 ${s.last_date || '—'}。`;
+        $('#pqNote').textContent = `共 ${list.length.toLocaleString()} 檔。`;
       }).catch(() => { if (ctx.alive()) $('#pqNote').textContent = '股票清單載入失敗，仍可直接輸入代號查詢。'; });
 
       // 輸入名稱時換成代號

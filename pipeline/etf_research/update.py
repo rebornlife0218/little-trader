@@ -53,6 +53,7 @@ def report():
     s = re.sub(r'結果在 output/[^。]*。', '', s)
     s = re.sub(r'^各檔所有持有期.*\n\n?', '', s, flags=re.M)
     s = re.sub(r'\bCM ?(?=ETF|台股|的)', '', s)          # 資料庫的來源不在網頁上註記
+    s = re.sub(r'｜資料：[^｜\n]*', '', s)               # 網頁不顯示資料來源
     left = re.findall(r'[\w./-]+\.(?:py|csv|parquet)', s)
     if left:
         raise SystemExit(f'報告還有本機檔案名稱：{left}')

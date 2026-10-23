@@ -39,11 +39,6 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-se
 
 .main{flex:1;min-width:0;display:flex;flex-direction:column;}
 #content{flex:1;width:100%;max-width:1320px;margin:0 auto;padding:22px 24px 40px;}
-footer.copy .page-sources{margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0;line-height:1.9;}
-footer.copy .page-sources:empty{display:none;}
-footer.copy .page-sources b{font-family:'Inter',sans-serif;color:var(--dim);font-weight:600;}
-footer.copy .page-sources a{color:var(--dim);text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:2px;}
-footer.copy .page-sources a:hover{color:var(--amber);}
 /* 回到頂部 / 底部 */
 .scroll-btns{position:fixed;right:18px;bottom:22px;display:flex;flex-direction:column;gap:8px;z-index:50;}
 .scroll-btns button{width:40px;height:40px;padding:0;border-radius:50%;font-size:17px;line-height:1;background:var(--panel2);border:1px solid var(--border-strong);color:var(--text);box-shadow:0 4px 14px var(--shadow);opacity:0;visibility:hidden;transform:translateY(6px);transition:opacity .2s,transform .2s,visibility .2s;}

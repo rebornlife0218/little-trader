@@ -334,7 +334,6 @@
                 <li><b>國內成分 vs 國外成分</b>：尾碼看不出來，要看追蹤的指數或投資範圍。國外成分 ETF(例如美國股票、美國公債)多了<b>匯率風險</b>與時差，淨值以國外收盤計算，台股盤中的價格比較容易出現折溢價。</li>
                 <li><b>風險由低到高</b>(證交所投資人教育的排列)：一般台股 ETF → 海外股債 ETF(跨市場、匯率) → 期貨 ETF(期現貨價差、轉倉風險) → 槓桿/反向 ETF(長期報酬偏離倍數，限制較多)。期貨與槓反 ETF 屬於需要簽署風險預告書的商品。</li>
               </ul>
-              <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.twse.com.tw/zh/products/securities/etf/products/li.html" target="_blank" rel="noopener">臺灣證券交易所 · 槓桿型及反向型ETF</a>；尾碼分類整理自<a href="https://tw.stock.yahoo.com/news/00980a%E3%80%8100980d%E3%80%8100980t%E4%B8%8D%E4%B8%80%E6%A8%A3%EF%BC%9F%E7%9C%8B%E6%87%8213%E7%A8%AEetf%E5%B0%BE%E7%A2%BC-%E5%BF%AB%E9%80%9F%E8%BE%A8%E8%AD%98%E6%8A%95%E8%B3%87%E9%A1%9E%E5%9E%8B-034928443.html" target="_blank" rel="noopener">Yahoo股市(2025-08-07，依證交所分類)</a>。新類型持續推出，以證交所公告為準。</p>
             </div>
           </div>
           <div class="panel doc">
@@ -397,7 +396,7 @@
             <div id="pkEtfChart"></div>
             <div id="pkEtfLegend"></div>
             <div class="tablewrap" style="margin-top:10px;"><table class="stattable" id="pkEtfTable"></table></div>
-            <p class="note">共同期間：從勾選的 ETF 中最晚上市的那一檔開始比較，期間越短越容易受單一年度行情影響，可以取消勾選上市較晚的 ETF 拉長比較期間。<b>配息貢獻</b> = 年化總報酬 − 年化價格報酬。2016 年以前的收盤價取自 Yahoo Finance，不含沒有成交的日子；總報酬用臺灣證券交易所的除息資料自行計算(股利在除息日以收盤價再投入)。</p>
+            <p class="note">共同期間：從勾選的 ETF 中最晚上市的那一檔開始比較，期間越短越容易受單一年度行情影響，可以取消勾選上市較晚的 ETF 拉長比較期間。<b>配息貢獻</b> = 年化總報酬 − 年化價格報酬。收盤價不含沒有成交的日子；總報酬用臺灣證券交易所的除息資料自行計算(股利在除息日以收盤價再投入)。</p>
             <div class="tablewrap" style="margin-top:6px;"><table class="stattable" id="pkSince"></table></div>
           </div>
 
@@ -598,7 +597,6 @@
                 <li><b>財富毀損</b>：晨星另一份研究(截至 2023 年的 10 年)估計，ARKK 讓投資人損失約 71 億美元，名列「毀損最多投資人財富的基金」第 3 名；ARK 旗下基金合計約 143 億美元，是損失最多的基金公司。</li>
                 <li><b>研究給的教訓</b>：三位數的報酬不會持續、要先了解風險、<b>考慮定期定額</b>——分批投入可以避免一次在高點投入大筆資金。</li>
               </ul>
-              <p class="mute" style="font-size:12px;">資料來源：${ARKK_REFS.map(r => `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.name)}</a>`).join('；')}。上圖為 ARKK 的還原股價(美元)，研究數字引用自原文。</p>
             </div>
           </div>
 `;
@@ -641,7 +639,6 @@
                 <li><b>逢低買入</b>：Felix 與 Warwick(2021)以總報酬指數下跌 10%、20% 為進場訊號比較，逢低買入的平均年化報酬明顯落後單筆投入，門檻越深落後越多；它確實改善了最差的情況，但那是因為平均持有大量現金(風險較低)換來的。</li>
                 <li><b>行為面</b>：很多人仍偏好定期定額，因為「行動後虧損」的後悔比「沒行動錯過」更痛苦，分批投入可以降低心理壓力。研究的建議是：如果怕一次投入的波動，代表目前的股票比重太高，與其分批進場，不如<b>選一個承受得了的資產配置(例如股債比例)後一次投入</b>——分批進場投完後，承擔的風險還是一樣。</li>
               </ul>
-              <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.pwlcapital.com/resources/dollar-cost-averaging-vs-lump-sum-investing/" target="_blank" rel="noopener">PWL Capital · Dollar-Cost Averaging vs Lump Sum Investing(Ben Felix，2020)</a>；<a href="https://pwlcapital.com/buy-the-dip/" target="_blank" rel="noopener">PWL Capital · Buy the Dip(Felix &amp; Warwick，2021)</a>；<a href="https://www.betashares.com.au/insights/lump-sum-investment/" target="_blank" rel="noopener">Betashares 整理</a>。</p>
             </div>
             <h4>用台股自己驗證</h4>
             <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">

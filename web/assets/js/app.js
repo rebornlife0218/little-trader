@@ -13,19 +13,6 @@ const LT = (() => {
     { key: 'stats', name: '統計學', desc: '初級統計學 13 章：觀念、公式、R 範例、台股實例與互動模擬' },
     { key: 'other', name: '其他', desc: '研究與交易時常用的網站推薦' },
   ];
-  // 資料集(= pipeline/<key>/、data 分支的 <key>/)；新增資料集在這裡加一筆，首頁會顯示更新狀態
-  const DATASETS = [
-    { key: 'indices', name: '指數' },
-    { key: 'etf_upcoming', name: '即將發行ETF' },
-    { key: 'etf_compare', name: '0050 vs 勞退基金' },
-    { key: 'options', name: '選擇權與台指期' },
-    { key: 'earnings', name: '美股財報' },
-    { key: 'sp500', name: 'S&P500 策略回測' },
-    { key: 'disposition', name: '台股處置股' },
-    { key: 'tw_strategy', name: '台股策略回測' },
-    { key: 'tw_research', name: '台股其他研究' },
-    { key: 'etf_research', name: 'ETF研究' },
-  ];
   // 頁面三種：一般 {section,key,name,mount(el,ctx),unmount?} / 外部連結 {…,href} / 建置中 {…,desc}(沒有 mount)
   // 加上 group(例如 '台股')，側欄與首頁會在區塊內再分小組，同組頁面請連續註冊
   const pages = [];
@@ -198,7 +185,6 @@ const LT = (() => {
     const main = document.getElementById('content');
     main.innerHTML = '';
     window.scrollTo(0, 0);
-    clearSources();
     if (page) {
       current = page;
       if (!openSections.has(page.section)) { openSections.add(page.section); saveOpenSections(); }
@@ -229,16 +215,13 @@ const LT = (() => {
     window.scrollTo(0, 0);
     renderSidebar(null);
     document.title = 'Little Trader 小交易員的研究室';
-    clearSources();
     home.mount(main, { alive: () => seq === routeSeq });
     track('home', '', '首頁', false);
-    // 首頁頁尾列出所有資料集的更新狀態
-    DATASETS.forEach(d => dataset(d.key).then(m => { if (seq === routeSeq) addSource(m, d.name); }).catch(() => {}));
     document.body.classList.remove('nav-open');
   }
 
   /* ---------- 資料集 ----------
-     每個資料集放在 data/<名稱>/，一定有 meta.json(更新時間、資料來源、排程、version)。
+     每個資料集放在 data/<名稱>/，一定有 meta.json(更新時間、資料來源、排程、version；網頁只用 version 更新快取，不顯示)。
      各區塊各自載入自己的資料集，互不影響。 */
   const metaCache = {};
   function dataset(name) {
@@ -256,34 +239,13 @@ const LT = (() => {
     return `data/${name}/${file}${meta && meta.version ? '?v=' + meta.version : ''}`;
   }
   async function loadJSON(name, file) {
-    const seq = routeSeq;
     const meta = await dataset(name);
     const r = await fetch(dataUrl(name, file, meta));
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    if (seq === routeSeq) addSource(meta);   // 這一頁用到的資料集，自動列在頁尾
     return { meta, data: await r.json() };
   }
-  /* ---------- 頁尾的「資料來源 · 更新時間 · 排程」 ----------
-     每頁載入的資料集會自動列在 COPYRIGHT 下方(loadJSON 時加入，換頁時清空)；首頁列出全部資料集。 */
-  let sources = new Map();
-  function clearSources() { sources = new Map(); renderSources(); }
-  function addSource(meta, label) {
-    if (!meta) return;
-    const key = meta.dataset || (meta.source || {}).name || meta.updated_at;
-    sources.set(key, { meta, label: label || (DATASETS.find(d => d.key === meta.dataset) || {}).name || '' });
-    renderSources();
-  }
-  function renderSources() {
-    const el = document.getElementById('pageSources');
-    if (!el) return;
-    el.innerHTML = [...sources.values()].map(({ meta, label }) => {
-      const src = meta.source || {};
-      const link = src.url ? `<a href="${src.url}" target="_blank" rel="noopener">${src.name || src.url}</a>` : (src.name || '');
-      return `<div>${label ? `<b>${label}</b> · ` : ''}資料來源：${link} · 更新：${meta.updated_at}(台北時間)${meta.schedule ? ' · 排程：' + meta.schedule : ''}</div>`;
-    }).join('');
-  }
-  // 舊介面：頁面呼叫 LT.sourceLine(meta) 時改為登記到頁尾，頁面上方不再顯示
-  function sourceLine(meta) { addSource(meta); return ''; }
+  // 網頁不顯示資料來源與更新排程(meta.json 仍保留，用 version 更新快取)；舊頁面呼叫的 LT.sourceLine 一律回傳空字串
+  function sourceLine() { return ''; }
 
   // 暗色 / 淺色模式(記住使用者偏好；預設暗色)
   function theme() { return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark'; }
@@ -363,5 +325,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();

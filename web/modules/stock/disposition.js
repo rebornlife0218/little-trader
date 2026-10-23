@@ -44,7 +44,6 @@
             </tbody>
           </table></div>
           <p>新制讓處置股的流動性變好、關的時間變短，處置的「冷卻」效果可能也跟著變弱，這正是下面要觀察的。</p>
-          <p class="mute" style="font-size:12px;">資料來源：PostgreSQL；新制整理參考<a href="https://www.esunsec.com.tw/article/post/671" target="_blank" rel="noopener">玉山證券</a>。</p>
         </div>
         <div id="dpBody"><div class="panel"><p class="mute">載入處置股資料中…</p></div></div>`;
       let J;
