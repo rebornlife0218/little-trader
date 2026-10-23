@@ -1,7 +1,7 @@
-/* ETF · ETF大禮包：三個分頁
-   · ETF介紹：ETF 是什麼、種類、成本、配息與總報酬、折溢價
-   · 怎麼存ETF：常存 ETF 績效比較、ETF 配息課稅試算、0050 vs 勞退基金
-   · ETF研究：和台股其他研究一樣，最上方選主題、再用下拉式選單選研究(RCATS)
+/* ETF 區塊的三個頁面(原 ETF大禮包，舊網址 #/etf/pack 會轉到新頁面)
+   · ETF介紹(#/etf/intro)：ETF 是什麼、種類、成本、配息與總報酬、折溢價
+   · 怎麼存ETF(#/etf/save)：常存 ETF 績效比較、ETF 配息課稅試算、0050 vs 勞退基金
+   · ETF研究(#/etf/research)：目錄頁(LT.catalog)，依類別分組的研究卡片(RCATS)，點進去是單一研究(#/etf/research/<研究>)
        投資方式：ARKK 研究(追高的代價)、單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD)
        主動式 ETF：A 系列 ETF 跟單(資料集 etf_research；pipeline/etf_research/update.py；績效統計與圖表共用 tw-strategy.js 的 LTTW)
    資料集：data/etf_compare/(compare.json、etfs.json；pipeline/etf_compare/update.py)、data/etf_research/(etf_follow.json) */
@@ -93,8 +93,8 @@
   }
   const best = c => Math.min(c.A, c.B);
 
-  /* ---------- ETF研究：主題與研究清單(同台股其他研究：最上方選主題，再用下拉式選單選研究；同一系列同一個顏色) ----------
-     新增研究：RCATS 加一筆，mount 裡的 VIEWS 加上畫面函式；需要資料檔的研究放在資料集 etf_research(pipeline/etf_research/update.py) */
+  /* ---------- ETF研究：類別與研究清單(目錄頁的卡片；同一系列同一個顏色) ----------
+     新增研究：RCATS 加一筆，pack() 裡 part === 'study' 那一行加上畫面函式；需要資料檔的研究放在資料集 etf_research(pipeline/etf_research/update.py) */
   const RSERIES = { how: { name: '投資方式', color: 'var(--amber)' }, active: { name: '主動式 ETF', color: '#B07CF0' } };
   const RCATS = [
     { key: 'how', name: '投資方式', desc: 'ARKK 研究、單筆 vs 定期定額 vs 逢低買入', studies: [
@@ -105,9 +105,6 @@
       { key: 'etf_follow', name: 'A 系列 ETF 跟單', series: 'active', desc: '主動式 ETF 每天公布持股，經理人加碼、調整、新納入之後跟著買，有沒有超額報酬' },
     ] },
   ];
-  const RCAT_KEY = 'lt.erCat', RSTUDY_KEY = 'lt.erStudy';
-  const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 無法使用 localStorage */ } };
-  const recall = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const tagOf = s => `<span class="series-tag"><i style="background:${RSERIES[s].color}"></i>${esc(RSERIES[s].name)}</span>`;
 
   // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png)
@@ -273,12 +270,11 @@
     el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig]; if (f) f(div); else div.parentElement.remove(); });
   }
 
-  LT.register({
-    section: 'etf', key: 'pack', name: 'ETF大禮包',
-    async mount(el, ctx) {
+  // ETF介紹(part = 'intro')、怎麼存ETF('save')兩個頁面，以及 ETF研究的單一研究('study')共用：載入資料、畫面與互動
+  async function pack(el, ctx, part, study) {
       el.innerHTML = `<div class="panel"><div class="empty"><p>正在載入資料…</p></div></div>`;
       let C = null, E = null, loadErr = '';
-      try {
+      if (part !== 'intro') try {
         [C, E] = await Promise.all([LT.loadJSON('etf_compare', 'compare.json').then(r => r.data), LT.loadJSON('etf_compare', 'etfs.json').then(r => r.data)]);
         // 長期回測用：加權報酬指數(含股息，2003 起)、加權指數(不含股息，1999 起)；沒有時只能選 ETF
         await Promise.all([['taiex', 'TAIEX.json'], ['taiex_tr', 'TAIEX_TR.json']].map(([k, f]) => LT.loadJSON('indices', f).then(r => { E[k] = r.data; }).catch(() => {})));
@@ -286,16 +282,14 @@
       if (!ctx.alive()) return;
       const failed = `<div class="panel"><div class="empty"><h3 style="margin:0;">資料載入失敗</h3><p>${esc(loadErr)}</p></div></div>`;
       const twList = E ? E.list.filter(x => x.currency === 'TWD') : [];
+      const $ = s => el.querySelector(s);
+      // 怎麼存ETF 與 ETF研究共用：常存 ETF 的月資料與顏色
+      const COLORS = ['var(--amber)', 'var(--blue)', 'var(--up)', 'var(--down)', 'var(--ma20)', 'var(--ma120)', 'var(--ma240)'];
+      const colorOf = code => COLORS[twList.findIndex(x => x.code === code) % COLORS.length];
+      const MO = {}; if (E) E.list.forEach(x => { MO[x.code] = monthly(E.daily[x.code]); });
+      if (part === 'study') { ({ arkk: arkkView, lsi: lsiView, etf_follow: etfFollow })[study](el, ctx.alive); return; }
       el.innerHTML = `
-        <header class="top"><div>
-          <h1>ETF大禮包</h1>
-          <p>從認識 ETF 到怎麼存 ETF：種類、成本、折溢價，以及存股的績效比較與投入方式</p>
-        </div></header>
-        <div class="mode-tabs pk-tabs">
-          <button class="mode-tab active" data-tab="intro"><b>ETF介紹</b><small>是什麼、種類、成本、配息、折溢價</small></button>
-          <button class="mode-tab" data-tab="save"><b>怎麼存ETF</b><small>常存 ETF 比較、配息怎麼繳稅、0050 vs 勞退</small></button>
-          <button class="mode-tab" data-tab="research"><b>ETF研究</b><small>投資方式、主動式 ETF 跟單</small></button>
-        </div>
+        <header class="top"><div><h1>${PARTS[part].name}</h1><p>${PARTS[part].desc}</p></div></header>
 
         <div class="pk-pane" data-pane="intro">
           <div class="panel doc">
@@ -453,33 +447,11 @@
 ` : failed}
         </div>
 
-        <div class="pk-pane" data-pane="research" hidden>
-          <div class="panel">
-            <div class="mode-tabs er-cat">${RCATS.map(c => `<button class="mode-tab" data-c="${c.key}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
-            <div class="paramgrid opt-form er-pick" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;">
-              <div class="paramitem"><label for="erStudy">研究</label><select id="erStudy"></select></div>
-              <p class="note" id="erDesc" style="margin:0 0 8px;"></p>
-            </div>
-          </div>
-          <div id="erBody"></div>
-        </div>`;
+`;
 
-      // 後台的熱門主題：記到「分頁」，ETF研究再記到「研究類別 › 研究」
-      let tab = 'intro', research = [];
-      const report = () => LT.view(el.querySelector(`.pk-tabs [data-tab="${tab}"] b`).textContent, ...(tab === 'research' ? research : []));
-      const showTab = t => {
-        tab = t; report();
-        el.querySelectorAll('.pk-tabs .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.tab === t));
-        el.querySelectorAll('.pk-pane').forEach(p => { p.hidden = p.dataset.pane !== t; });
-        try { localStorage.setItem('lt.pkTab', t); } catch (e) {}
-      };
-      el.querySelector('.pk-tabs').onclick = e => { const b = e.target.closest('[data-tab]'); if (b) showTab(b.dataset.tab); };
-      let saved = 'intro'; try { saved = localStorage.getItem('lt.pkTab') || 'intro'; } catch (e) {}
-      const link = (location.hash.split('/')[3] || '').trim();   // 網址 #/etf/pack/<研究> 直接開啟 ETF研究的該研究
-      const linked = RCATS.some(c => c.studies.some(x => x.key === link));
-      showTab(linked ? 'research' : ['save', 'research'].includes(saved) ? saved : 'intro');
-      if (!C || !E) { initResearch(); return; }
-      const $ = s => el.querySelector(s);
+      // 只留這一頁的內容(畫面裡有 ETF介紹、怎麼存ETF 兩段)
+      el.querySelectorAll('.pk-pane').forEach(p => { if (p.dataset.pane === part) p.hidden = false; else p.remove(); });
+      if (part !== 'save' || !C || !E) return;
 
       /* ---------- 一、0050 vs 勞退基金 ---------- */
       const drawLpf = r => {
@@ -510,9 +482,6 @@
             <td style="font-family:Inter,sans-serif;font-weight:700;color:${t.r > l.r ? 'var(--up)' : 'var(--blue)'}">${t.r > l.r ? '0050' : '勞退基金'}</td></tr>`; }).join('')}</tbody>`;
 
       /* ---------- 二、常存的 ETF 績效比較 ---------- */
-      const COLORS = ['var(--amber)', 'var(--blue)', 'var(--up)', 'var(--down)', 'var(--ma20)', 'var(--ma120)', 'var(--ma240)'];
-      const colorOf = code => COLORS[twList.findIndex(x => x.code === code) % COLORS.length];
-      const MO = {}; E.list.forEach(x => { MO[x.code] = monthly(E.daily[x.code]); });
       const drawEtfs = () => {
         const picked = [...el.querySelectorAll('#pkPicks input:checked')].map(i => i.value);
         if (!picked.length) { $('#pkEtfTable').innerHTML = ''; $('#pkEtfChart').innerHTML = '<p class="mute">請至少勾選一檔 ETF</p>'; $('#pkEtfLegend').innerHTML = ''; return; }
@@ -710,36 +679,23 @@
         $('#rsCash').oninput = drawRolling;
         drawRolling();
       }
-      function initResearch() {
-        const all = RCATS.flatMap(c => c.studies), VIEWS = { arkk: arkkView, lsi: lsiView, etf_follow: etfFollow };
-        let cat = RCATS.some(c => c.key === recall(RCAT_KEY)) ? recall(RCAT_KEY) : RCATS[0].key;
-        let study = all.some(x => x.key === recall(RSTUDY_KEY)) ? recall(RSTUDY_KEY) : all[0].key;
-        if (linked) { study = link; cat = RCATS.find(c => c.studies.some(x => x.key === link)).key; }
-        const body = el.querySelector('#erBody'), pick = el.querySelector('.er-pick'), sel = el.querySelector('#erStudy'), desc = el.querySelector('#erDesc');
-        let seq = 0;   // 每次切換研究加 1：還在載入的舊研究不會蓋掉新選的
-        const showStudy = k => {
-          study = k; store(RSTUDY_KEY, k);
-          const S = all.find(x => x.key === k);
-          research = [RCATS.find(c => c.key === cat).name, S.name]; report();
-          sel.value = k; sel.style.color = RSERIES[S.series].color;
-          desc.innerHTML = `${tagOf(S.series)} ${esc(S.desc)}`;
-          const my = ++seq;
-          VIEWS[k](body, () => ctx.alive() && seq === my);
-        };
-        const showCat = ck => {
-          cat = ck; store(RCAT_KEY, ck);
-          const Cx = RCATS.find(x => x.key === ck);
-          el.querySelectorAll('.er-cat .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.c === ck));
-          sel.innerHTML = Cx.studies.map(x => `<option value="${x.key}" style="color:${RSERIES[x.series].color}">● ${esc(x.name)}</option>`).join('');
-          pick.style.display = Cx.studies.length ? '' : 'none';
-          if (!Cx.studies.length) { ++seq; body.innerHTML = LT.UNDER_CONSTRUCTION; return; }
-          showStudy(Cx.studies.some(x => x.key === study) ? study : Cx.studies[0].key);
-        };
-        el.querySelector('.er-cat').onclick = e => { const b = e.target.closest('[data-c]'); if (b && b.dataset.c !== cat) showCat(b.dataset.c); };
-        sel.onchange = () => { if (sel.value !== study) showStudy(sel.value); };
-        showCat(cat);
-      }
-      initResearch();
-    },
+  }
+
+  const PARTS = {
+    intro: { name: 'ETF介紹', desc: '是什麼、種類、成本、配息、折溢價' },
+    save: { name: '怎麼存ETF', desc: '常存 ETF 比較、配息怎麼繳稅、0050 vs 勞退基金' },
+  };
+  LT.register({ section: 'etf', key: 'intro', name: 'ETF介紹', mount: (el, ctx) => pack(el, ctx, 'intro') });
+  LT.register({ section: 'etf', key: 'save', name: '怎麼存ETF', mount: (el, ctx) => pack(el, ctx, 'save') });
+  // 目錄頁(LT.catalog)：依類別分組的研究卡片，點進去是單一研究(網址 #/etf/research/<研究>)
+  LT.catalog({
+    section: 'etf', key: 'research', name: 'ETF研究',
+    desc: '投資方式、主動式 ETF 跟單；同一個顏色代表同一系列的研究',
+    groups: RCATS.map(c => ({ name: c.name, desc: c.desc, items: c.studies.map(x => ({
+      key: x.key, name: x.name, desc: x.desc, tags: tagOf(x.series), run: (el, ctx) => pack(el, ctx, 'study', x.key),
+    })) })),
   });
+  // 舊網址 #/etf/pack、#/etf/pack/<研究>(ETF大禮包)：轉到新的頁面
+  LT.register({ section: 'etf', key: 'pack', name: 'ETF大禮包', hidden: true,
+    mount() { const k = location.hash.split('/')[3]; location.replace(k ? `#/etf/research/${k}` : '#/etf/intro'); } });
 })();

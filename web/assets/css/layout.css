@@ -100,3 +100,18 @@ footer.copy{border-top:1px solid var(--border);color:var(--mute);font-size:12px;
 .welcome .login-btn{display:block;width:100%;box-sizing:border-box;}
 .welcome-guest{display:block;width:100%;margin-top:10px;color:var(--dim);background:transparent;}
 footer.copy .foot-src{display:inline-block;margin-top:6px;font-size:11px;color:var(--mute);}
+
+/* ---------- LOGO 下方的股票搜尋(app.js initSearch) ---------- */
+.side-search{display:flex;align-items:center;gap:6px;margin:0 0 14px;padding:0 10px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;}
+.side-search:focus-within{border-color:var(--amber);}
+.side-search .ss-ico{flex:0 0 auto;padding:6px 0;background:none;border:0;font-size:14px;cursor:pointer;opacity:.85;}
+.side-search input{flex:1 1 auto;min-width:0;padding:8px 0;background:transparent;border:0;outline:none;color:var(--text);font-family:'Inter',sans-serif;font-size:13px;}
+.side-search input::-webkit-search-cancel-button{display:none;}
+.side-collapsed .side-search{justify-content:center;padding:0;background:none;border-color:transparent;}
+.side-collapsed .side-search input{display:none;}
+.topbar-btns{display:flex;gap:8px;}
+#topSearch{padding:7px 10px;}
+@media (max-width:860px){
+  .side-collapsed .side-search{justify-content:flex-start;padding:0 10px;background:var(--panel2);border-color:var(--border);}
+  .side-collapsed .side-search input{display:block;}
+}

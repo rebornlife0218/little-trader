@@ -1,5 +1,5 @@
 /* 股票 · 台股 · 策略：台股策略回測(資料集 tw_strategy，pipeline/tw_strategy/update.py，資料來自本機 PostgreSQL 的台股日資料)
-   最上方選策略；淨值已在 pipeline 依整數股與交易成本算好，網頁端只做：扣借券費(做空，可調整)、計算績效統計與畫圖(版型同美股策略 us-strategy.js)。
+   目錄頁(LT.catalog)：依做多、做空分組的策略卡片，點進去是單一策略；淨值已在 pipeline 依整數股與交易成本算好，網頁端只做：扣借券費(做空，可調整)、計算績效統計與畫圖(版型同美股策略 us-strategy.js)。
    新增策略：pipeline 加一種選股規則，這裡的 STRATS 加一筆 */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -96,7 +96,7 @@
     legend.innerHTML = LTChart.legend(keys.map(k => meta[k]));
   }
 
-  // 最上方先選做多 / 做空，再用下拉式選單選策略：新增策略時在 strats 加一筆(run = 畫面函式)，尚未完成的設 soon: true(顯示「努力建置中」)
+  // 策略清單(依做多 / 做空分組)：新增策略時在 strats 加一筆(run = 畫面函式)，尚未完成的設 soon: true(卡片顯示「努力建置中」)
   const SIDES = [
     { key: 'long', name: '做多', desc: '買進股票，賺上漲的錢', strats: [
       { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去半年波動最小的股票，持有一個月', run: (...a) => lowvol(...a) },
@@ -106,53 +106,16 @@
       { key: 'against', name: '大盤跌個股逆勢漲就是欠踹', desc: '大盤大跌時逆勢大漲、借券賣出創新高的股票，隔天開盤放空、當天收盤回補', run: eventStrat('against') },
     ] },
   ];
-  const SIDE_KEY = 'lt.twSide', FAMILY_KEY = 'lt.twFamily';
   const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 無法使用 localStorage */ } };
   const recall = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
 
-  LT.register({
-    section: 'stock', group: '台股', key: 'tw-strategy', name: '策略',
-    async mount(el, ctx) {
-      let side = SIDES.some(x => x.key === recall(SIDE_KEY)) ? recall(SIDE_KEY) : 'long';
-      const all = SIDES.flatMap(x => x.strats);
-      let fam = all.some(f => f.key === recall(FAMILY_KEY)) ? recall(FAMILY_KEY) : 'lowvol';
-      el.innerHTML = `
-        <header class="top"><div>
-          <h1>台股策略</h1>
-          <p>選擇做多或做空的策略，與買進持有 0050 比較報酬與風險</p>
-        </div></header>
-        <div class="panel">
-          <div class="mode-tabs tw-side">${SIDES.map(x => `<button class="mode-tab" data-s="${x.key}"><b>${esc(x.name)}</b><small>${x.soon ? '努力建置中' : esc(x.desc)}</small></button>`).join('')}</div>
-          <div class="paramgrid opt-form tw-family" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;">
-            <div class="paramitem"><label for="twStrat">策略</label><select id="twStrat"></select></div>
-            <p class="note" id="twStratDesc" style="margin:0 0 8px;"></p>
-          </div>
-        </div>
-        <div id="twFam"></div>`;
-      const famEl = el.querySelector('#twFam'), famTabs = el.querySelector('.tw-family'), famSel = el.querySelector('#twStrat'), famDesc = el.querySelector('#twStratDesc');
-      let seq = 0;   // 每次切換策略加 1：還在載入的舊策略結果不會蓋掉新選的
-      const showFam = f => {
-        fam = f; store(FAMILY_KEY, f);
-        const F = all.find(x => x.key === f);
-        famSel.value = f; famDesc.textContent = F.desc;
-        const my = ++seq, sideName = SIDES.find(x => x.key === side).name;
-        const view = (...more) => LT.view(sideName, F.name, ...more);   // 後台的熱門主題(策略裡有分頁的再多記一層)
-        view();
-        F.run(famEl, { alive: () => ctx.alive() && seq === my, view });
-      };
-      const showSide = sk => {
-        side = sk; store(SIDE_KEY, sk);
-        const S = SIDES.find(x => x.key === sk);
-        el.querySelectorAll('.tw-side .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.s === sk));
-        famSel.innerHTML = S.strats.map(f => `<option value="${f.key}">${esc(f.name)}</option>`).join('');
-        famTabs.style.display = S.strats.length ? '' : 'none';
-        if (S.soon) { ++seq; famEl.innerHTML = LT.UNDER_CONSTRUCTION; return; }
-        showFam(S.strats.some(f => f.key === fam) ? fam : S.strats[0].key);
-      };
-      el.querySelector('.tw-side').onclick = e => { const b = e.target.closest('[data-s]'); if (b && b.dataset.s !== side) showSide(b.dataset.s); };
-      famSel.onchange = () => { if (famSel.value !== fam) showFam(famSel.value); };
-      showSide(side);
-    },
+  // 目錄頁(LT.catalog)：依做多、做空分組的策略卡片，點進去是單一策略(網址 #/stock/tw-strategy/<策略>)
+  LT.catalog({
+    section: 'stock', group: '台股', key: 'tw-strategy', name: '策略', title: '台股策略',
+    desc: '依做多、做空分組的策略，一律與買進持有 0050 比較報酬與風險',
+    groups: SIDES.map(sd => ({ name: sd.name, desc: sd.desc, items: sd.strats.map(f => ({
+      key: f.key, name: f.name, desc: f.desc, tags: f.key === 'margin' ? '🔒 需要密碼' : '', run: f.run,
+    })) })),
   });
 
   /* ---------- 低波動選股 ---------- */

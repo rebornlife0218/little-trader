@@ -228,7 +228,7 @@
   }
 
   LT.register({
-    section: 'stock', group: '台股', key: 'query', name: '股票查詢',
+    section: 'stock', group: '台股', key: 'query', name: '股票查詢', hidden: true,   // 不列在側欄：從 LOGO 下方的搜尋框或代號連結進來
     async mount(el, ctx) {
       let last = '2330', range = '1y';
       try { last = localStorage.getItem('lt.query.symbol') || last; range = localStorage.getItem('lt.query.range') || range; } catch (e) {}

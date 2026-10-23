@@ -19,15 +19,15 @@ web/                                網站(部署時整個資料夾就是網站�
     home/home.js                    首頁：各區塊入口、各資料集更新狀態
     indices/indices.js              指數：大盤漲跌分析、K棒型態
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
-    etf/pack.js                     ETF：ETF大禮包(ETF介紹、怎麼存ETF、ETF研究；ETF研究同台股其他研究，最上方選主題(投資方式、主動式 ETF)，再用下拉式選單選研究；A 系列 ETF 跟單用資料集 etf_research，績效統計共用 tw-strategy.js 的 LTTW)
+    etf/pack.js                     ETF：ETF介紹、怎麼存ETF 兩個頁面，與 ETF研究(目錄頁：投資方式、主動式 ETF 分組的研究卡片；A 系列 ETF 跟單用資料集 etf_research，績效統計共用 tw-strategy.js 的 LTTW)；舊網址 #/etf/pack 轉到新頁面
     etf/etf.js                      ETF：即將發行ETF
     stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
     stock/tw.js                     股票 · 台股：隔日沖(建置中)
-    stock/tw-strategy.js            股票 · 台股：策略回測(做多：低波動選股、融資都沒退，算我輸嗎(需要密碼)；做空：大盤跌個股逆勢漲就是欠踹；一律和 0050 比較；資料集 tw_strategy)；績效統計與圖表函式以 window.LTTW 共用給 tw-research.js
-    stock/tw-research.js            股票 · 台股：其他研究(最上方選主題：營收、因子、事件、機器學習，再用下拉式選單選研究；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research)
+    stock/tw-strategy.js            股票 · 台股：策略回測(目錄頁：做多、做空分組的策略卡片；做多：低波動選股、融資都沒退，算我輸嗎(需要密碼)；做空：大盤跌個股逆勢漲就是欠踹；一律和 0050 比較；資料集 tw_strategy)；績效統計與圖表函式以 window.LTTW 共用給 tw-research.js
+    stock/tw-research.js            股票 · 台股：其他研究(目錄頁：營收、因子、事件、機器學習分組的研究卡片；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research)
     stock/earnings.js               股票 · 美股：財報行事曆
-    stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
-    stock/query.js                  股票 · 台股：股票查詢(K 線圖、法人、融資券、借券、月營收與除權息等事件；api/prices，資料在 Cloudflare D1)
+    stock/us-strategy.js            股票 · 美股：策略(目錄頁)；S&P500 季度換股策略回測(單一策略頁裡選總覽或單一策略；資料集 sp500)
+    stock/query.js                  股票 · 台股：股票查詢(不列在側欄，從 LOGO 下方的搜尋框或代號連結進入；K 線圖、法人、融資券、借券、月營收與除權息等事件；api/prices，資料在 Cloudflare D1)
     admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
@@ -55,7 +55,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_strategy/private_strategies.py 不公開的策略(條件、網頁說明、密碼；不進版控，只在本機，要自己備份)：輸出時整份加密，網頁輸入密碼後解密
   run_local.py                      本機資料集(tw_strategy、disposition、etf_compare)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
   tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
-  etf_research/update.py            ETF大禮包「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
+  etf_research/update.py            「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
   price_query/sync.py               股票查詢的資料：cm schema → Cloudflare D1(本機執行，只上傳有變動的部分)
 
@@ -168,7 +168,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 ## 股票查詢
 
-- 網頁：股票 › 台股 › 股票查詢(`modules/stock/query.js`，登入 Google 才能用)。輸入代號或名稱、選期間：
+- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `#/stock/query/<代號>`(`modules/stock/query.js`，登入 Google 才能用；不列在側欄)。查詢頁也可以改代號、選期間：
   - 標題列：代號、名稱、上市／上櫃／創新板、股本(億元，實收資本額；ETF 沒有股本)。
   - K 線圖(canvas)：左上角切換原始價、還原價(開高低乘上當天的還原收盤價 ÷ 收盤價)；5、20、60MA；點一下出現十字線(左側價格軸標收盤價)，資訊列列出開高低收、各 MA(後面 ↑↓ 是當天斜率)、成交量、外資與投信買賣超、融資券餘額、借券賣出餘額、當天的事件；滾輪縮放、拖曳平移、← → 移動。為了讓 60MA 從第一天就有值，查詢時多抓前 120 個日曆天(圖一開始只顯示查詢期間)。
   - 事件：月營收在公告日的 K 棒上方畫小菱形(紅色 = 單月營收年成長、綠色 = 年衰退，點 K 棒在資訊列看年成長 %)；「息」除權息、「分割」分割或減資、「停」暫停交易標在 K 棒下方；處置期間畫淡色底。
@@ -238,8 +238,21 @@ LT.register({
 ```
 
 - **新增側欄區塊**：在 `app.js` 的 `SECTIONS` 加一筆(`desc` 會顯示在首頁)；會員限定的區塊另外加到 `access.json` 的 `memberSections`。
+- **目錄頁(研究、策略這類「一份一份」的內容)**：用 `LT.catalog`，不要自己寫類別按鈕和下拉選單：
+
+  ```js
+  LT.catalog({
+    section: 'stock', group: '台股', key: 'tw-research', name: '其他研究', title: '台股其他研究', desc: '一句話說明',
+    groups: [{ name: '營收', desc: '分組說明', items: [
+      { key: 'rev_pre', name: '營收公告前布局', desc: '卡片上的一句話', tags: '(選填，卡片下方的小字)', run: (el, ctx) => { ... } },
+      { key: 'x', name: '還沒做好的', soon: true },
+    ] }],
+  });
+  ```
+
+  `#/<區塊>/<頁面>` 是分組的卡片列表，`#/<區塊>/<頁面>/<項目>` 是單一內容(上方有「← 返回」，可分享、加書籤)；`run(el, ctx)` 畫內容，`ctx.alive()` 同一般頁面，內容裡還有分頁時呼叫 `ctx.view('分頁名稱')`。後台的熱門主題自動記到「分組 › 項目」。目前用在 ETF研究、台股其他研究、台股策略、美股策略。
 - **股票代號連結**：表格裡的台股代號用 `LT.stockLink(代號, 顯示文字)`，點了跳到股票查詢並直接查那一檔，查詢頁有按鈕可以跳回來(目前用在處置股、策略)。
-- **後台的熱門主題細項**：頁面裡有分頁、下拉選單時，在切換的地方呼叫 `LT.view('分頁名稱', '類別', '研究名稱')`(最多三層，名稱用畫面上看到的文字)，後台就能一層一層看各細項的瀏覽次數。目前用在 ETF大禮包、台股其他研究、策略、美股策略、選擇權市場概況、大盤漲跌分析與 K棒型態分析、初級統計學(章)。
+- **後台的熱門主題細項**：頁面裡有分頁、下拉選單時，在切換的地方呼叫 `LT.view('分頁名稱', '類別', '研究名稱')`(最多三層，名稱用畫面上看到的文字)，後台就能一層一層看各細項的瀏覽次數。目錄頁會自動記錄；其他頁面目前用在選擇權市場概況(分頁)、大盤漲跌分析與 K棒型態分析(模式 › 指數)、初級統計學(章)，以及目錄頁裡的低波動選股、美股策略(分頁)。
 - **不列在側欄的頁面**：註冊時加 `hidden: true`(例如後台)，只能用網址開。
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
