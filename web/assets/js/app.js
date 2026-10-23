@@ -66,9 +66,48 @@ const LT = (() => {
   }
   document.addEventListener('click', e => {
     const a = e.target.closest && e.target.closest('a.stock-link');
-    if (!a || !current) return;
-    try { sessionStorage.setItem('lt.query.back', JSON.stringify({ hash: location.hash || '#/', name: current.name, y: window.scrollY })); } catch (er) {}
+    if (a) rememberBack();
   }, true);
+  // 記住從哪一頁去股票查詢(查詢頁上方的「返回」按鈕用)；本來就在股票查詢就不覆蓋
+  function rememberBack() {
+    if (!current || current.key === 'query') return;
+    try { sessionStorage.setItem('lt.query.back', JSON.stringify({ hash: location.hash || '#/', name: current.name, y: window.scrollY })); } catch (er) {}
+  }
+  /* ---------- LOGO 下方的股票搜尋 ----------
+     輸入代號或名稱(建議清單來自 api/symbols，第一次點搜尋框才載入)，Enter 或選了建議就跳到股票查詢；
+     側欄收起時只顯示 🔍(點了展開側欄)，手機版在上方另有 🔍 按鈕 */
+  function initSearch() {
+    const form = document.getElementById('sideSearch'), input = document.getElementById('sideSearchInput');
+    if (!form) return;
+    let list = null;
+    const loadList = () => {
+      if (list) return;
+      list = [];
+      fetch('api/symbols').then(r => r.ok ? r.json() : Promise.reject())
+        .then(j => { list = j.symbols; document.getElementById('sideSymList').innerHTML = list.map(x => `<option value="${esc(x.symbol)} ${esc(x.name)}">`).join(''); })
+        .catch(() => { list = null; });
+    };
+    const go = () => {
+      const v = input.value.trim();
+      if (!v) return;
+      const m = v.match(/^([0-9A-Za-z]{4,6})(\s|$)/);
+      const hit = !m && list && (list.find(x => x.name === v) || list.find(x => x.name && x.name.includes(v)));
+      const code = m ? m[1].toUpperCase() : hit ? hit.symbol : v;
+      input.value = ''; input.blur();
+      document.body.classList.remove('nav-open');
+      rememberBack();
+      location.hash = `#/stock/query/${encodeURIComponent(code)}`;
+    };
+    input.addEventListener('focus', loadList);
+    // 從建議清單選了一檔(值是「代號 名稱」)就直接查
+    input.addEventListener('input', e => { if (!e.inputType && list && /^[0-9A-Za-z]{4,6} /.test(input.value)) go(); });
+    form.onsubmit = e => { e.preventDefault(); go(); };
+    form.querySelector('.ss-ico').onclick = () => {
+      if (document.documentElement.classList.contains('side-collapsed') && window.innerWidth > 860) { toggleSidebar(); setTimeout(() => input.focus(), 250); }
+      else if (input.value.trim()) go(); else input.focus();
+    };
+    document.getElementById('topSearch').onclick = () => { document.body.classList.add('nav-open'); setTimeout(() => input.focus(), 220); };
+  }
   function goBack(back) {
     try { sessionStorage.setItem('lt.restoreY', JSON.stringify(back)); sessionStorage.removeItem('lt.query.back'); } catch (e) {}
     location.hash = back.hash;
@@ -132,6 +171,43 @@ const LT = (() => {
     pages.push(page);
   }
   function setHome(page) { home = page; }
+
+  /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
+     LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, tags, soon, run(el, ctx) }] }] })
+       - #/<區塊>/<頁面>          卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
+       - #/<區塊>/<頁面>/<項目>   單一內容：上方有「← 返回列表」，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
+                                  ctx.view(...) 可再記一層細項(例如策略裡的分頁)
+     每個項目都有自己的網址(可分享、加書籤、上一頁回到列表)，後台的熱門主題自動記到「分組 › 項目」 */
+  function catalog(def) {
+    register({
+      section: def.section, group: def.group, key: def.key, name: def.name, catalog: def,
+      mount(el, ctx) {
+        const items = def.groups.flatMap(g => g.items.map(it => ({ ...it, groupName: g.name })));
+        const want = decodeURIComponent(location.hash.split('/')[3] || '');
+        const it = items.find(x => x.key === want && !x.soon);
+        const base = `#/${def.section}/${def.key}`;
+        if (!it) {
+          if (want) history.replaceState(null, '', base);   // 找不到的項目：回到列表
+          el.innerHTML = `<header class="top"><div><h1>${esc(def.title || def.name)}</h1>${def.desc ? `<p>${esc(def.desc)}</p>` : ''}</div></header>
+            ${def.groups.map(g => `<section class="cat-group">
+              ${g.name ? `<h2 class="cat-group-h">${esc(g.name)}${g.desc ? ` <small>${esc(g.desc)}</small>` : ''}</h2>` : ''}
+              <div class="cat-grid">${g.items.length ? g.items.map(x => x.soon
+                ? `<div class="cat-card soon"><b>${esc(x.name)}</b><span>${esc(x.desc || '')}</span><em>努力建置中</em></div>`
+                : `<a class="cat-card" href="${base}/${encodeURIComponent(x.key)}"><b>${esc(x.name)}</b><span>${esc(x.desc || '')}</span>${x.tags ? `<em>${x.tags}</em>` : ''}</a>`).join('')
+                : '<div class="cat-card soon"><b>努力建置中</b></div>'}</div>
+            </section>`).join('')}`;
+          return;
+        }
+        document.title = `${it.name} · Little Trader`;
+        el.innerHTML = `<a class="cat-back" href="${base}">← ${esc(def.name)}</a>
+          <header class="top"><div><h1>${esc(it.name)}</h1><p>${it.groupName ? `<span class="cat-crumb">${esc(it.groupName)}</span>` : ''}${esc(it.desc || '')}${it.tags ? ` ${it.tags}` : ''}</p></div></header>
+          <div class="cat-body"></div>`;
+        const label = [it.groupName, it.name].filter(Boolean);
+        view(...label);
+        it.run(el.querySelector('.cat-body'), { alive: ctx.alive, view: (...more) => view(...label, ...more) });
+      },
+    });
+  }
   function listPages() { return pages.slice(); }
 
   function parseHash() {
@@ -328,6 +404,7 @@ const LT = (() => {
     initScrollButtons();
     document.getElementById('navToggle').onclick = () => document.body.classList.toggle('nav-open');
     document.getElementById('sideCollapse').onclick = toggleSidebar;
+    initSearch();
     document.querySelectorAll('.theme-toggle').forEach(b => b.onclick = toggleTheme);
     syncCollapseButton();
     syncThemeButton();
@@ -340,5 +417,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();

@@ -1,5 +1,5 @@
 /* 股票 · 台股 · 其他研究：依主題(營收、因子、事件、機器學習)分類的研究(資料集 tw_research，pipeline/tw_research/update.py)
-   最上方選主題，再用下拉式選單選研究；同一系列的研究標同一個顏色。
+   目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究；同一系列的研究標同一個顏色。
    淨值與交易統計已在 pipeline 用本機資料庫算好(整數股、交易成本與資金規則同台股策略，根目錄 CLAUDE.md)，網頁端只計算績效統計、畫圖與顯示報告(Markdown)。
    績效統計與圖表共用 tw-strategy.js 的 LTTW。新增研究：pipeline 加一個 <key>.json，這裡的 CATS 加一筆(run = 畫面函式) */
 (() => {
@@ -19,56 +19,15 @@
     { key: 'event', name: '事件', desc: '特定事件前後的股價表現', studies: [] },
     { key: 'ml', name: '機器學習', desc: '用模型預測報酬', studies: [] },
   ];
-  const CAT_KEY = 'lt.twrCat', STUDY_KEY = 'lt.twrStudy';
-  const store = (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* 無法使用 localStorage */ } };
-  const recall = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const tag = s => `<span class="series-tag"><i style="background:${SERIES[s].color}"></i>${esc(SERIES[s].name)}</span>`;
 
-  LT.register({
-    section: 'stock', group: '台股', key: 'tw-research', name: '其他研究',
-    async mount(el, ctx) {
-      const all = CATS.flatMap(c => c.studies);
-      let cat = CATS.some(c => c.key === recall(CAT_KEY)) ? recall(CAT_KEY) : 'revenue';
-      let study = all.some(s => s.key === recall(STUDY_KEY)) ? recall(STUDY_KEY) : all[0].key;
-      const link = (location.hash.split('/')[3] || '').trim();   // 網址 #/stock/tw-research/<研究> 直接開啟該研究
-      if (all.some(s => s.key === link)) { study = link; cat = CATS.find(c => c.studies.some(s => s.key === link)).key; }
-      el.innerHTML = `
-        <header class="top"><div>
-          <h1>台股其他研究</h1>
-          <p>選擇主題，再從下拉式選單選擇研究；同一個顏色代表同一系列的研究。回測一律和買進持有 0050 比較</p>
-        </div></header>
-        <div class="panel">
-          <div class="mode-tabs twr-cat">${CATS.map(c => `<button class="mode-tab" data-c="${c.key}"><b>${esc(c.name)}</b><small>${c.studies.length ? `${c.studies.length} 份研究` : '努力建置中'}</small></button>`).join('')}</div>
-          <div class="paramgrid opt-form twr-pick" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end;">
-            <div class="paramitem"><label for="twrStudy">研究</label><select id="twrStudy"></select></div>
-            <p class="note" id="twrDesc" style="margin:0 0 8px;"></p>
-          </div>
-        </div>
-        <div id="twrBody"></div>`;
-      const body = el.querySelector('#twrBody'), pick = el.querySelector('.twr-pick'), sel = el.querySelector('#twrStudy'), desc = el.querySelector('#twrDesc');
-      let seq = 0;   // 每次切換研究加 1：還在載入的舊研究不會蓋掉新選的
-      const showStudy = k => {
-        study = k; store(STUDY_KEY, k);
-        const S = all.find(x => x.key === k);
-        LT.view(CATS.find(x => x.key === cat).name, S.name);   // 後台的熱門主題
-        sel.value = k; sel.style.color = SERIES[S.series].color;
-        desc.innerHTML = `${tag(S.series)} ${esc(S.desc)}`;
-        const my = ++seq;
-        S.run(body, { alive: () => ctx.alive() && seq === my }, S);
-      };
-      const showCat = ck => {
-        cat = ck; store(CAT_KEY, ck);
-        const C = CATS.find(x => x.key === ck);
-        el.querySelectorAll('.twr-cat .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.c === ck));
-        sel.innerHTML = C.studies.map(s => `<option value="${s.key}" style="color:${SERIES[s.series].color}">● ${esc(s.name)}</option>`).join('');
-        pick.style.display = C.studies.length ? '' : 'none';
-        if (!C.studies.length) { ++seq; body.innerHTML = LT.UNDER_CONSTRUCTION; return; }
-        showStudy(C.studies.some(s => s.key === study) ? study : C.studies[0].key);
-      };
-      el.querySelector('.twr-cat').onclick = e => { const b = e.target.closest('[data-c]'); if (b && b.dataset.c !== cat) showCat(b.dataset.c); };
-      sel.onchange = () => { if (sel.value !== study) showStudy(sel.value); };
-      showCat(cat);
-    },
+  // 目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究(網址 #/stock/tw-research/<研究>)
+  LT.catalog({
+    section: 'stock', group: '台股', key: 'tw-research', name: '其他研究', title: '台股其他研究',
+    desc: '依主題分類的研究；同一個顏色代表同一系列的研究。回測一律和買進持有 0050 比較',
+    groups: CATS.map(c => ({ name: c.name, desc: c.desc, items: c.studies.map(x => ({
+      key: x.key, name: x.name, desc: x.desc, tags: tag(x.series), run: (el, ctx) => x.run(el, ctx, x),
+    })) })),
   });
 
   /* ---------- 共用 ---------- */

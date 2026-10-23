@@ -21,7 +21,7 @@
 <body>
 <div class="topbar">
   <a class="brand" href="#/" title="回到首頁"><img class="logo" src="assets/img/logo.svg" alt=""><div class="name">Little <span>Trader</span></div></a>
-  <button id="navToggle" aria-label="選單">☰ 選單</button>
+  <div class="topbar-btns"><button id="topSearch" aria-label="搜尋股票" title="搜尋股票">🔍</button><button id="navToggle" aria-label="選單">☰ 選單</button></div>
 </div>
 <div class="shell">
   <aside class="sidebar">
@@ -32,6 +32,12 @@
       </a>
       <button id="sideCollapse" class="side-collapse" title="收起側欄" aria-label="收起側欄">«</button>
     </div>
+    <!-- 股票搜尋：輸入代號或名稱，跳到股票查詢(#/stock/query/<代號>) -->
+    <form id="sideSearch" class="side-search" role="search" autocomplete="off">
+      <button type="button" class="ss-ico" title="搜尋股票" aria-label="搜尋股票">🔍</button>
+      <input id="sideSearchInput" type="search" list="sideSymList" placeholder="搜尋股票代號或名稱" aria-label="搜尋股票代號或名稱" enterkeyhint="search">
+      <datalist id="sideSymList"></datalist>
+    </form>
     <nav id="sideNav"></nav>
     <div class="side-foot"><div id="sideAccount" class="side-account"></div><button class="theme-toggle"></button></div>
   </aside>
