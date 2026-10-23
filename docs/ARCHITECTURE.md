@@ -27,7 +27,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/tw-research.js            股票 · 台股：其他研究(最上方選主題：營收、因子、事件、機器學習，再用下拉式選單選研究；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research)
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
-    stock/query.js                  股票 · 台股：股價查詢(api/prices，資料在 Cloudflare D1)；保留給以後開放，目前只給管理員用網址 #/stock/query 預覽
+    stock/query.js                  股票 · 台股：股票查詢(K 線圖、法人、融資券、借券、月營收與除權息等事件；api/prices，資料在 Cloudflare D1)
     admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
@@ -57,14 +57,14 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
   etf_research/update.py            ETF大禮包「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
-  price_query/sync.py               股價查詢的資料：cm.tw_daily → Cloudflare D1(本機執行，只上傳有變動的部分)
+  price_query/sync.py               股票查詢的資料：cm schema → Cloudflare D1(本機執行，只上傳有變動的部分)
 
 functions/                          Cloudflare Pages Functions(後端，只在 Cloudflare 主站運作)
   _lib/access.json                  權限設定(唯一的設定處)：會員限定的區塊、頁面程式、資料集，以及後台程式
   _lib/auth.ts                      Firebase ID token 驗證、會員 session cookie、訪客 id
-  _lib/types.ts                     環境變數、股價查詢的期間與每日額度 POLICY
+  _lib/types.ts                     環境變數、股票查詢的期間與每日額度 POLICY
   _lib/security.ts                  API 的資安防護：來源檢查(CORS)、安全標頭、每分鐘次數限制
-  api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、symbols、prices(股價查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
+  api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、symbols、prices(股票查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
   data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
 migrations/                         D1 資料表(users、query_logs、page_views、usage_daily、rate_minute、symbols、price_chunks、meta)
@@ -92,7 +92,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 網址 | 角色 | 部署方式 |
 |---|---|---|
-| https://little-trader.pages.dev/ (Cloudflare Pages，專案 `little-trader`) | 主要網址：完整版＋後端(登入、會員權限、股價查詢) | `deploy.yml` 的 `cloudflare-pages` 工作，在 repo 根目錄用 wrangler 直接上傳(Direct Upload)，一起上傳 `functions/` |
+| https://little-trader.pages.dev/ (Cloudflare Pages，專案 `little-trader`) | 主要網址：完整版＋後端(登入、會員權限、股票查詢) | `deploy.yml` 的 `cloudflare-pages` 工作，在 repo 根目錄用 wrangler 直接上傳(Direct Upload)，一起上傳 `functions/` |
 | https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪：公開版(沒有後端、不能登入，會員區塊顯示「到主站登入」) | `deploy.yml` 的 `github-pages` 工作，用 `scripts/build-site.mjs` 拿掉會員限定的程式與資料 |
 
 - 觸發點不變：推送到 main、資料集排程、`run_local.py`(`gh workflow run deploy.yml`)都會一次部署兩邊。只改網站內容的話，照舊 commit + push 即可，不用碰 Cloudflare。
@@ -124,7 +124,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 |---|---|
 | 訪客 | 指數、統計學、其他 |
 | 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
-| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin`，以及保留中的股價查詢 `#/stock/query`(預覽) |
+| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin` |
 
 **怎麼運作**
 
@@ -139,7 +139,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me`、`/api/track` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM page_views WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
 - API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
   - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。
-  - **每分鐘次數限制**：訪客每個 IP 10 次、會員每個帳號 60 次(`PER_MINUTE`)，超過回 429 與 `Retry-After`；`api/me`、`api/logout` 不計。用 D1 的 `rate_minute` 原子計數(Workers 的記憶體不共用、KV 不即時，都算不準；Pages Functions 不能直接用 Durable Objects)。另外股價查詢還有每日額度(`POLICY`)。
+  - **每分鐘次數限制**：訪客每個 IP 10 次、會員每個帳號 60 次(`PER_MINUTE`)，超過回 429 與 `Retry-After`；`api/me`、`api/logout` 不計。用 D1 的 `rate_minute` 原子計數(Workers 的記憶體不共用、KV 不即時，都算不準；Pages Functions 不能直接用 Durable Objects)。另外股票查詢還有每日額度(`POLICY`)。
   - **需要登入的資料檔也限流**：`data/<需要登入的資料集>/` 每個帳號每分鐘最多 100 個檔(`PER_MINUTE_DATA`，`functions/data/_middleware.ts`)，防止登入後用程式整批下載；頁面程式(`modules/`)與 `meta.json` 不計。公開區塊的檔案(指數、選擇權資料等)沒有限流，由 Cloudflare CDN 提供。
   - **驗證**：`Authorization: Bearer <Firebase ID token>` 或網頁登入後的 session cookie 都算會員；token 不合法回 401，不降級成訪客。
   - **資料在後端過濾**：訪客的查詢期間在後端截成最近 31 天，只讀那幾年的資料區塊、逐日篩選後才回傳，訪客拿不到更早的資料。
@@ -160,21 +160,24 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 5. 建立 D1：`npx wrangler d1 create little-trader`，把輸出的 `database_id` 填進 `wrangler.toml`；再 `npm run db:migrate:remote` 建資料表。
 6. 設定簽 cookie 的金鑰(隨機產生，不進 repo)：
    `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))" | npx wrangler pages secret put SESSION_SECRET --project-name little-trader`
-7. 第一次上傳股價：`python pipeline/price_query/sync.py`(約 60 MB，之後每天由 `run_local.py` 只上傳變動的部分)。
+7. 第一次上傳股價：`python pipeline/price_query/sync.py`(約 92 MB，之後每天由 `run_local.py` 只上傳變動的部分)。
 8. 推送後部署，用 Google 登入一次，再把自己設成管理員：
    `npx wrangler d1 execute little-trader --remote --command "UPDATE users SET role = 'admin' WHERE email = '你的 Gmail'"`
 
 **本機測試**：`npm run dev` 開 http://localhost:8788(含 functions 與本機 D1)。本機的 `SESSION_SECRET` 寫在 `.dev.vars`(不進版控)；本機 D1 要先 `npm run db:migrate:local`、`python pipeline/price_query/sync.py --local`。
 
-## 股價查詢
+## 股票查詢
 
-- **保留給以後開放**：網頁上目前沒有股價查詢；`modules/stock/query.js` 放在 `access.json` 的 `adminScripts`、註冊時 `hidden: true`，只有管理員能用網址 `#/stock/query` 預覽。後端 API、D1 資料與每天的同步都照常運作。開放時把它移到 `memberScripts`(台股那幾頁後面)並拿掉 `hidden`。
-- 網頁：股票 › 台股 › 股價查詢(`modules/stock/query.js`)。輸入代號或名稱、選期間，顯示收盤價與還原收盤價走勢、成交量、含息報酬，以及每日資料表(可下載 CSV)。
-- 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價(含除權息)、成交量(張)。股票名稱來自公司基本資料；資料庫沒有 ETF 名稱，改用證交所、櫃買中心當天的收盤行情補上(累積在 `~/.cache/little-trader/etf_names.json`，下市的 ETF 也留著)。
-- 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON)，全部約 2.2 萬筆、60 MB；查 10 年只讀約 11 列，不會用掉 D1 每天 500 萬列的免費讀取額度。
-- 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳。`run_local.py` 每天在 cm 同步後執行(`wrangler.toml` 還沒填 D1 的 ID 時略過)。
-- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：會員不限期間、每天 1000 次；訪客最近 31 天、每天 30 次(股價查詢頁只開放會員，訪客的限制是 API 的保險)。額度以台北日期計，會員依帳號、訪客依 IP。
-- 報酬一律用還原收盤價計算；開高低收是原始價格，遇到分割(例如 0050 在 2025/6 一拆四)會有斷層。
+- 網頁：股票 › 台股 › 股票查詢(`modules/stock/query.js`，登入 Google 才能用)。輸入代號或名稱、選期間：
+  - 標題列：代號、名稱、上市／上櫃／創新板、股本(億元，實收資本額；ETF 沒有股本)。
+  - K 線圖(canvas)：左上角切換原始價、還原價(開高低乘上當天的還原收盤價 ÷ 收盤價)；5、20、60MA；點一下出現十字線(左側價格軸標收盤價)，資訊列列出開高低收、各 MA(後面 ↑↓ 是當天斜率)、成交量、外資與投信買賣超、融資券餘額、借券賣出餘額、當天的事件；滾輪縮放、拖曳平移、← → 移動。為了讓 60MA 從第一天就有值，查詢時多抓前 120 個日曆天(圖一開始只顯示查詢期間)。
+  - 事件：月營收標在公告日(K 棒上方的數字是單月營收年成長 %，K 棒太密時改成小點)；「息」除權息、「分割」分割或減資、「停」暫停交易標在 K 棒下方；處置期間畫淡色底。
+  - 下方小圖(可隱藏)：成交量、外資買賣超、投信買賣超、融資餘額、融券餘額、借券賣出餘額(都是張)。
+  - 統計卡(最新收盤、含息報酬、年化、外資與投信累計買賣超)、每日資料表(可下載 CSV)。
+- 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價、成交量、外資與投信買賣超、融資(`資餘`)與融券(`券餘`)餘額、借券賣出餘額，單位都已用 2330 核對(都是張)。事件來自 `cm.tw_monthly_revenue`(公告日、單月合併營收年成長，沒有合併數字時用單月營收)、`cm.tw_trading_halt`、`cm.tw_disposition`；除權息、分割或減資沒有現成欄位，由「還原收盤價 ÷ 收盤價」的跳動推算(超過四捨五入誤差才算；跳動超過 25% 視為分割或減資)，日期對到該股票的交易日(公告日沒交易就放在下一個交易日)。名稱、市場、股本來自 `cm.tw_company_info`(上市上櫃代碼：1 上市、2 上櫃、7 創新板)；資料庫沒有 ETF，改用證交所(上市)、櫃買中心(上櫃)當天的收盤行情補名稱與市場(累積在 `~/.cache/little-trader/etf_names.json`)。
+- 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON，欄位與事件都在裡面)，全部約 2.2 萬筆、92 MB；查 10 年只讀約 11 列。
+- 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳(約 4 分鐘)。`run_local.py` 每天在 cm 同步後執行。
+- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：登入 Google 不限期間、每天 1000 次；訪客最近 31 天、每天 30 次(查詢頁只開放登入的人，訪客的限制是 API 的保險)。額度以台北日期計，登入的人依帳號、訪客依 IP；另有每分鐘上限(見「會員與權限」)。
 
 ## 資料集
 
@@ -269,7 +272,7 @@ python pipeline/options/update.py
 python -m http.server 8000 -d web
 ```
 
-開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(會員區塊顯示「到主站登入」)；要測登入、會員區塊與股價查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
+開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(會員區塊顯示「到主站登入」)；要測登入、會員區塊與股票查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
 
 ## 手動更新資料
 

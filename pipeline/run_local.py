@@ -1,7 +1,7 @@
 """
 本機資料集(股價來自本機 PostgreSQL，GitHub Actions 連不到)：Windows 工作排程器「LittleTrader_local」以 pythonw.exe 執行
   等 cm 同步(工作排程器 CM_PostgreSQL_Sync)跑完 → 各資料集 update.py → 發佈到 data 分支 → 觸發一次重新部署；
-  股價查詢的資料(price_query)直接同步到 Cloudflare D1
+  股票查詢的資料(price_query)直接同步到 Cloudflare D1
 用法：python pipeline/run_local.py [資料集 ...]   (預設全部本機資料集)；記錄寫在 ~/.cache/little-trader/local.log
 需要：本機 PostgreSQL 與 pgpass.conf、gh 已登入(gh auth login)
 
@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 REPO = 'rebornlife0218/little-trader'
 DATASETS = ['tw_strategy', 'disposition', 'etf_compare', 'price_query']
-# price_query 不發佈到 data 分支：pipeline/price_query/sync.py 直接寫進 Cloudflare D1(股價查詢頁)；
+# price_query 不發佈到 data 分支：pipeline/price_query/sync.py 直接寫進 Cloudflare D1(股票查詢頁)；
 # wrangler.toml 還沒填 D1 的 database_id(尚未建立資料庫)時略過
 LOG = Path.home() / '.cache' / 'little-trader' / 'local.log'
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)

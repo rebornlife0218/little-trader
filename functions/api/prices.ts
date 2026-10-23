@@ -1,11 +1,12 @@
 /* GET /api/prices?symbol=2330&from=2016-01-01&to=2026-10-22
-   股價依「股票 × 年度」存成一筆 gzip 的 JSON(price_chunks)：查 10 年只讀約 11 列，不會用掉 D1 的讀取額度。
-   回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價(含除權息), v 成交量(張)} */
+   股價依「股票 × 年度」存成一筆 gzip 的 JSON(price_chunks，pipeline/price_query/sync.py)：查 10 年只讀約 11 列。
+   回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價, v 成交量, f 外資, t 投信, m 融資餘額, s 融券餘額, b 借券賣出餘額}
+   (單位都是張)與 events = [[日期, 種類, 說明, 結束日期]]；另附股票名稱、市場、股本(億元)。
+   資料一律在後端篩選：訪客的期間先截成最近 31 天，只讀那幾年的區塊、逐日篩掉範圍外的資料才回傳 */
 import { POLICY, json, taipeiDate, type Env, type Data } from '../_lib/types';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
-type Chunk = { d: string[]; o: number[]; h: number[]; l: number[]; c: number[]; a: number[]; v: number[] };
-const COLS = ['d', 'o', 'h', 'l', 'c', 'a', 'v'] as const;
+type Chunk = Record<string, unknown[]> & { d: string[]; ev?: [string, string, string, string | null][] };
 
 async function gunzipJson(blob: ArrayBuffer | number[]): Promise<Chunk> {
   const bytes = blob instanceof ArrayBuffer ? new Uint8Array(blob) : Uint8Array.from(blob);
@@ -36,20 +37,25 @@ export const onRequestGet: PagesFunction<Env, string, Data> = async ({ request, 
   if (used > policy.dailyQuota) return json({ error: 'quota_exceeded', limit: policy.dailyQuota, kind: data.identity.kind }, 429);
 
   const [info, chunks] = await env.DB.batch([
-    env.DB.prepare('SELECT name, first_date, last_date, delisted FROM symbols WHERE symbol = ?1').bind(symbol),
+    env.DB.prepare('SELECT name, first_date, last_date, delisted, market, capital FROM symbols WHERE symbol = ?1').bind(symbol),
     env.DB.prepare('SELECT data FROM price_chunks WHERE symbol = ?1 AND year BETWEEN ?2 AND ?3 ORDER BY year')
       .bind(symbol, +from.slice(0, 4), +to.slice(0, 4)),
   ]);
   if (!info.results.length) return json({ error: 'not_found' }, 404);
 
-  const rows: Chunk = { d: [], o: [], h: [], l: [], c: [], a: [], v: [] };
+  const rows: Record<string, unknown[]> = {};
+  const events: unknown[] = [];
   for (const r of chunks.results as { data: ArrayBuffer | number[] }[]) {
     const ch = await gunzipJson(r.data);
+    const keys = Object.keys(ch).filter(k => k !== 'ev');
+    keys.forEach(k => { rows[k] ??= []; });
     ch.d.forEach((d, i) => {
       if (d < from || d > to) return;
-      COLS.forEach(k => (rows[k] as unknown[]).push(ch[k][i]));
+      keys.forEach(k => rows[k].push(ch[k][i]));
     });
+    (ch.ev ?? []).forEach(e => { if ((e[3] ?? e[0]) >= from && e[0] <= to) events.push(e); });   // 處置期間只要和查詢期間重疊就給
   }
+  if (!rows.d) rows.d = [];
   return json({ symbol, ...info.results[0], from, to, kind: data.identity.kind, truncated,
-                remaining: Math.max(0, policy.dailyQuota - used), limit: policy.dailyQuota, rows });
+                remaining: Math.max(0, policy.dailyQuota - used), limit: policy.dailyQuota, rows, events });
 };

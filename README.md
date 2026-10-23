@@ -8,14 +8,14 @@
 |---|---|
 | 指數 | 全球主要指數的急跌反彈、均線支撐壓力、週期性分析與 K 棒型態統計；台指期貨(期現貨價差、每月轉倉、結算日曆、三大法人未平倉) |
 | ETF | ETF大禮包(ETF 介紹與折溢價；怎麼存 ETF：常存 ETF 績效比較、配息課稅試算、0050 vs 勞退基金；ETF 研究：投資方式(ARKK 研究、單筆 vs 定期定額 vs 逢低買入)、主動式 ETF(A 系列 ETF 跟單))、即將發行的新 ETF |
-| 股票 | 台股：處置股(新制說明與處置期間表現)；台股策略回測(低波動選股)；隔日沖、波段(建置中)；美股：財報行事曆(盤前/盤後、預估與實際 EPS)、S&P500 季度換股策略回測(使用當時的歷史成分股，含已下市公司) |
+| 股票 | 台股：處置股(新制說明與處置期間表現)；台股策略回測(低波動選股)；股票查詢(K 線圖、法人、融資券、借券、月營收與除權息等事件，2016 年起)；隔日沖、波段(建置中)；美股：財報行事曆(盤前/盤後、預估與實際 EPS)、S&P500 季度換股策略回測(使用當時的歷史成分股，含已下市公司) |
 | 選擇權 | 臺指選擇權的隱含波動率、P/C ratio、週選與月選結算日曆、T 字報價與未平倉量、Black-Scholes 計算器；24 種策略損益圖 |
 | 統計學 | 初級統計學 13 章(公式、R 範例、台股實例、互動模擬) |
 | 其他 | 常用網站推薦 |
 
 ## 運作方式
 
-網站以靜態網頁為主(Cloudflare Pages，GitHub Pages 備援)；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。訪客可以看指數、統計學、其他，用 Google 登入後可以看全部；登入、會員權限由 Cloudflare Pages Functions ＋ D1 處理(股價查詢 API 也已建好，保留給以後開放)(GitHub Pages 備援站只有公開內容)。台股處置股與台股策略回測的股價來自本機 PostgreSQL(GitHub Actions 連不到)，改由本機排程執行同樣的流程(`pipeline/run_local.py`)。
+網站以靜態網頁為主(Cloudflare Pages，GitHub Pages 備援)；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。訪客可以看指數、統計學、其他，用 Google 登入後可以看全部；登入、權限與股票查詢由 Cloudflare Pages Functions ＋ D1 處理(GitHub Pages 備援站只有公開內容)。台股處置股與台股策略回測的股價來自本機 PostgreSQL(GitHub Actions 連不到)，改由本機排程執行同樣的流程(`pipeline/run_local.py`)。
 
 ```
  資料來源                    GitHub Actions(依各資料集排程)                 Cloudflare Pages ＋ GitHub Pages

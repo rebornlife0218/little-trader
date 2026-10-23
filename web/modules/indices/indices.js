@@ -678,7 +678,7 @@ function drawChart(key){
     }
   }
 
-  // 點選的K棒：垂直虛線 + 收盤價水平線
+  // 點選的K棒：十字線(垂直虛線 + 收盤價水平線)，左側價格軸標收盤價；不框住K棒
   const cur = state.cursor[key];
   if (cur!=null && cur>=s && cur<=e){
     const x = xAt(cur-s), yc = yAt(rows[cur].close);
@@ -686,9 +686,11 @@ function drawChart(key){
     pctx.strokeStyle = C.cursor; pctx.globalAlpha = 0.55; pctx.setLineDash([4,3]); pctx.lineWidth = 1;
     pctx.beginPath(); pctx.moveTo(x,10); pctx.lineTo(x,priceH-20); pctx.moveTo(padL,yc); pctx.lineTo(wrapW-padR,yc); pctx.stroke();
     pctx.setLineDash([]); pctx.globalAlpha = 1;
-    pctx.strokeStyle = C.amber; pctx.lineWidth = 1.5;
-    const bw = Math.max(cw*0.9,6), yh = yAt(rows[cur].high), yl = yAt(rows[cur].low);
-    pctx.strokeRect(x-bw/2-1, yh-3, bw+2, (yl-yh)+6);
+    const label = fmtNum(rows[cur].close, rows[cur].close>1000?0:2);
+    pctx.font = '600 11px IBM Plex Mono';
+    const tw = pctx.measureText(label).width + 8;
+    pctx.fillStyle = C.amber; pctx.fillRect(Math.max(0, padL-tw-2), yc-8, tw, 16);
+    pctx.fillStyle = LT.cssVar('--on-amber'); pctx.fillText(label, Math.max(4, padL-tw+2), yc+4);
     pctx.restore();
     if (vctx){ vctx.save(); vctx.strokeStyle=C.cursor; vctx.globalAlpha=0.5; vctx.setLineDash([4,3]); vctx.beginPath(); vctx.moveTo(x,0); vctx.lineTo(x,volH-14); vctx.stroke(); vctx.restore(); }
   }
@@ -771,7 +773,12 @@ function updateOhlcInfo(){
   }
   const d = rows[i], chg = i>0 ? d.close/rows[i-1].close-1 : NaN;
   const cls = chg>=0 ? 'up' : 'down', f = v=>fmtNum(v, v>1000?0:2);
-  const mas = MA_PERIODS.map(p=>{ const v=state.ma[key]&&state.ma[key][p][i]; return Number.isNaN(v)||v==null ? '' : `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA <em>${f(v)}</em></span>`; }).join('');
+  // 各 MA 後面的箭頭：當天的 MA 比前一天高(斜率向上)↑、低 ↓
+  const mas = MA_PERIODS.map(p=>{
+    const arr=state.ma[key]&&state.ma[key][p], v=arr&&arr[i], pv=arr&&i>0?arr[i-1]:NaN;
+    if (Number.isNaN(v)||v==null) return '';
+    const arrow = Number.isNaN(pv)||pv==null ? '' : v>pv ? '<b class="up">↑</b>' : v<pv ? '<b class="down">↓</b>' : '';
+    return `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA <em>${f(v)}</em>${arrow}</span>`; }).join('');
   el.innerHTML = `<b>${d.date}</b>
     <span>開 <em>${f(d.open)}</em></span><span>高 <em>${f(d.high)}</em></span><span>低 <em>${f(d.low)}</em></span>
     <span>收 <em class="${cls}">${f(d.close)}</em></span><span class="${cls}">${fmtPct(chg,2)}</span>
