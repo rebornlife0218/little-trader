@@ -17,3 +17,4 @@ jobs:
     uses: ./.github/workflows/_dataset.yml
     with:
       dataset: etf_compare
+    secrets: inherit   # Cloudflare Pages 部署用

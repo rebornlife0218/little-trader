@@ -1,7 +1,9 @@
 name: 部署網站
 
-# 網站程式(main 的 web/) + 最新資料(data 分支) → GitHub Pages
+# 網站程式(main 的 web/) + 最新資料(data 分支) → GitHub Pages 與 Cloudflare Pages(同一份檔案)
 # 觸發：程式更新(push)、手動、或各資料集更新完成後呼叫
+# Cloudflare Pages 需要 repo secrets：CLOUDFLARE_API_TOKEN、CLOUDFLARE_ACCOUNT_ID(沒設定時只部署 GitHub Pages)；
+# 專案名稱用 repo variable CLOUDFLARE_PROJECT，未設定時為 little-trader，第一次部署會自動建立專案
 on:
   push:
     branches: [main]
@@ -14,14 +16,8 @@ permissions:
   id-token: write
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       # 一律用 main 的最新程式：資料集更新是在較早的 commit 觸發的，若用觸發當下的版本，
       # 部署完成時可能把期間推送的新程式蓋回舊版
@@ -43,10 +39,67 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
+      # GitHub Pages 用的封裝
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
+      # Cloudflare Pages 用的同一份檔案
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: _site
+          retention-days: 1
+
+  github-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: 部署到 GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  cloudflare-pages:
+    needs: build
+    runs-on: ubuntu-latest
+    concurrency:
+      group: cloudflare-pages
+      cancel-in-progress: false
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROJECT: ${{ vars.CLOUDFLARE_PROJECT || 'little-trader' }}
+    steps:
+      - name: 檢查 Cloudflare 設定
+        id: check
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::未設定 CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID，略過 Cloudflare Pages"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/download-artifact@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          name: site
+          path: _site
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.skip != 'true'
+        with:
+          node-version: 20
+
+      - name: 部署到 Cloudflare Pages
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          # 專案不存在就先建立(只有第一次)
+          if ! npx --yes wrangler@4 pages project list | grep -qw "$PROJECT"; then
+            npx --yes wrangler@4 pages project create "$PROJECT" --production-branch=main
+          fi
+          npx --yes wrangler@4 pages deploy _site --project-name="$PROJECT" --branch=main --commit-hash="$GITHUB_SHA" --commit-message="$GITHUB_WORKFLOW #$GITHUB_RUN_NUMBER" --commit-dirty=true

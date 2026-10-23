@@ -32,7 +32,7 @@ jobs:
       - name: 更新資料 ${{ inputs.dataset }}
         run: python pipeline/${{ inputs.dataset }}/update.py
         env:
-          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}   # 只有 sp500 用到(呼叫端需 secrets: inherit)
+          TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}   # 只有 sp500 用到
       - name: 發佈到 data 分支
         run: bash pipeline/publish_data.sh ${{ inputs.dataset }}
         env:
@@ -41,3 +41,4 @@ jobs:
   deploy:
     needs: update
     uses: ./.github/workflows/deploy.yml
+    secrets: inherit   # Cloudflare Pages 部署用

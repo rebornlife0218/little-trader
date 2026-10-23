@@ -1,6 +1,6 @@
 # Little Trader 小交易員的研究室
 
-**網站：https://rebornlife0218.github.io/little-trader/**
+**網站：Cloudflare Pages(主要)、https://rebornlife0218.github.io/little-trader/ (備援)**
 
 用公開資料研究台股與全球市場，把研究結果整理成圖表與統計，並收錄統計學教材。
 
@@ -15,10 +15,10 @@
 
 ## 運作方式
 
-網站是純靜態網頁(GitHub Pages)，沒有後端伺服器；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。台股處置股與台股策略回測的股價來自本機 PostgreSQL(GitHub Actions 連不到)，改由本機排程執行同樣的流程(`pipeline/run_local.py`)。
+網站是純靜態網頁(Cloudflare Pages，GitHub Pages 備援)，沒有後端伺服器；資料由 GitHub Actions 定時抓取後存成 JSON，網頁在瀏覽器端載入並計算、繪圖。台股處置股與台股策略回測的股價來自本機 PostgreSQL(GitHub Actions 連不到)，改由本機排程執行同樣的流程(`pipeline/run_local.py`)。
 
 ```
- 資料來源                    GitHub Actions(依各資料集排程)                 GitHub Pages
+ 資料來源                    GitHub Actions(依各資料集排程)                 Cloudflare Pages ＋ GitHub Pages
  ───────────                 ──────────────────────────────                 ────────────
  Yahoo Finance ─┐            pipeline/<資料集>/update.py
  臺灣證券交易所 ─┼──抓取──▶  整理成 JSON ＋ meta.json(來源、更新時間)  ──▶  data 分支
@@ -32,12 +32,12 @@
 
 - **main 分支**：程式與內容。`web/` 是網站本身，`pipeline/` 是資料抓取程式。
 - **data 分支**：只放最新一份資料(每個資料集一個資料夾)，各資料集各自排程更新、互不影響，也不會讓 repo 越來越大。
-- **部署**：程式推送到 main、或任一資料集更新完成，都會把 `web/` 和 data 分支合併後發佈到 GitHub Pages。
+- **部署**：程式推送到 main、或任一資料集更新完成，都會把 `web/` 和 data 分支合併後，同時發佈到 Cloudflare Pages 與 GitHub Pages(設定與維護見 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)「部署」)。
 
 ## 專案結構
 
 ```
-web/                    網站(GitHub Pages 的根目錄)
+web/                    網站(部署時的根目錄)
   index.html            外框：側欄、內容區、頁尾，載入所有模組
   assets/               共用框架(路由、資料載入、圖表)、樣式、第三方套件
   modules/<區塊>/        各區塊的頁面(指數、ETF、股票、選擇權、統計學、其他)

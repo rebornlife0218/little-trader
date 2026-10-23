@@ -57,7 +57,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
   data-<資料集>.yml                  各資料集的排程，只呼叫 _dataset.yml
-  deploy.yml                        組合 web/ 與 data 分支 → GitHub Pages
+  deploy.yml                        組合 web/ 與 data 分支 → GitHub Pages ＋ Cloudflare Pages(同一份檔案)
 ```
 
 ## 資料怎麼流動
@@ -65,9 +65,39 @@ pipeline/                           資料抓取，一個資料集一個資料�
 1. `data-<資料集>.yml` 依排程觸發 `_dataset.yml`。
 2. 執行 `pipeline/<資料集>/update.py`，輸出到 `web/data/<資料集>/`，一定包含 `meta.json`(更新時間、來源、排程、version)。
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
-4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → GitHub Pages。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
+4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 GitHub Pages 與 Cloudflare Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
 網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。每頁用到的資料集會自動列在頁尾 COPYRIGHT 下方(「資料來源 · 更新時間 · 排程」，換頁時更新；首頁列出全部資料集)，頁面不用自己顯示。
+
+## 部署
+
+同一份 `_site/` 發佈到兩個地方，兩邊內容永遠一樣：
+
+| 網址 | 角色 | 部署方式 |
+|---|---|---|
+| Cloudflare Pages(`<專案名稱>.pages.dev`) | 主要網址 | `deploy.yml` 的 `cloudflare-pages` 工作，用 wrangler 直接上傳(Direct Upload) |
+| https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪 | `deploy.yml` 的 `github-pages` 工作 |
+
+- 觸發點不變：推送到 main、資料集排程、`run_local.py`(`gh workflow run deploy.yml`)都會一次部署兩邊。只改網站內容的話，照舊 commit + push 即可，不用碰 Cloudflare。
+- 不用 Cloudflare 的「連接 GitHub 自動建置」：網站是 main 的 `web/` 加上 data 分支組合而成，資料更新只推 data 分支，用 Git 連接會漏掉資料更新。
+- Cloudflare 沒設定好(缺 secrets)時，`cloudflare-pages` 會顯示警告並略過，不影響 GitHub Pages。
+- 網頁一律用相對路徑(GitHub Pages 在 `/little-trader/` 子路徑、Cloudflare 在根目錄，兩邊都能用)；新增檔案或連結時不要寫 `/` 開頭的絕對路徑。
+- Cloudflare Pages 單一檔案上限 25 MB、總檔案數上限 20,000，資料檔要控制在這之內。
+
+**第一次設定(只做一次)**
+
+1. 登入 Cloudflare → My Profile → API Tokens → Create Token → 用「Edit Cloudflare Workers」範本，或自訂權限 Account › Cloudflare Pages › Edit。
+2. Cloudflare 首頁右側(或任一網址列 `dash.cloudflare.com/<帳戶 ID>`)複製 Account ID。
+3. GitHub repo → Settings → Secrets and variables → Actions：新增 secrets `CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`。也可以用 `gh secret set CLOUDFLARE_API_TOKEN`(會提示貼上，不會留在指令紀錄)。
+4. (選填)專案名稱預設 `little-trader`，要改就新增 variable `CLOUDFLARE_PROJECT`。
+5. Actions → 部署網站 → Run workflow。第一次會自動建立 Cloudflare Pages 專案，完成後網址顯示在 Cloudflare 的 Workers & Pages。
+
+**日後維護**
+
+- API token 到期或被撤銷：重新建立後更新 `CLOUDFLARE_API_TOKEN` 即可。
+- 綁自己的網域：Cloudflare → Workers & Pages → 專案 → Custom domains。
+- 回復舊版：Cloudflare 專案的 Deployments 可以對任一次部署 Rollback；GitHub Pages 則重跑舊 commit 的部署。
+- 不想再部署 GitHub Pages：刪掉 `deploy.yml` 的 `github-pages` 工作，並到 repo Settings → Pages 停用。
 
 ## 資料集
 
