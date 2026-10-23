@@ -85,7 +85,7 @@
         lo = Math.min(lo, price[i].l); hi = Math.max(hi, price[i].h);
         MAS.forEach(p => { const v = ma[p][i]; if (v === v) { lo = Math.min(lo, v); hi = Math.max(hi, v); } });
       }
-      const pad = (hi - lo) * 0.1 || hi * 0.02; lo -= pad; hi += pad * 1.6;   // 上方多留空間寫月營收
+      const pad = (hi - lo) * 0.1 || hi * 0.02; lo -= pad; hi += pad * 1.3;   // 上方多留空間畫月營收的符號
       const y = v => 8 + (PH - 16) * (1 - (v - lo) / (hi - lo));
       g.strokeStyle = C('--grid'); g.fillStyle = C('--mute');
       for (let k = 0; k <= 4; k++) {
@@ -114,17 +114,15 @@
         for (let i = s; i <= e; i++) { const v = ma[p][i]; if (v !== v) { on = false; continue; } if (on) g.lineTo(xAt(i), y(v)); else g.moveTo(xAt(i), y(v)); on = true; }
         g.strokeStyle = C('--ma' + p); g.lineWidth = 1.2; g.stroke(); g.lineWidth = 1;
       });
-      // 事件：月營收在 K 棒上方寫年成長(%)；除權息、分割、暫停交易在下方標小字；K 棒太密時月營收改畫小點
-      const showRev = cnt <= 320;
+      // 事件：月營收在 K 棒上方畫小菱形(紅 = 年成長、綠 = 年衰退，數字點 K 棒看)；除權息、分割、暫停交易在下方標小字
       g.textAlign = 'center';
       for (let i = s; i <= e; i++) {
         (evAt[i] || []).forEach(ev => {
           const x = xAt(i);
           if (ev[1] === 'rev') {
-            const m = ev[2].match(/([+-][\d.]+)%/), v = m ? parseFloat(m[1]) : NaN;
-            g.fillStyle = v >= 0 ? up : dn;
-            if (showRev) g.fillText(m ? (v > 0 ? '+' : '') + Math.round(v) : '營', x, y(price[i].h) - 6);
-            else { g.beginPath(); g.arc(x, y(price[i].h) - 5, 2, 0, 7); g.fill(); }
+            const m = ev[2].match(/([+-][\d.]+)%/), v = m ? parseFloat(m[1]) : NaN, yy = y(price[i].h) - 8, r = 3.5;
+            g.fillStyle = !m ? C('--mute') : v >= 0 ? up : dn;
+            g.beginPath(); g.moveTo(x, yy - r); g.lineTo(x + r, yy); g.lineTo(x, yy + r); g.lineTo(x - r, yy); g.closePath(); g.fill();
           } else if (EV_TAG[ev[1]]) {
             g.fillStyle = ev[1] === 'halt' ? C('--mute') : C('--blue');
             g.fillText(EV_TAG[ev[1]], x, Math.min(y(price[i].l) + 13, PH - 2));
@@ -332,13 +330,13 @@
             <div class="pq-toolbar">
               <div class="btnrow-l pq-mode">${[['raw', '原始價'], ['adj', '還原價']].map(([k, t]) => `<button type="button" data-m="${k}" class="${opts.mode === k ? 'active' : ''}">${t}</button>`).join('')}</div>
               <div class="pq-legend">${MAS.map(p => `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
-                <span><b class="up">+25</b> 月營收年成長(%)</span><span><b style="color:var(--blue)">息</b> 除權息</span><span><b class="mute">停</b> 暫停交易</span><span><i class="dot" style="background:var(--amber)"></i>處置期間</span></div>
+                <span><b class="up">◆</b><b class="down">◆</b> 月營收公告(年成長 / 衰退)</span><span><b style="color:var(--blue)">息</b> 除權息</span><span><b class="mute">停</b> 暫停交易</span><span><i class="dot" style="background:var(--amber)"></i>處置期間</span></div>
             </div>
             <div class="btnrow-l pq-panels">${PANELS.map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${p.name}</button>`).join('')}</div>
             <div id="pqInfo" class="ohlc-info pq-info"></div>
             <div id="pqChart" class="pq-chart"></div>
             <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移；上方按鈕可隱藏或顯示下方的小圖。
-              還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收標在公告日，數字是單月營收年成長(%)；
+              還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
               「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。
               今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。</p>
           </div>`;
