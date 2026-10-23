@@ -57,7 +57,7 @@ const LT = (() => {
     return `<header class="top"><div><h1>${esc(sec.name)}</h1><p>${esc(sec.desc || '')}</p></div></header>
       <div class="panel lock-panel">
         <div class="lock-ico">🔒</div>
-        <h2>這個區塊需要登入</h2>
+        <h2>登入 Google 看更多</h2>
         <p class="mute">用 Google 帳號登入後，就能看 ETF、股票、選擇權的所有內容；設有密碼的策略仍需要另外輸入密碼。</p>
         ${loginButton()}
         ${LTAuth.error ? `<p class="lock-err">${esc(LTAuth.error)}</p>` : ''}
@@ -67,9 +67,16 @@ const LT = (() => {
     const el = document.getElementById('sideAccount');
     if (!el) return;
     el.innerHTML = auth.kind === 'member'
-      ? `<div class="acct-who" title="${esc(auth.email || '')}">👤 ${esc(auth.email || '會員')}</div>
+      ? `<div class="acct-who" title="${esc(auth.email || '')}">👤 ${esc(auth.email || 'Google 帳號')}</div>
          ${auth.admin ? '<a class="acct-link" href="#/other/admin">後台</a>' : ''}<button type="button" class="acct-link" onclick="LTAuth.logout()">登出</button>`
-      : `<div class="acct-who mute">訪客</div>${loginButton('Google 登入')}`;
+      : `<div class="acct-who mute">訪客</div>${loginButton('Google 登入')}${LTAuth.error ? `<div class="acct-err">${esc(LTAuth.error)}</div>` : ''}`;
+  }
+  // 瀏覽紀錄：每次換頁送一筆到 api/track(後台的「最受歡迎的主題」)；備援站沒有後端就不送
+  function track(section, page, title, isLocked) {
+    if (!auth.api) return;
+    try {
+      navigator.sendBeacon('api/track', new Blob([JSON.stringify({ section, page, title, locked: !!isLocked })], { type: 'application/json' }));
+    } catch (e) {}
   }
   // 第一次來訪：選擇用 Google 登入或以訪客身分繼續(記住選擇，不再詢問)
   function welcome() {
@@ -81,7 +88,7 @@ const LT = (() => {
     box.innerHTML = `<div class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
         <img src="assets/img/logo.svg" alt="" class="welcome-logo">
         <h2 id="welcomeTitle">歡迎來到 Little Trader</h2>
-        <p class="mute">訪客可以看指數、統計學與其他區塊；用 Google 登入後可以看全部內容。</p>
+        <p class="mute">訪客可以看指數、統計學與其他；登入 Google 看更多：ETF、股票、選擇權。</p>
         ${loginButton()}
         <button type="button" class="welcome-guest">以訪客身分繼續瀏覽</button>
       </div>`;
@@ -124,7 +131,7 @@ const LT = (() => {
         ? `<a href="${p.href}" target="_blank" rel="noopener" class="side-link ext" title="在新分頁開啟外部網站">${p.name}<span class="ext-ico">↗</span></a>`
         : `<a href="#/${sec.key}/${p.key}" class="side-link ${isActive(p) ? 'active' : ''}">${p.name}${p.mount ? '' : '<span class="soon-tag">建置中</span>'}</a>`;
       const items = locked(sec.key)
-        ? `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key ? 'active' : ''}">🔒 登入後查看</a>`
+        ? `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key ? 'active' : ''}">🔒 登入 Google 看更多</a>`
         : list.length
         ? groupPages(list).map(([g, ps]) => (g ? `<div class="side-sub">${g}</div>` : '') + ps.map(link).join('')).join('')
         : `<a href="#/${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
@@ -172,12 +179,14 @@ const LT = (() => {
       const seq = ++routeSeq;
       if (page.mount) page.mount(main, { alive: () => seq === routeSeq });
       else mountPlaceholder(page, main);
+      if (!page.hidden) track(page.section, page.key, page.name, false);
     } else {
       current = null;
       routeSeq++;
       renderSidebar({ section: sec.key });
       document.title = `${sec.name} · Little Trader`;
       main.innerHTML = locked(sec.key) ? lockedPanel(sec) : UNDER_CONSTRUCTION;
+      track(sec.key, '', sec.name, locked(sec.key));
     }
     document.body.classList.remove('nav-open');
   }
@@ -193,6 +202,7 @@ const LT = (() => {
     document.title = 'Little Trader 小交易員的研究室';
     clearSources();
     home.mount(main, { alive: () => seq === routeSeq });
+    track('home', '', '首頁', false);
     // 首頁頁尾列出所有資料集的更新狀態
     DATASETS.forEach(d => dataset(d.key).then(m => { if (seq === routeSeq) addSource(m, d.name); }).catch(() => {}));
     document.body.classList.remove('nav-open');

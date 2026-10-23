@@ -3,7 +3,7 @@
    clientId：Firebase 主控台 › Authentication › Sign-in method › Google › 網頁 SDK 設定 › 網路用戶端 ID
    留空時登入功能停用(網站照常以訪客身分運作) */
 window.LT_FIREBASE = {
-  apiKey: '',
-  projectId: '',
-  clientId: '',
+  apiKey: 'AIzaSyAVt2TYqZPHNGmP8uAX-2kXNWqgUIgVIBg',
+  projectId: 'little-trader-bbf1c',
+  clientId: '257403230604-tgnjvl084r07nv51dvnp74j1gh6juig3.apps.googleusercontent.com',
 };

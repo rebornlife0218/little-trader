@@ -28,7 +28,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
     stock/query.js                  股票 · 台股：股價查詢(api/prices，資料在 Cloudflare D1)；保留給以後開放，目前只給管理員用網址 #/stock/query 預覽
-    admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：誰在查資料、熱門股票、API 用量與效能
+    admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
     option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
@@ -64,10 +64,10 @@ functions/                          Cloudflare Pages Functions(後端，只在 C
   _lib/auth.ts                      Firebase ID token 驗證、會員 session cookie、訪客 id
   _lib/types.ts                     環境變數、股價查詢的期間與每日額度 POLICY
   _lib/security.ts                  API 的資安防護：來源檢查(CORS)、安全標頭、每分鐘次數限制
-  api/                              me(目前身分)、session(登入)、logout、symbols、prices(股價查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
+  api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、symbols、prices(股價查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
   data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
-migrations/                         D1 資料表(users、query_logs、usage_daily、rate_minute、symbols、price_chunks、meta)
+migrations/                         D1 資料表(users、query_logs、page_views、usage_daily、rate_minute、symbols、price_chunks、meta)
 scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)與 GitHub Pages 的公開版
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose)
 
@@ -123,19 +123,20 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 | 身分 | 看得到 |
 |---|---|
 | 訪客 | 指數、統計學、其他 |
-| 會員(Google 登入) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
+| 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
 | 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin`，以及保留中的股價查詢 `#/stock/query`(預覽) |
 
 **怎麼運作**
 
 - 登入(`assets/js/auth.js`)：轉到 Google 登入頁 → 回來時用 Firebase REST API(`accounts:signInWithIdp`)換成 Firebase ID token → `POST api/session`，後端驗證 token(`jose`，Google 公開金鑰)後發 `lt_sess` cookie(HttpOnly、HMAC 簽章、30 天)。不用 Firebase SDK，因為它會從 Google 載入外部腳本，違反 CSP 只允許同源的規則；CSP 只為登入多開 `connect-src https://identitytoolkit.googleapis.com`。
-- 開網頁時 `app.js` 先呼叫 `api/me`：會員才拿到會員區塊的程式清單並載入；訪客在側欄與首頁看到 🔒，點進去是登入提示。第一次來訪會跳出「用 Google 登入 / 以訪客身分繼續瀏覽」(選訪客會記在 localStorage `lt.guest`，不再詢問；這個標記只控制畫面)。
+- 開網頁時 `app.js` 先呼叫 `api/me`：會員才拿到會員區塊的程式清單並載入；訪客在側欄與首頁看到「🔒 登入 Google 看更多」，點進去是登入提示(網頁上不用「會員」這個詞)。第一次來訪會跳出「用 Google 登入 / 以訪客身分繼續瀏覽」(選訪客會記在 localStorage `lt.guest`，不再詢問；這個標記只控制畫面)。
 - 真正的權限在後端：`functions/data/_middleware.ts`、`functions/modules/_middleware.ts` 擋訪客下載會員限定的資料與程式(回 401)，畫面上的鎖只是提示。
 - 權限清單只寫在 `functions/_lib/access.json`：後端檢查、部署時的 `_routes.json`、GitHub Pages 公開版、網頁要載入的程式都從這裡來。
   - **新增會員區塊的頁面**：程式放在 `web/modules/<區塊>/`，路徑加到 `memberScripts`(依側欄順序，同一小組要連續)，**不要**寫進 `index.html`。
   - **新增會員限定的資料集**：名稱加到 `memberDatasets`。
   - 要把整個區塊改成公開或會員限定：改 `memberSections`，並把該區塊的程式在 `index.html` 與 `memberScripts` 之間搬動。
-- 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
+- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否被擋在需要登入的區塊)，存在 `page_views`；後台的「最受歡迎的主題」「各區塊」由此統計。只記到頁面層級，頁面裡的分頁或下拉選單不記；同一頁重新整理會再記一筆。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
+- 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me`、`/api/track` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM page_views WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
 - API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
   - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。
   - **每分鐘次數限制**：訪客每個 IP 10 次、會員每個帳號 60 次(`PER_MINUTE`)，超過回 429 與 `Retry-After`；`api/me`、`api/logout` 不計。用 D1 的 `rate_minute` 原子計數(Workers 的記憶體不共用、KV 不即時，都算不準；Pages Functions 不能直接用 Durable Objects)。另外股價查詢還有每日額度(`POLICY`)。

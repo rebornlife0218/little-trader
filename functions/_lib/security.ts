@@ -51,21 +51,29 @@ export function secure(res: Response, origin: string | null): Response {
    (Workers 的記憶體不共用、KV 不即時，都不適合精準計數；Pages Functions 不能直接用 Durable Objects)。
    訪客依 IP、會員依帳號，超過就回 429 與 Retry-After。 */
 export const PER_MINUTE = { guest: 10, member: 60 } as const;
+export const PER_MINUTE_TRACK = 30;   // 瀏覽紀錄(api/track)另外計，換頁快也不會卡到一般 API
 
-export async function rateLimit(env: Env, id: Identity, ip: string, waitUntil: (p: Promise<unknown>) => void): Promise<Response | null> {
+export async function rateLimit(env: Env, id: Identity, ip: string, waitUntil: (p: Promise<unknown>) => void,
+                                bucket: { prefix: string; limit: number } | null = null): Promise<Response | null> {
   if (!env.DB) return null;
   const now = new Date(), minute = now.toISOString().slice(0, 16);
-  const key = id.kind === 'member' ? 'u:' + id.uid : 'ip:' + ip;
-  const row = await env.DB.prepare(
-    `INSERT INTO rate_minute (rate_key, minute, count) VALUES (?1, ?2, 1)
-     ON CONFLICT (rate_key, minute) DO UPDATE SET count = count + 1
-     RETURNING count`).bind(key, minute).first<{ count: number }>();
+  const key = (bucket ? bucket.prefix + ':' : '') + (id.kind === 'member' ? 'u:' + id.uid : 'ip:' + ip);
+  let row: { count: number } | null;
+  try {
+    row = await env.DB.prepare(
+      `INSERT INTO rate_minute (rate_key, minute, count) VALUES (?1, ?2, 1)
+       ON CONFLICT (rate_key, minute) DO UPDATE SET count = count + 1
+       RETURNING count`).bind(key, minute).first<{ count: number }>();
+  } catch (e) {
+    console.error('rate limit failed', e);   // 計數出錯不擋正常使用(錯誤會留在 Cloudflare 的記錄)
+    return null;
+  }
   // 約 1% 的請求順手清掉 10 分鐘前的計數，資料表不會越長越大
   if (Math.random() < 0.01) {
     waitUntil(env.DB.prepare('DELETE FROM rate_minute WHERE minute < ?1')
       .bind(new Date(now.getTime() - 10 * 60e3).toISOString().slice(0, 16)).run());
   }
-  const limit = PER_MINUTE[id.kind];
+  const limit = bucket ? bucket.limit : PER_MINUTE[id.kind];
   if ((row?.count ?? 0) <= limit) return null;
   const retry = 60 - now.getUTCSeconds();
   return Response.json({ error: 'rate_limited', limit_per_minute: limit, retry_after: retry },

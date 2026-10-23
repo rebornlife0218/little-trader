@@ -1,13 +1,13 @@
 /* 所有 /api 的驗證中介層：
    1. 來源檢查(CORS)：只有 ALLOWED_ORIGINS 的網頁能從瀏覽器呼叫，其他網站一律 403
    2. 辨識身分：Bearer Firebase token 或 session cookie → 會員；都沒有 → 訪客；token 不合法 → 401
-   3. 每分鐘次數限制：訪客每個 IP 10 次、會員每個帳號 60 次，超過回 429(api/me、api/logout 不計)
+   3. 每分鐘次數限制：訪客每個 IP 10 次、會員每個帳號 60 次，超過回 429(api/me、api/logout 不計；api/track 另計 30 次)
    4. 回應後寫一筆查詢日誌，並加上安全標頭 */
 import { identify } from '../_lib/auth';
-import { checkOrigin, rateLimit, secure } from '../_lib/security';
+import { checkOrigin, rateLimit, secure, PER_MINUTE_TRACK } from '../_lib/security';
 import { json, type Env, type Data } from '../_lib/types';
 
-const NO_LOG = new Set(['/api/me']);                       // 每次開網頁都會呼叫，不記
+const NO_LOG = new Set(['/api/me', '/api/track']);        // 每次開網頁、換頁都會呼叫，不記(瀏覽紀錄另存 page_views)
 const NO_LIMIT = new Set(['/api/me', '/api/logout']);
 
 export const onRequest: PagesFunction<Env, string, Data> = async (ctx) => {
@@ -23,7 +23,8 @@ export const onRequest: PagesFunction<Env, string, Data> = async (ctx) => {
   ctx.data.identity = identity;
   ctx.data.ip = ip;
 
-  let res: Response | null = NO_LIMIT.has(path) ? null : await rateLimit(env, identity, ip, p => ctx.waitUntil(p));
+  let res: Response | null = NO_LIMIT.has(path) ? null : await rateLimit(env, identity, ip, p => ctx.waitUntil(p),
+    path === '/api/track' ? { prefix: 't', limit: PER_MINUTE_TRACK } : null);
   if (!res) {
     try {
       res = await ctx.next();

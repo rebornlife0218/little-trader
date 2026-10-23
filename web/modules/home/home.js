@@ -24,9 +24,9 @@ LT.setHome({
         ${LT.SECTIONS.map(sec => {
           const list = pages.filter(p => p.section === sec.key && !p.hidden);
           if (LT.locked(sec.key)) return `<div class="panel home-card">
-            <h2>${sec.name} <span class="lock-tag">🔒 會員</span></h2>
+            <h2>${sec.name} <span class="lock-tag">🔒 登入 Google 看更多</span></h2>
             <p class="mute">${sec.desc || ''}</p>
-            <div class="home-links home-lock">${LT.loginButton('登入後查看')}</div>
+            <div class="home-links home-lock">${LT.loginButton('用 Google 登入')}</div>
           </div>`;
           return `<div class="panel home-card">
             <h2>${sec.name}</h2>

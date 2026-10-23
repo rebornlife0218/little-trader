@@ -6,13 +6,14 @@
   const table = (heads, rows) => `<div class="tablewrap"><table class="stattable"><thead><tr>${heads.map(h => `<th>${h}</th>`).join('')}</tr></thead>
     <tbody>${rows.length ? rows.join('') : `<tr><td colspan="${heads.length}" class="mute">沒有資料</td></tr>`}</tbody></table></div>`;
   const who = r => `${r.kind === 'member' ? '👤 ' : ''}${esc(r.kind === 'guest' ? '訪客 ' + String(r.who).slice(0, 8) : r.who)}`;
+  const secName = k => k === 'home' ? '首頁' : (LT.SECTIONS.find(s => s.key === k) || {}).name || k;
 
   LT.register({
     section: 'other', key: 'admin', name: '後台', hidden: true,
     async mount(el, ctx) {
       let days = 7;
       el.innerHTML = `
-        <header class="top"><div><h1>後台</h1><p>誰在查資料、熱門股票、API 用量與效能(時間皆為台北時間)；保留中的功能：<a href="#/stock/query">股價查詢(預覽)</a></p></div></header>
+        <header class="top"><div><h1>後台</h1><p>最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能(時間皆為台北時間)；保留中的功能：<a href="#/stock/query">股價查詢(預覽)</a></p></div></header>
         <div class="btnrow-l adm-days">${[1, 7, 30, 90].map(d => `<button type="button" data-d="${d}" class="${d === days ? 'active' : ''}">${d === 1 ? '24 小時' : `近 ${d} 天`}</button>`).join('')}</div>
         <div id="admOut" style="margin-top:14px;"><div class="panel"><p class="mute">載入中…</p></div></div>`;
       const out = el.querySelector('#admOut');
@@ -24,12 +25,20 @@
         out.innerHTML = `
           <div class="statgrid" style="margin-bottom:16px;">
             <div class="stat"><div class="v">${n0(T.requests)}</div><div class="l">API 請求數</div></div>
-            <div class="stat"><div class="v">${n0(T.active_members)} / ${n0(T.members)}</div><div class="l">期間有登入的會員 / 全部會員</div></div>
-            <div class="stat"><div class="v">${n0(T.guests)}</div><div class="l">呼叫 API 的訪客</div></div>
+            <div class="stat"><div class="v">${n0(T.active_members)} / ${n0(T.members)}</div><div class="l">期間有登入 / 登入過 Google 的人</div></div>
+            <div class="stat"><div class="v">${n0(T.views)}</div><div class="l">頁面瀏覽次數</div></div>
+            <div class="stat"><div class="v">${n0(T.viewers)}</div><div class="l">瀏覽人數(不重複)</div></div>
+          </div>
+          <div class="adm-grid">
+            <div class="panel"><h3 style="margin-top:0;">最受歡迎的主題</h3>${table(['#', '主題', '瀏覽次數', '人數', '登入 / 訪客'],
+              S.pages.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(secName(r.section))}${r.page ? ' › ' + esc(r.title || r.page) : r.locked ? ' <span class="mute">(訪客被擋)</span>' : ''}</td><td>${n0(r.n)}</td><td>${n0(r.people)}</td><td>${n0(r.member)} / ${n0(r.guest)}</td></tr>`))}</div>
+            <div class="panel"><h3 style="margin-top:0;">各區塊</h3>${table(['區塊', '瀏覽次數', '人數', '訪客被擋'],
+              S.sections.map(r => `<tr><td>${esc(secName(r.section))}</td><td>${n0(r.n)}</td><td>${n0(r.people)}</td><td>${n0(r.locked)}</td></tr>`))}
+              <p class="note">「訪客被擋」：沒登入的人點進需要登入的區塊的次數，可以看出大家想看但被擋住的主題。</p></div>
           </div>
           <div class="panel"><h3 style="margin-top:0;">每日請求數</h3><div id="admChart"></div></div>
           <div class="adm-grid">
-            <div class="panel"><h3 style="margin-top:0;">熱門股票</h3>${table(['#', '股票', '查詢次數', '查詢人數', '會員 / 訪客'],
+            <div class="panel"><h3 style="margin-top:0;">熱門股票</h3>${table(['#', '股票', '查詢次數', '查詢人數', '登入 / 訪客'],
               S.symbols.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.symbol)} ${esc(r.name || '')}</td><td>${n0(r.n)}</td><td>${n0(r.users)}</td><td>${n0(r.member)} / ${n0(r.guest)}</td></tr>`))}</div>
             <div class="panel"><h3 style="margin-top:0;">誰在查資料</h3>${table(['使用者', '請求數', '查過幾檔', '最後一次'],
               S.users.map(r => `<tr><td>${who(r)}</td><td>${n0(r.n)}</td><td>${n0(r.symbols)}</td><td>${esc(r.last)}</td></tr>`))}</div>

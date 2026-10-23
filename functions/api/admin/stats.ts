@@ -6,7 +6,7 @@ export const onRequestGet: PagesFunction<Env, string, Data> = async ({ request, 
   const db = env.DB!;
   const days = Math.min(365, Math.max(1, +(new URL(request.url).searchParams.get('days') ?? 7) || 7));
   const since = new Date(Date.now() - days * 86400e3).toISOString();
-  const [users, symbols, daily, recent, totals] = await db.batch([
+  const [users, symbols, daily, recent, totals, pages, sections] = await db.batch([
     // a. 誰在查資料：每位使用者的用量
     db.prepare(`
       SELECT l.kind, COALESCE(u.email, l.subject) AS who, COUNT(*) AS n,
@@ -36,7 +36,19 @@ export const onRequestGet: PagesFunction<Env, string, Data> = async ({ request, 
       SELECT (SELECT COUNT(*) FROM users) AS members,
              (SELECT COUNT(*) FROM users WHERE last_seen_at >= datetime(?1)) AS active_members,
              (SELECT COUNT(*) FROM query_logs WHERE ts >= ?1) AS requests,
-             (SELECT COUNT(DISTINCT subject) FROM query_logs WHERE ts >= ?1 AND kind = 'guest') AS guests`).bind(since),
+             (SELECT COUNT(DISTINCT subject) FROM query_logs WHERE ts >= ?1 AND kind = 'guest') AS guests,
+             (SELECT COUNT(*) FROM page_views WHERE ts >= ?1) AS views,
+             (SELECT COUNT(DISTINCT subject) FROM page_views WHERE ts >= ?1) AS viewers`).bind(since),
+    // 最受歡迎的主題：各頁面的瀏覽次數、不重複瀏覽人數(登入 Google / 訪客)；locked = 訪客點進需要登入的區塊
+    db.prepare(`
+      SELECT section, page, MAX(title) AS title, COUNT(*) AS n, COUNT(DISTINCT subject) AS people,
+             SUM(kind = 'member') AS member, SUM(kind = 'guest') AS guest, MAX(locked) AS locked
+      FROM page_views WHERE ts >= ?1 AND section <> 'home'
+      GROUP BY section, page ORDER BY n DESC LIMIT 30`).bind(since),
+    db.prepare(`
+      SELECT section, COUNT(*) AS n, COUNT(DISTINCT subject) AS people, SUM(locked) AS locked
+      FROM page_views WHERE ts >= ?1 GROUP BY section ORDER BY n DESC`).bind(since),
   ]);
-  return json({ days, totals: totals.results[0], users: users.results, symbols: symbols.results, daily: daily.results, recent: recent.results });
+  return json({ days, totals: totals.results[0], users: users.results, symbols: symbols.results, daily: daily.results, recent: recent.results,
+                pages: pages.results, sections: sections.results });
 };

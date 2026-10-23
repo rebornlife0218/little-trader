@@ -94,6 +94,7 @@ footer.copy{border-top:1px solid var(--border);color:var(--mute);font-size:12px;
 .lock-panel p{max-width:520px;margin:0 auto 18px;line-height:1.8;}
 .lock-ico{font-size:34px;}
 .lock-err{color:var(--up);margin-top:12px !important;font-size:13px;}
+.acct-err{flex:1 1 100%;color:var(--up);font-size:11.5px;line-height:1.5;}
 .lock-tag{font-size:11.5px;font-weight:600;color:var(--amber);border:1px solid var(--amber);border-radius:999px;padding:1px 8px;vertical-align:3px;}
 .home-lock{align-items:flex-start;}
 .welcome-mask{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.55);}
