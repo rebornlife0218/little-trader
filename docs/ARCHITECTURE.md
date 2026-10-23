@@ -140,6 +140,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
   - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。
   - **每分鐘次數限制**：訪客每個 IP 10 次、會員每個帳號 60 次(`PER_MINUTE`)，超過回 429 與 `Retry-After`；`api/me`、`api/logout` 不計。用 D1 的 `rate_minute` 原子計數(Workers 的記憶體不共用、KV 不即時，都算不準；Pages Functions 不能直接用 Durable Objects)。另外股價查詢還有每日額度(`POLICY`)。
+  - **需要登入的資料檔也限流**：`data/<需要登入的資料集>/` 每個帳號每分鐘最多 60 個檔(`PER_MINUTE_DATA`，`functions/data/_middleware.ts`)，防止登入後用程式整批下載；頁面程式(`modules/`)與 `meta.json` 不計。公開區塊的檔案(指數、選擇權資料等)沒有限流，由 Cloudflare CDN 提供。
   - **驗證**：`Authorization: Bearer <Firebase ID token>` 或網頁登入後的 session cookie 都算會員；token 不合法回 401，不降級成訪客。
   - **資料在後端過濾**：訪客的查詢期間在後端截成最近 31 天，只讀那幾年的資料區塊、逐日篩選後才回傳，訪客拿不到更早的資料。
   - **安全標頭**：API 回應加上 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Content-Security-Policy: default-src 'none'`、`Referrer-Policy: no-referrer`、`Cache-Control: private, no-store`；靜態檔的安全標頭在 `web/_headers`(只有 Cloudflare 會套用)。
