@@ -767,7 +767,7 @@ def main(keys=None, data=None, write=True):
             write_json(out / f'{key}.json', res[key][0])
             print(f'{key}.json：{(out / f"{key}.json").stat().st_size / 1024:.0f} KB')
     if write:
-        write_meta(NAME, 'CM 台股日資料、月營收(本機計算)', '', '不定期(研究更新時手動執行)')
+        write_meta(NAME, '台股日資料、月營收(本機計算)', '', '不定期(研究更新時手動執行)')
     return res
 
 

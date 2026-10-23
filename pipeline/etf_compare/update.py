@@ -261,7 +261,7 @@ def main():
         'etf_total': [round(etf[m][1], 6) for m in months],        # 0050 總報酬(股利再投入)
     })
     write_json(out / 'etfs.json', etfs)
-    write_meta(DATASET, '勞動基金運用局 勞退基金收益率、CMoney(台股 ETF 股價；2016 年以前 Yahoo Finance)、臺灣證券交易所(除息資料)', LPF_URL,
+    write_meta(DATASET, '勞動基金運用局 勞退基金收益率、Yahoo Finance(2016 年以前的台股 ETF 股價、ARKK)、臺灣證券交易所(除息資料)', LPF_URL,
                '週一~五 23:45、週二~六 12:15(台北時間，本機排程；勞退基金每月初公告前兩個月的收益率)', months=len(months))
 
 

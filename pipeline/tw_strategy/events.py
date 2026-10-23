@@ -1,7 +1,7 @@
 """
 台股事件型策略(每天收盤後選股、隔天開盤進場、持有幾天就出場)：共用同一份資料、同一套進出場與漲跌停規則，
 每個策略輸出 web/data/tw_strategy/<key>.json，比較基準一律是 0050(股息再投入、買進持有)。
-資料：本機 PostgreSQL 的 cm.tw_daily(CMoney 日資料，2016 年起)；加權指數用 data 分支的 indices/TAIEX.json。
+資料：本機 PostgreSQL 的 cm.tw_daily(日資料，2016 年起)；加權指數用 data 分支的 indices/TAIEX.json。
 
 新增策略：在 STRATEGIES 加一筆(訊號函式 + 出場參數 + 選股表要顯示的欄位)，網頁 tw-strategy.js 的 SIDES 加一筆設定。
 不公開的策略寫在本機的 private_strategies.py(不進版控)：它的 COLS、STRATEGIES 會併進來；有 password 的策略，

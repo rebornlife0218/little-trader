@@ -4,7 +4,7 @@
 研究：
   etf_follow  A 系列 ETF 跟單：主動式 ETF 每天公布持股，經理人加碼、調整、新納入之後跟著買，有沒有超額報酬
 
-研究本身在本機的研究資料夾計算(CM 的 ETF 持股明細、ETF 折溢價表與台股日資料；進出場、成本與資金模擬共用 tw_strategy/events.py)，
+研究本身在本機的研究資料夾計算(ETF 持股明細、ETF 折溢價表與台股日資料；進出場、成本與資金模擬共用 tw_strategy/events.py)，
 這裡只把研究輸出的結果(淨值、交易統計、報告用的統計表)與報告 Markdown 轉成網頁用的 JSON；不發佈 csv、png 與原始股價。
 報告裡的圖片 ![說明](xxx.png) 由網頁依 JSON 重畫。研究結果不每日更新，研究改版後手動執行：
   python pipeline/run_local.py etf_research        (轉檔、發佈到 data 分支並重新部署)
@@ -52,6 +52,7 @@ def report():
     s = re.sub(r'^\| 程式 \|.*\n', '', s, flags=re.M)
     s = re.sub(r'結果在 output/[^。]*。', '', s)
     s = re.sub(r'^各檔所有持有期.*\n\n?', '', s, flags=re.M)
+    s = re.sub(r'\bCM ?(?=ETF|台股|的)', '', s)          # 資料庫的來源不在網頁上註記
     left = re.findall(r'[\w./-]+\.(?:py|csv|parquet)', s)
     if left:
         raise SystemExit(f'報告還有本機檔案名稱：{left}')
@@ -102,7 +103,7 @@ def main():
     out = dataset_dir(NAME)
     B = follow()
     write_json(out / 'etf_follow.json', B)
-    write_meta(NAME, 'CM ETF持股明細、ETF折溢價、台股日資料(本機計算)', '', '不定期(研究更新時手動執行)', asof=B['asof'])
+    write_meta(NAME, 'ETF持股明細、ETF折溢價、台股日資料(本機計算)', '', '不定期(研究更新時手動執行)', asof=B['asof'])
     print(f"etf_follow：{len(B['strats'])} 個策略、{len(B['d'])} 個交易日(至 {B['asof']})")
 
 

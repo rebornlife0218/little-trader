@@ -397,7 +397,7 @@
             <div id="pkEtfChart"></div>
             <div id="pkEtfLegend"></div>
             <div class="tablewrap" style="margin-top:10px;"><table class="stattable" id="pkEtfTable"></table></div>
-            <p class="note">共同期間：從勾選的 ETF 中最晚上市的那一檔開始比較，期間越短越容易受單一年度行情影響，可以取消勾選上市較晚的 ETF 拉長比較期間。<b>配息貢獻</b> = 年化總報酬 − 年化價格報酬。收盤價取自 CMoney(2016 年以前用 Yahoo Finance)，不含沒有成交的日子；總報酬用臺灣證券交易所的除息資料自行計算(股利在除息日以收盤價再投入)。</p>
+            <p class="note">共同期間：從勾選的 ETF 中最晚上市的那一檔開始比較，期間越短越容易受單一年度行情影響，可以取消勾選上市較晚的 ETF 拉長比較期間。<b>配息貢獻</b> = 年化總報酬 − 年化價格報酬。2016 年以前的收盤價取自 Yahoo Finance，不含沒有成交的日子；總報酬用臺灣證券交易所的除息資料自行計算(股利在除息日以收盤價再投入)。</p>
             <div class="tablewrap" style="margin-top:6px;"><table class="stattable" id="pkSince"></table></div>
           </div>
 

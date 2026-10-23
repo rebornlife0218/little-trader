@@ -1,4 +1,4 @@
-/* 股票 · 台股 · 策略：台股策略回測(資料集 tw_strategy，pipeline/tw_strategy/update.py，資料來自本機 PostgreSQL 的 CMoney 日資料)
+/* 股票 · 台股 · 策略：台股策略回測(資料集 tw_strategy，pipeline/tw_strategy/update.py，資料來自本機 PostgreSQL 的台股日資料)
    最上方選策略；淨值已在 pipeline 依整數股與交易成本算好，網頁端只做：扣借券費(做空，可調整)、計算績效統計與畫圖(版型同美股策略 us-strategy.js)。
    新增策略：pipeline 加一種選股規則，這裡的 STRATS 加一筆 */
 (() => {

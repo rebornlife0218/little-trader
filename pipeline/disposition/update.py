@@ -1,8 +1,8 @@
 """
 資料集 disposition：台股處置股(上市 + 上櫃)與處置前後的股價表現
 
-處置名單：本機 PostgreSQL 的 cm.tw_disposition(CMoney，依證交所、櫃買中心公告)
-股價：本機 PostgreSQL 的 cm.tw_daily(CMoney 日資料；開收用原始價格判斷 K 棒，報酬用還原股價)
+處置名單：本機 PostgreSQL 的 cm.tw_disposition(依證交所、櫃買中心公告)
+股價：本機 PostgreSQL 的 cm.tw_daily(日資料；開收用原始價格判斷 K 棒，報酬用還原股價)
 大盤：加權指數用 data 分支已發佈的 indices/TAIEX.json(證交所)，櫃買指數用櫃買中心資料
 資料庫在本機，GitHub Actions 連不到，只在本機執行：python pipeline/run_local.py(Windows 排程呼叫)
 新制：2026-08-10 起處置期間由 10 個營業日縮短為 5 個營業日(當沖過熱 12 → 7)，撮合改為約每 2 分鐘一次。

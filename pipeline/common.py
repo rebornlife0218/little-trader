@@ -36,7 +36,7 @@ def load_published(name: str, file: str, default=None):
 
 
 def pg_connect():
-    """本機 PostgreSQL(cm schema，CMoney 資料)：只有在本機執行的資料集(tw_strategy、disposition)用到。
+    """本機 PostgreSQL(cm schema)：只有在本機執行的資料集(tw_strategy、disposition)用到。
     連線用環境變數 PGHOST / PGPORT / PGUSER / PGDATABASE(預設 localhost:9457、postgres)，
     密碼由 libpq 從 %APPDATA%/postgresql/pgpass.conf 讀取，不寫在程式裡。"""
     import psycopg
