@@ -494,8 +494,6 @@
   .pq-form input[type=date]{color-scheme:dark;}
   :root[data-theme="light"] .pq-form input[type=date]{color-scheme:light;}
   .pq-range{margin:0;}
-  .pq-table-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;}
-  .pq-table td{font-family:'IBM Plex Mono',monospace;font-size:12.5px;}
   @media (max-width:640px){ .pq-form label:not(.pq-sym){flex:1 1 40%;} .pq-form input{width:100%;box-sizing:border-box;} }
   .adm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;}
   .adm-grid .panel{margin:0;}
@@ -513,3 +511,6 @@
   .pq-info .pq-ev{color:var(--amber);}
   .pq-chart{width:100%;}
   .pq-canvas{cursor:crosshair;touch-action:pan-y;outline:none;}
+  .stock-link{color:var(--amber);text-decoration:none;font-family:'IBM Plex Mono',monospace;}
+  .stock-link:hover{text-decoration:underline;}
+  .pq-back{margin-bottom:8px;}

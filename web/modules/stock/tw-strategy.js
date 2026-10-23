@@ -332,7 +332,7 @@
           <h3>${pk.entered ? '本月持股' : '下個月持股'}(${esc(pk.signal)} 收盤選股，${picks.length} 檔)</h3>
           <p class="mute">產業分布：${indTop.slice(0, 8).map(([n, c]) => `${esc(n)} ${c}`).join('、')}${indTop.length > 8 ? '…' : ''}</p>
           <div class="tablewrap"><table class="stattable"><thead><tr><th>代號</th><th>名稱</th><th style="text-align:left">產業</th><th>年化波動</th><th>每日成交金額(中位數)</th></tr></thead><tbody>
-            ${picks.map(([c, n, i, v, m]) => `<tr><td>${esc(c)}</td><td>${esc(n)}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`).join('')}
+            ${picks.map(([c, n, i, v, m]) => `<tr><td>${LT.stockLink(c)}</td><td>${esc(n)}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`).join('')}
           </tbody></table></div>
           <p class="note">資料到 ${esc(B.asof)}，當月合格股票 ${pk.n} 檔。年化波動 = 過去半年 5 日報酬標準差 × √(252/5)。歷史回測不代表未來，這裡的持股只是策略規則的結果，不是投資建議。</p>
         </div>`;
@@ -476,7 +476,7 @@
       const T = B.trades.map(t => ({ c: t[0], n: t[1], e: t[2], x: t[3], why: t[5], days: t[6], delay: t[7], edelay: t[8], net: t[4] - fee * t[9] / 365 }));
       return { i0, fee, navs, st: { s: stats(navs.s), b0050: stats(navs.b0050) }, T };
     };
-    const tradeRow = t => `<tr><td>${esc(t.c)}</td><td>${esc(t.n)}</td><td>${esc(t.e)}${t.edelay ? `<br><small class="mute">${T0.inLock}延後 ${t.edelay} 天</small>` : ''}</td><td>${t.x ? esc(t.x) : '—'}</td><td>${t.days}</td><td class="${cls(t.net)}">${pct(t.net, 1)}</td><td>${WHY[t.why]}${t.delay ? `<br><small class="mute">${T0.lock}延後 ${t.delay} 天</small>` : ''}</td></tr>`;
+    const tradeRow = t => `<tr><td>${LT.stockLink(t.c)}</td><td>${esc(t.n)}</td><td>${esc(t.e)}${t.edelay ? `<br><small class="mute">${T0.inLock}延後 ${t.edelay} 天</small>` : ''}</td><td>${t.x ? esc(t.x) : '—'}</td><td>${t.days}</td><td class="${cls(t.net)}">${pct(t.net, 1)}</td><td>${WHY[t.why]}${t.delay ? `<br><small class="mute">${T0.lock}延後 ${t.delay} 天</small>` : ''}</td></tr>`;
     const tradeTable = list => `<div class="tablewrap"><table class="stattable"><thead><tr><th>代號</th><th>名稱</th><th>進場日</th><th>出場日</th><th>持有天數</th><th>報酬(扣成本)</th><th>出場原因</th></tr></thead><tbody>${list.map(tradeRow).join('')}</tbody></table></div>`;
 
     function draw() {
@@ -533,7 +533,7 @@
 
     // 每日選股：最新一個交易日＋最近幾個交易日
     const R = B.recent, last = R[0];
-    const pickRow = p => `<tr><td>${esc(p[0])}</td><td>${esc(p[1])}</td><td style="text-align:left">${esc(p[2])}</td><td>${p[3]}</td>${B.cols.map(([, f], i) => { const v = p[4 + i]; return `<td class="${f === 'chg' ? cls(v) : ''}">${v == null ? '—' : COL_FMT[f](v)}</td>`; }).join('')}</tr>`;
+    const pickRow = p => `<tr><td>${LT.stockLink(p[0])}</td><td>${esc(p[1])}</td><td style="text-align:left">${esc(p[2])}</td><td>${p[3]}</td>${B.cols.map(([, f], i) => { const v = p[4 + i]; return `<td class="${f === 'chg' ? cls(v) : ''}">${v == null ? '—' : COL_FMT[f](v)}</td>`; }).join('')}</tr>`;
     $('#evPicks').innerHTML = `
       <div class="panel">
         <h3>每日選股</h3>
@@ -542,7 +542,7 @@
           : '<p class="mute">這一天沒有股票符合全部條件。</p>'}
         <h4>最近 ${R.length} 個交易日</h4>
         <div class="tablewrap"><table class="stattable"><thead><tr><th>選股日</th><th>檔數</th><th style="text-align:left">股票</th></tr></thead><tbody>
-          ${R.map(r => `<tr><td>${esc(r.d)}</td><td>${r.p.length}</td><td style="text-align:left;white-space:normal">${r.p.length ? r.p.map(p => `${esc(p[0])} ${esc(p[1])}`).join('、') : '<span class="mute">—</span>'}</td></tr>`).join('')}
+          ${R.map(r => `<tr><td>${esc(r.d)}</td><td>${r.p.length}</td><td style="text-align:left;white-space:normal">${r.p.length ? r.p.map(p => LT.stockLink(p[0], `${p[0]} ${p[1]}`)).join('、') : '<span class="mute">—</span>'}</td></tr>`).join('')}
         </tbody></table></div>
         <p class="note">資料到 ${esc(B.asof)}。歷史回測不代表未來，這裡的選股只是策略規則的結果，不是投資建議。</p>
       </div>`;

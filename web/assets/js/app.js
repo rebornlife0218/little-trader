@@ -71,6 +71,34 @@ const LT = (() => {
          ${auth.admin ? '<a class="acct-link" href="#/other/admin">後台</a>' : ''}<button type="button" class="acct-link" onclick="LTAuth.logout()">登出</button>`
       : `<div class="acct-who mute">訪客</div>${loginButton('Google 登入')}${LTAuth.error ? `<div class="acct-err">${esc(LTAuth.error)}</div>` : ''}`;
   }
+  /* ---------- 股票代號連結：點了跳到股票查詢並直接查這一檔，查詢頁有按鈕可以跳回來 ----------
+     頁面裡用 LT.stockLink(代號, 顯示文字) 產生連結(#/stock/query/<代號>)；點的時候記住原本的頁面與捲動位置，
+     按「返回」回到原本的頁面後，等內容載入再捲回原本的位置 */
+  function stockLink(code, text) {
+    return `<a href="#/stock/query/${encodeURIComponent(code)}" class="stock-link" title="在股票查詢看 ${esc(code)}">${esc(text ?? code)}</a>`;
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest && e.target.closest('a.stock-link');
+    if (!a || !current) return;
+    try { sessionStorage.setItem('lt.query.back', JSON.stringify({ hash: location.hash || '#/', name: current.name, y: window.scrollY })); } catch (er) {}
+  }, true);
+  function goBack(back) {
+    try { sessionStorage.setItem('lt.restoreY', JSON.stringify(back)); sessionStorage.removeItem('lt.query.back'); } catch (e) {}
+    location.hash = back.hash;
+  }
+  // 從股票查詢返回時捲回原本的位置：頁面內容是非同步載入的，等頁面夠高再捲(最多等 4 秒)
+  function restoreScroll(seq) {
+    let r = null;
+    try { r = JSON.parse(sessionStorage.getItem('lt.restoreY') || 'null'); } catch (e) {}
+    if (!r || r.hash !== location.hash) return;
+    try { sessionStorage.removeItem('lt.restoreY'); } catch (e) {}
+    const t0 = Date.now();
+    (function tryScroll() {
+      if (seq !== routeSeq) return;
+      if (document.documentElement.scrollHeight - window.innerHeight >= r.y || Date.now() - t0 > 4000) window.scrollTo(0, r.y);
+      else setTimeout(tryScroll, 150);
+    })();
+  }
   // 瀏覽紀錄：每次換頁送一筆到 api/track(後台的「最受歡迎的主題」)；備援站沒有後端就不送
   function track(section, page, title, isLocked) {
     if (!auth.api) return;
@@ -180,6 +208,7 @@ const LT = (() => {
       if (page.mount) page.mount(main, { alive: () => seq === routeSeq });
       else mountPlaceholder(page, main);
       if (!page.hidden) track(page.section, page.key, page.name, false);
+      restoreScroll(seq);
     } else {
       current = null;
       routeSeq++;
@@ -334,5 +363,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, DATASETS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
 })();

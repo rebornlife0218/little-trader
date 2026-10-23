@@ -234,10 +234,17 @@
     async mount(el, ctx) {
       let last = '2330', range = '1y';
       try { last = localStorage.getItem('lt.query.symbol') || last; range = localStorage.getItem('lt.query.range') || range; } catch (e) {}
+      // 從其他頁面的代號連結過來(#/stock/query/<代號>)：直接查這一檔，並顯示「返回」按鈕
+      const fromLink = decodeURIComponent(location.hash.split('/')[3] || '').toUpperCase();
+      if (/^[0-9A-Z]{4,6}$/.test(fromLink)) last = fromLink;
+      let back = null;
+      try { back = JSON.parse(sessionStorage.getItem('lt.query.back') || 'null'); } catch (e) {}
+      if (!fromLink || !back || back.hash.startsWith('#/stock/query')) back = null;
       if (!RANGES.some(r => r[0] === range)) range = '1y';
       const opts = { mode: 'raw', panels: new Set(PANELS.map(p => p.key)), onCursor: () => {} };
       try { opts.mode = localStorage.getItem('lt.query.mode') === 'adj' ? 'adj' : 'raw'; } catch (e) {}
       el.innerHTML = `
+        ${back ? `<button type="button" class="pq-back acct-link">← 返回${esc(back.name)}</button>` : ''}
         <header class="top"><div>
           <h1>股票查詢</h1>
           <p>上市櫃股票與 ETF 的價量、外資與投信買賣超、融資券、借券，以及月營收、除權息、暫停交易、處置，2016 年起(含已下市櫃)</p>
@@ -254,6 +261,7 @@
         </div>
         <div id="pqOut"></div>`;
       const $ = s => el.querySelector(s);
+      if (back) $('.pq-back').onclick = () => LT.goBack(back);
       let chart = null;
       const setRange = k => {
         range = k;
@@ -284,6 +292,7 @@
         const symbol = toSymbol($('#pqSym').value);
         $('#pqSym').value = symbol;
         try { localStorage.setItem('lt.query.symbol', symbol); localStorage.setItem('lt.query.range', range); } catch (e) {}
+        if (fromLink) history.replaceState(null, '', `#/stock/query/${encodeURIComponent(symbol)}`);   // 重新整理時查同一檔
         if (chart) { chart.destroy(); chart = null; }
         $('#pqOut').innerHTML = '<div class="panel"><p class="mute"><span class="spinner"></span>查詢中…</p></div>';
         const from = $('#pqFrom').value, to = $('#pqTo').value;
@@ -330,16 +339,8 @@
             <div id="pqChart" class="pq-chart"></div>
             <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移；上方按鈕可隱藏或顯示下方的小圖。
               還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收標在公告日，數字是單月營收年成長(%)；
-              「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。</p>
-          </div>
-          <div class="panel">
-            <div class="pq-table-head"><h3 style="margin:0;">每日資料</h3><button type="button" id="pqCsv" class="acct-link">下載 CSV</button></div>
-            <div class="tablewrap"><table class="stattable pq-table">
-              <thead><tr><th>日期</th><th>開盤</th><th>最高</th><th>最低</th><th>收盤</th><th>漲跌(含息)</th><th>成交量</th><th>外資</th><th>投信</th><th>融資餘額</th><th>融券餘額</th><th>借券餘額</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-            <div class="btnrow-l" style="margin-top:10px;"><button type="button" id="pqMore">顯示全部</button></div>
-            <p class="note">今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。表格的開高低收是原始價格，其他欄位的單位是張。</p>
+              「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。
+              今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。</p>
           </div>`;
 
         const info = $('#pqInfo');
@@ -373,27 +374,6 @@
           if (opts.panels.has(b.dataset.p)) opts.panels.delete(b.dataset.p); else opts.panels.add(b.dataset.p);
           b.classList.toggle('active', opts.panels.has(b.dataset.p));
           chart.redraw();
-        };
-
-        // 每日資料表(新到舊；查詢期間內)
-        const rows = []; for (let i = last; i >= i0; i--) rows.push(i);
-        const at = (k, i) => R[k] ? R[k][i] : NaN;
-        const rowHtml = i => `<tr><td>${R.d[i]}</td><td>${num(R.o[i])}</td><td>${num(R.h[i])}</td><td>${num(R.l[i])}</td><td>${num(R.c[i])}</td>
-          <td class="${cls(R.a[i] / R.a[i - 1] - 1)}">${i ? pct(R.a[i] / R.a[i - 1] - 1) : '—'}</td><td>${int(R.v[i])}</td>
-          <td class="${cls(at('f', i))}">${sint(at('f', i))}</td><td class="${cls(at('t', i))}">${sint(at('t', i))}</td>
-          <td>${int(at('m', i))}</td><td>${int(at('s', i))}</td><td>${int(at('b', i))}</td></tr>`;
-        const tbody = el.querySelector('.pq-table tbody'), more = $('#pqMore');
-        tbody.innerHTML = rows.slice(0, 30).map(rowHtml).join('');
-        if (rows.length <= 30) more.parentElement.remove();
-        else { more.textContent = `顯示全部 ${rows.length.toLocaleString()} 天`; more.onclick = () => { tbody.innerHTML = rows.map(rowHtml).join(''); more.parentElement.remove(); }; }
-        $('#pqCsv').onclick = () => {
-          const lines = ['日期,開盤,最高,最低,收盤,還原收盤,成交量(張),外資買賣超(張),投信買賣超(張),融資餘額(張),融券餘額(張),借券賣出餘額(張)',
-            ...rows.slice().reverse().map(i => [R.d[i], R.o[i], R.h[i], R.l[i], R.c[i], R.a[i], R.v[i], ...['f', 't', 'm', 's', 'b'].map(k => R[k] ? R[k][i] ?? '' : '')].join(','))];
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\n')], { type: 'text/csv' }));
-          a.download = `${j.symbol}_${R.d[i0]}_${R.d[last]}.csv`;
-          a.click();
-          setTimeout(() => URL.revokeObjectURL(a.href), 1000);
         };
       }
 

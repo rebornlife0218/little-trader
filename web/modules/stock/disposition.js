@@ -107,7 +107,7 @@
         const mk = $('#dpMarket').value;
         const rows = NEW.filter(e => !mk || e.market === mk).sort((a, b) => b.start.localeCompare(a.start) || a.code.localeCompare(b.code)).slice(0, 80);
         $('#dpTable').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>市場</th><th>處置期間</th><th>處置</th><th>第一天漲跌</th><th>處置期間報酬</th><th>同期大盤</th><th>出關後 5 日</th></tr></thead><tbody>
-          ${rows.map(e => `<tr><td>${esc(e.code)}</td><td>${esc(e.name)}</td><td>${e.market === 'TWSE' ? '上市' : '上櫃'}</td><td>${md(e.start)}～${md(e.end)}${e.done ? '' : ' <small class="mute">進行中</small>'}</td><td>${esc(e.kind)}</td>
+          ${rows.map(e => `<tr><td>${LT.stockLink(e.code)}</td><td>${esc(e.name)}</td><td>${e.market === 'TWSE' ? '上市' : '上櫃'}</td><td>${md(e.start)}～${md(e.end)}${e.done ? '' : ' <small class="mute">進行中</small>'}</td><td>${esc(e.kind)}</td>
             <td class="${cls(d1ret(e))}">${pct(d1ret(e))}</td><td class="${cls(e.ret)}">${pct(e.ret)}</td><td class="${cls(e.mkt)}">${pct(e.mkt)}</td><td class="${cls(e.post5)}">${pct(e.post5)}</td></tr>`).join('')}</tbody>`;
       };
       $('#dpMarket').onchange = table;
