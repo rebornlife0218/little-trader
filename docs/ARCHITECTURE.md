@@ -6,9 +6,11 @@
 
 ```
 web/                                網站(部署時整個資料夾就是網站根目錄)
-  index.html                        外框，在此依序載入框架與各模組的 <script defer>(平行下載、依序執行)
+  index.html                        外框，在此依序載入框架與訪客也能看的模組 <script defer>(平行下載、依序執行)；會員區塊的程式登入後才由 app.js 載入
   assets/
-    js/app.js                       框架：側欄區塊 SECTIONS、資料集清單 DATASETS、頁面註冊、路由、資料載入
+    js/app.js                       框架：側欄區塊 SECTIONS、資料集清單 DATASETS、頁面註冊、路由、資料載入、會員區塊的鎖與登入畫面
+    js/auth.js                      Google 登入(不用 Firebase SDK)：Google OAuth → Firebase REST → api/session 發 cookie；api/me 取得身分
+    js/firebase-config.js           Firebase 與 Google 登入的設定(apiKey、projectId、clientId，都是公開資訊)
     js/chart.js                     共用 SVG 圖表 LTChart.line / LTChart.bars(跟隨主題與寬度、滑鼠提示)
     css/components.css、layout.css  色彩變數(暗色/淺色)與元件樣式、版型
     vendor/                         第三方套件(放在本站以符合 CSP)：marked(Markdown)、KaTeX(公式)
@@ -25,6 +27,8 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/tw-research.js            股票 · 台股：其他研究(最上方選主題：營收、因子、事件、機器學習，再用下拉式選單選研究；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research)
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
+    stock/query.js                  股票 · 台股：股價查詢(api/prices，資料在 Cloudflare D1)
+    admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
     option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
@@ -53,11 +57,23 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
   etf_research/update.py            ETF大禮包「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
+  price_query/sync.py               股價查詢的資料：cm.tw_daily → Cloudflare D1(本機執行，只上傳有變動的部分)
+
+functions/                          Cloudflare Pages Functions(後端，只在 Cloudflare 主站運作)
+  _lib/access.json                  權限設定(唯一的設定處)：會員限定的區塊、頁面程式、資料集，以及後台程式
+  _lib/auth.ts                      Firebase ID token 驗證、會員 session cookie、訪客 id
+  _lib/types.ts                     環境變數、股價查詢的期間與每日額度 POLICY
+  api/                              me(目前身分)、session(登入)、logout、symbols、prices(股價查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
+  data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
+  modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
+migrations/                         D1 資料表(users、query_logs、usage_daily、symbols、price_chunks、meta)
+scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)與 GitHub Pages 的公開版
+wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose)
 
 .github/workflows/
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
   data-<資料集>.yml                  各資料集的排程，只呼叫 _dataset.yml
-  deploy.yml                        組合 web/ 與 data 分支 → GitHub Pages ＋ Cloudflare Pages(同一份檔案)
+  deploy.yml                        組合 web/ 與 data 分支 → Cloudflare Pages(完整版＋functions/)＋ GitHub Pages(公開版)
 ```
 
 ## 資料怎麼流動
@@ -65,18 +81,18 @@ pipeline/                           資料抓取，一個資料集一個資料�
 1. `data-<資料集>.yml` 依排程觸發 `_dataset.yml`。
 2. 執行 `pipeline/<資料集>/update.py`，輸出到 `web/data/<資料集>/`，一定包含 `meta.json`(更新時間、來源、排程、version)。
 3. `publish_data.sh` 只替換 data 分支裡該資料集的資料夾。data 分支永遠只有一個 commit。
-4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 GitHub Pages 與 Cloudflare Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
+4. 呼叫 `deploy.yml`：`web/` ＋ data 分支 → `_site/` → 同時發佈到 Cloudflare Pages 與 GitHub Pages(見「部署」)。推送到 main 也會觸發部署(沿用 data 分支現有資料)。
 
 網頁端用 `LT.loadJSON(資料集, 檔名)` 載入資料，網址帶 `meta.version`，資料沒更新前瀏覽器直接用快取。每頁用到的資料集會自動列在頁尾 COPYRIGHT 下方(「資料來源 · 更新時間 · 排程」，換頁時更新；首頁列出全部資料集)，頁面不用自己顯示。
 
 ## 部署
 
-同一份 `_site/` 發佈到兩個地方，兩邊內容永遠一樣：
+同一份 `_site/` 發佈到兩個地方：
 
 | 網址 | 角色 | 部署方式 |
 |---|---|---|
-| https://little-trader.pages.dev/ (Cloudflare Pages，專案 `little-trader`) | 主要網址 | `deploy.yml` 的 `cloudflare-pages` 工作，用 wrangler 直接上傳(Direct Upload) |
-| https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪 | `deploy.yml` 的 `github-pages` 工作 |
+| https://little-trader.pages.dev/ (Cloudflare Pages，專案 `little-trader`) | 主要網址：完整版＋後端(登入、會員權限、股價查詢) | `deploy.yml` 的 `cloudflare-pages` 工作，在 repo 根目錄用 wrangler 直接上傳(Direct Upload)，一起上傳 `functions/` |
+| https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪：公開版(沒有後端、不能登入，會員區塊顯示「到主站登入」) | `deploy.yml` 的 `github-pages` 工作，用 `scripts/build-site.mjs` 拿掉會員限定的程式與資料 |
 
 - 觸發點不變：推送到 main、資料集排程、`run_local.py`(`gh workflow run deploy.yml`)都會一次部署兩邊。只改網站內容的話，照舊 commit + push 即可，不用碰 Cloudflare。
 - 不用 Cloudflare 的「連接 GitHub 自動建置」：網站是 main 的 `web/` 加上 data 分支組合而成，資料更新只推 data 分支，用 Git 連接會漏掉資料更新。
@@ -100,6 +116,55 @@ pipeline/                           資料抓取，一個資料集一個資料�
 - 綁自己的網域：Cloudflare → Workers & Pages → 專案 → Custom domains。
 - 回復舊版：Cloudflare 專案的 Deployments 可以對任一次部署 Rollback；GitHub Pages 則重跑舊 commit 的部署。
 - 不想再部署 GitHub Pages：刪掉 `deploy.yml` 的 `github-pages` 工作，並到 repo Settings → Pages 停用。
+
+## 會員與權限
+
+| 身分 | 看得到 |
+|---|---|
+| 訪客 | 指數、統計學、其他 |
+| 會員(Google 登入) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
+| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin` |
+
+**怎麼運作**
+
+- 登入(`assets/js/auth.js`)：轉到 Google 登入頁 → 回來時用 Firebase REST API(`accounts:signInWithIdp`)換成 Firebase ID token → `POST api/session`，後端驗證 token(`jose`，Google 公開金鑰)後發 `lt_sess` cookie(HttpOnly、HMAC 簽章、30 天)。不用 Firebase SDK，因為它會從 Google 載入外部腳本，違反 CSP 只允許同源的規則；CSP 只為登入多開 `connect-src https://identitytoolkit.googleapis.com`。
+- 開網頁時 `app.js` 先呼叫 `api/me`：會員才拿到會員區塊的程式清單並載入；訪客在側欄與首頁看到 🔒，點進去是登入提示。第一次來訪會跳出「用 Google 登入 / 以訪客身分繼續瀏覽」(選訪客會記在 localStorage `lt.guest`，不再詢問；這個標記只控制畫面)。
+- 真正的權限在後端：`functions/data/_middleware.ts`、`functions/modules/_middleware.ts` 擋訪客下載會員限定的資料與程式(回 401)，畫面上的鎖只是提示。
+- 權限清單只寫在 `functions/_lib/access.json`：後端檢查、部署時的 `_routes.json`、GitHub Pages 公開版、網頁要載入的程式都從這裡來。
+  - **新增會員區塊的頁面**：程式放在 `web/modules/<區塊>/`，路徑加到 `memberScripts`(依側欄順序，同一小組要連續)，**不要**寫進 `index.html`。
+  - **新增會員限定的資料集**：名稱加到 `memberDatasets`。
+  - 要把整個區塊改成公開或會員限定：改 `memberSections`，並把該區塊的程式在 `index.html` 與 `memberScripts` 之間搬動。
+- 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
+- Functions 用量：免費方案每天 10 萬次請求；`_routes.json` 讓只有 `/api/*` 與會員限定的檔案經過 functions，其他靜態檔不計。
+
+**第一次設定(只做一次)**
+
+1. Firebase 主控台(console.firebase.google.com)建立專案 → Authentication → Sign-in method 啟用 Google。
+   - 專案設定 › 一般：複製 Web API Key(`apiKey`)與專案 ID(`projectId`)。
+   - Google 登入的「網頁 SDK 設定」：複製網路用戶端 ID(`clientId`)。
+   - Authentication › Settings › Authorized domains：加上 `little-trader.pages.dev`。
+2. Google Cloud Console(同一個專案)› API 和服務 › 憑證 › 上面那個 OAuth 用戶端：
+   - 已授權的 JavaScript 來源：`https://little-trader.pages.dev`、`http://localhost:8788`。
+   - 已授權的重新導向 URI：`https://little-trader.pages.dev/`、`http://localhost:8788/`(結尾的斜線要有)。
+3. 把 `apiKey`、`projectId`、`clientId` 填進 `web/assets/js/firebase-config.js`，`projectId` 也填進 `wrangler.toml` 的 `FIREBASE_PROJECT_ID`。
+4. 本機登入 Cloudflare：`npx wrangler login`(瀏覽器授權)。
+5. 建立 D1：`npx wrangler d1 create little-trader`，把輸出的 `database_id` 填進 `wrangler.toml`；再 `npm run db:migrate:remote` 建資料表。
+6. 設定簽 cookie 的金鑰(隨機產生，不進 repo)：
+   `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))" | npx wrangler pages secret put SESSION_SECRET --project-name little-trader`
+7. 第一次上傳股價：`python pipeline/price_query/sync.py`(約 60 MB，之後每天由 `run_local.py` 只上傳變動的部分)。
+8. 推送後部署，用 Google 登入一次，再把自己設成管理員：
+   `npx wrangler d1 execute little-trader --remote --command "UPDATE users SET role = 'admin' WHERE email = '你的 Gmail'"`
+
+**本機測試**：`npm run dev` 開 http://localhost:8788(含 functions 與本機 D1)。本機的 `SESSION_SECRET` 寫在 `.dev.vars`(不進版控)；本機 D1 要先 `npm run db:migrate:local`、`python pipeline/price_query/sync.py --local`。
+
+## 股價查詢
+
+- 網頁：股票 › 台股 › 股價查詢(`modules/stock/query.js`，會員限定)。輸入代號或名稱、選期間，顯示收盤價與還原收盤價走勢、成交量、含息報酬，以及每日資料表(可下載 CSV)。
+- 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價(含除權息)、成交量(張)。股票名稱來自公司基本資料；資料庫沒有 ETF 名稱，改用證交所、櫃買中心當天的收盤行情補上(累積在 `~/.cache/little-trader/etf_names.json`，下市的 ETF 也留著)。
+- 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON)，全部約 2.2 萬筆、60 MB；查 10 年只讀約 11 列，不會用掉 D1 每天 500 萬列的免費讀取額度。
+- 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳。`run_local.py` 每天在 cm 同步後執行(`wrangler.toml` 還沒填 D1 的 ID 時略過)。
+- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：會員不限期間、每天 1000 次；訪客最近 31 天、每天 30 次(股價查詢頁只開放會員，訪客的限制是 API 的保險)。額度以台北日期計，會員依帳號、訪客依 IP。
+- 報酬一律用還原收盤價計算；開高低收是原始價格，遇到分割(例如 0050 在 2025/6 一拆四)會有斷層。
 
 ## 資料集
 
@@ -136,7 +201,7 @@ sp500 的特殊處理：
 
 ## 新增頁面
 
-在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)：
+在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)。會員區塊(ETF、股票、選擇權)的頁面改加到 `functions/_lib/access.json` 的 `memberScripts`，不寫進 `index.html`(見「會員與權限」)：
 
 ```js
 LT.register({ section: 'etf', key: 'x', name: '外部網站', href: 'https://...' });       // 側欄直接開新分頁
@@ -158,7 +223,8 @@ LT.register({
 });
 ```
 
-- **新增側欄區塊**：在 `app.js` 的 `SECTIONS` 加一筆(`desc` 會顯示在首頁)。
+- **新增側欄區塊**：在 `app.js` 的 `SECTIONS` 加一筆(`desc` 會顯示在首頁)；會員限定的區塊另外加到 `access.json` 的 `memberSections`。
+- **不列在側欄的頁面**：註冊時加 `hidden: true`(例如後台)，只能用網址開。
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
@@ -193,7 +259,7 @@ python pipeline/options/update.py
 python -m http.server 8000 -d web
 ```
 
-開啟 http://localhost:8000
+開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(會員區塊顯示「到主站登入」)；要測登入、會員區塊與股價查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
 
 ## 手動更新資料
 

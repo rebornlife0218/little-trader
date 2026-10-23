@@ -1,0 +1,14 @@
+# Cloudflare Pages 設定：網站檔案 + functions/(後端 API 與權限)+ D1 資料庫
+# 部署由 .github/workflows/deploy.yml 執行；本機開發：npm run dev(http://localhost:8788)
+name = "little-trader"
+pages_build_output_dir = "_site"
+compatibility_date = "2026-10-01"
+
+[vars]
+FIREBASE_PROJECT_ID = ""          # Firebase 專案 ID(公開資訊)；空白時登入功能停用
+
+[[d1_databases]]
+binding = "DB"
+database_name = "little-trader"
+database_id = "00000000-0000-0000-0000-000000000000"   # wrangler d1 create little-trader 之後換成實際的 ID
+migrations_dir = "migrations"

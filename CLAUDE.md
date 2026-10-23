@@ -11,8 +11,9 @@
 
 ## 網站
 
-- 所有計算不是在 pipeline 先算好，就是在瀏覽器端算。
-- CSP 只允許同源：第三方套件放 `web/assets/vendor/`，不用 CDN；新的 `<script>` 一律加 `defer`。
+- 所有計算不是在 pipeline 先算好，就是在瀏覽器端算；後端(`functions/`)只負責登入、權限、查詢日誌與股價查詢。
+- 訪客只能看指數、統計學、其他；ETF、股票、選擇權要 Google 登入，設有密碼的策略仍要密碼。權限清單只寫在 `functions/_lib/access.json`：會員區塊的新頁面加到 `memberScripts`(不寫進 `index.html`)，會員限定的新資料集加到 `memberDatasets`。
+- CSP 只允許同源：第三方套件放 `web/assets/vendor/`，不用 CDN；新的 `<script>` 一律加 `defer`。唯一例外是登入時連 `identitytoolkit.googleapis.com`(只有 connect-src，不載入外部腳本)。
 - 新頁面用 `LT.register`，資料用 `LT.loadJSON`，圖表用 `LTChart`；顏色用 CSS 變數，暗色、淺色主題都要正常顯示，手機寬度也要能看。
 - 每個資料集都要有 `meta.json`(更新時間、來源、排程、version)，網頁靠 version 更新快取。
 - 文字用繁體中文、台灣用語，和現有頁面的寫法一致。

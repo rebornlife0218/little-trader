@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<!-- 資安：只允許載入本站與 Google Fonts 的資源、只連線回本站，阻擋外部惡意腳本與資料外洩 -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+<!-- 資安：只允許載入本站與 Google Fonts 的資源、只連線回本站(登入時另外連 Firebase 驗證)，阻擋外部惡意腳本與資料外洩 -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' https://identitytoolkit.googleapis.com; object-src 'none'; base-uri 'self'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <title>Little Trader</title>
 <meta name="description" content="Little Trader 小交易員：指數、ETF、股票、選擇權、統計學與市場研究" />
@@ -33,7 +33,7 @@
       <button id="sideCollapse" class="side-collapse" title="收起側欄" aria-label="收起側欄">«</button>
     </div>
     <nav id="sideNav"></nav>
-    <div class="side-foot"><button class="theme-toggle"></button></div>
+    <div class="side-foot"><div id="sideAccount" class="side-account"></div><button class="theme-toggle"></button></div>
   </aside>
   <div class="main">
     <main id="content"><div class="page-loading"><span class="spinner"></span>載入中…</div></main>
@@ -42,27 +42,19 @@
 </div>
 
 <!-- 網站框架(defer：平行下載、依順序在頁面解析完後執行) -->
+<script defer src="assets/js/firebase-config.js"></script>
+<script defer src="assets/js/auth.js"></script>
 <script defer src="assets/js/app.js"></script>
 <script defer src="assets/js/chart.js"></script>
 <script defer src="modules/home/home.js"></script>
 <!-- 第三方套件(放在本站，符合資安設定)：Markdown 解析、數學公式排版 -->
 <script defer src="assets/vendor/marked/marked.js"></script>
 <script defer src="assets/vendor/katex/katex.min.js"></script>
-<!-- 研究模組：新增研究內容時在此加入 -->
+<!-- 研究模組(訪客也能看的區塊)：新增研究內容時在此加入。
+     會員區塊(ETF、股票、選擇權)的程式不寫在這裡：清單在 functions/_lib/access.json，登入後由 app.js 載入 -->
 <script defer src="modules/indices/indices.js"></script>
-<script defer src="modules/etf/pack.js"></script>   <!-- ETF研究的 A 系列跟單用到 tw-strategy.js 的 LTTW(執行時才用，載入順序不影響) -->
-<script defer src="modules/etf/etf.js"></script>
-<script defer src="modules/stock/disposition.js"></script>
-<script defer src="modules/stock/tw.js"></script>
-<script defer src="modules/stock/tw-strategy.js"></script>
-<script defer src="modules/stock/tw-research.js"></script>   <!-- 用到 tw-strategy.js 的 LTTW -->
-<script defer src="modules/stock/earnings.js"></script>
-<script defer src="modules/stock/us-strategy.js"></script>
-<script defer src="modules/option/lib.js"></script>
-<script defer src="modules/option/calculator.js"></script>
-<script defer src="modules/option/market.js"></script>
-<script defer src="modules/indices/futures.js"></script>   <!-- 台指期貨：屬於指數區塊，但用到 option/lib.js -->
-<script defer src="modules/option/strategy.js"></script>
+<script defer src="modules/option/lib.js"></script>   <!-- 選擇權共用函式：台指期貨(指數區塊)與選擇權頁面都用到 -->
+<script defer src="modules/indices/futures.js"></script>
 <script defer src="modules/stats/demos.js"></script>
 <script defer src="modules/stats/basic.js"></script>
 <script defer src="modules/stats/stats.js"></script>
