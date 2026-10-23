@@ -1,5 +1,7 @@
 /* 股票 · 台股 · 股價查詢：上市櫃股票與 ETF 的日資料(2016 年起，含已下市櫃)
-   資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢；會員限定(functions/_lib/access.json)
+   資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢
+   保留給以後開放：目前只有管理員下載得到(functions/_lib/access.json 的 adminScripts)，不列在側欄，網址 #/stock/query；
+   開放時把它移到 memberScripts(台股那幾頁後面)，並拿掉下面的 hidden
    api/prices 回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價(含除權息), v 成交量(張)} */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -23,7 +25,7 @@
   };
 
   LT.register({
-    section: 'stock', group: '台股', key: 'query', name: '股價查詢',
+    section: 'stock', group: '台股', key: 'query', name: '股價查詢', hidden: true,
     async mount(el, ctx) {
       let last = '2330', range = '1y';
       try { last = localStorage.getItem('lt.query.symbol') || last; range = localStorage.getItem('lt.query.range') || range; } catch (e) {}

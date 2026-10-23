@@ -68,8 +68,21 @@ async function guestCookie(secret: string, gid: string) {
   return cookie('lt_gid', `${gid}.${await hmac(secret, gid)}`, 365 * 86400);
 }
 
-/* 會員：有效的 session cookie；其他都是訪客(前端的訪客標記只控制畫面，後端不採信) */
-export async function identify(req: Request, env: Env, ip: string): Promise<{ identity: Identity; setCookie: string | null }> {
+/* 驗證中介層用：辨識身分
+   1. Header 有 Authorization: Bearer <Firebase ID token> → 驗證簽章與期限，合法就是會員；不合法回 invalid(由呼叫端回 401，不降級成訪客)
+   2. 有效的 session cookie(網頁登入後發的)→ 會員
+   3. 其他都是訪客(前端的訪客標記只控制畫面，後端不採信) */
+export async function identify(req: Request, env: Env, ip: string): Promise<{ identity: Identity; setCookie: string | null; invalid?: boolean }> {
+  const authz = req.headers.get('Authorization');
+  if (authz?.startsWith('Bearer ')) {
+    if (!env.FIREBASE_PROJECT_ID) return { identity: { kind: 'guest', gid: 'bearer', quotaKey: 'ip:' + ip }, setCookie: null, invalid: true };
+    try {
+      const p = await verifyFirebaseToken(authz.slice(7), env.FIREBASE_PROJECT_ID);
+      return { identity: { kind: 'member', uid: p.sub!, email: (p.email as string) ?? null, quotaKey: 'u:' + p.sub }, setCookie: null };
+    } catch {
+      return { identity: { kind: 'guest', gid: 'bearer', quotaKey: 'ip:' + ip }, setCookie: null, invalid: true };
+    }
+  }
   const s = await readSession(req, env);
   if (s) return { identity: { kind: 'member', uid: s.uid, email: s.email, quotaKey: 'u:' + s.uid }, setCookie: null };
   let gid = env.SESSION_SECRET ? await readGuest(req, env.SESSION_SECRET) : null, setCookie: string | null = null;

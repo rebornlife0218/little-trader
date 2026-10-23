@@ -27,7 +27,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/tw-research.js            股票 · 台股：其他研究(最上方選主題：營收、因子、事件、機器學習，再用下拉式選單選研究；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research)
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：S&P500 季度換股策略回測(最上方選總覽或單一策略；資料集 sp500)
-    stock/query.js                  股票 · 台股：股價查詢(api/prices，資料在 Cloudflare D1)
+    stock/query.js                  股票 · 台股：股價查詢(api/prices，資料在 Cloudflare D1)；保留給以後開放，目前只給管理員用網址 #/stock/query 預覽
     admin/admin.js                  後台(#/other/admin，只給管理員，不列在側欄)：誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
@@ -63,10 +63,11 @@ functions/                          Cloudflare Pages Functions(後端，只在 C
   _lib/access.json                  權限設定(唯一的設定處)：會員限定的區塊、頁面程式、資料集，以及後台程式
   _lib/auth.ts                      Firebase ID token 驗證、會員 session cookie、訪客 id
   _lib/types.ts                     環境變數、股價查詢的期間與每日額度 POLICY
+  _lib/security.ts                  API 的資安防護：來源檢查(CORS)、安全標頭、每分鐘次數限制
   api/                              me(目前身分)、session(登入)、logout、symbols、prices(股價查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
   data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
-migrations/                         D1 資料表(users、query_logs、usage_daily、symbols、price_chunks、meta)
+migrations/                         D1 資料表(users、query_logs、usage_daily、rate_minute、symbols、price_chunks、meta)
 scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)與 GitHub Pages 的公開版
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose)
 
@@ -123,7 +124,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 |---|---|
 | 訪客 | 指數、統計學、其他 |
 | 會員(Google 登入) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
-| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin` |
+| 管理員(`users.role = 'admin'`) | 另外有後台 `#/other/admin`，以及保留中的股價查詢 `#/stock/query`(預覽) |
 
 **怎麼運作**
 
@@ -135,6 +136,12 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
   - **新增會員限定的資料集**：名稱加到 `memberDatasets`。
   - 要把整個區塊改成公開或會員限定：改 `memberSections`，並把該區塊的程式在 `index.html` 與 `memberScripts` 之間搬動。
 - 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
+- API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
+  - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。
+  - **每分鐘次數限制**：訪客每個 IP 10 次、會員每個帳號 60 次(`PER_MINUTE`)，超過回 429 與 `Retry-After`；`api/me`、`api/logout` 不計。用 D1 的 `rate_minute` 原子計數(Workers 的記憶體不共用、KV 不即時，都算不準；Pages Functions 不能直接用 Durable Objects)。另外股價查詢還有每日額度(`POLICY`)。
+  - **驗證**：`Authorization: Bearer <Firebase ID token>` 或網頁登入後的 session cookie 都算會員；token 不合法回 401，不降級成訪客。
+  - **資料在後端過濾**：訪客的查詢期間在後端截成最近 31 天，只讀那幾年的資料區塊、逐日篩選後才回傳，訪客拿不到更早的資料。
+  - **安全標頭**：API 回應加上 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Content-Security-Policy: default-src 'none'`、`Referrer-Policy: no-referrer`、`Cache-Control: private, no-store`；靜態檔的安全標頭在 `web/_headers`(只有 Cloudflare 會套用)。
 - Functions 用量：免費方案每天 10 萬次請求；`_routes.json` 讓只有 `/api/*` 與會員限定的檔案經過 functions，其他靜態檔不計。
 
 **第一次設定(只做一次)**
@@ -159,7 +166,8 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 ## 股價查詢
 
-- 網頁：股票 › 台股 › 股價查詢(`modules/stock/query.js`，會員限定)。輸入代號或名稱、選期間，顯示收盤價與還原收盤價走勢、成交量、含息報酬，以及每日資料表(可下載 CSV)。
+- **保留給以後開放**：網頁上目前沒有股價查詢；`modules/stock/query.js` 放在 `access.json` 的 `adminScripts`、註冊時 `hidden: true`，只有管理員能用網址 `#/stock/query` 預覽。後端 API、D1 資料與每天的同步都照常運作。開放時把它移到 `memberScripts`(台股那幾頁後面)並拿掉 `hidden`。
+- 網頁：股票 › 台股 › 股價查詢(`modules/stock/query.js`)。輸入代號或名稱、選期間，顯示收盤價與還原收盤價走勢、成交量、含息報酬，以及每日資料表(可下載 CSV)。
 - 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價(含除權息)、成交量(張)。股票名稱來自公司基本資料；資料庫沒有 ETF 名稱，改用證交所、櫃買中心當天的收盤行情補上(累積在 `~/.cache/little-trader/etf_names.json`，下市的 ETF 也留著)。
 - 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON)，全部約 2.2 萬筆、60 MB；查 10 年只讀約 11 列，不會用掉 D1 每天 500 萬列的免費讀取額度。
 - 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳。`run_local.py` 每天在 cm 同步後執行(`wrangler.toml` 還沒填 D1 的 ID 時略過)。

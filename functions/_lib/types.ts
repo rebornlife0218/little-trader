@@ -5,6 +5,7 @@ export interface Env {
   DB?: D1Database;                 // wrangler.toml 的 d1_databases
   FIREBASE_PROJECT_ID?: string;    // wrangler.toml 的 vars
   SESSION_SECRET?: string;         // 簽 cookie 用(wrangler pages secret put SESSION_SECRET)，不進 repo
+  ALLOWED_ORIGINS?: string;        // 允許呼叫 API 的網頁來源(逗號分隔)，wrangler.toml 的 vars
 }
 
 export type Identity =

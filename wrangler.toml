@@ -6,6 +6,7 @@ compatibility_date = "2026-10-01"
 
 [vars]
 FIREBASE_PROJECT_ID = ""          # Firebase 專案 ID(公開資訊)；空白時登入功能停用
+ALLOWED_ORIGINS = "https://little-trader.pages.dev,http://localhost:8788,http://127.0.0.1:8788"   # 允許呼叫 API 的網頁來源(CORS)；綁自己的網域時加上去
 
 [[d1_databases]]
 binding = "DB"

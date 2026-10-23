@@ -1,5 +1,5 @@
 {
-  "說明": "訪客與會員的權限(唯一的設定處)：後端擋檔案(functions/)、部署時產生 _routes.json 與 GitHub Pages 的公開版(scripts/build-site.mjs)、網頁載入程式(/api/me 回傳)都讀這裡",
+  "說明": "訪客與會員的權限(唯一的設定處)：後端擋檔案(functions/)、部署時產生 _routes.json 與 GitHub Pages 的公開版(scripts/build-site.mjs)、網頁載入程式(/api/me 回傳)都讀這裡。股價查詢(modules/stock/query.js)保留給以後開放，目前只給管理員用網址 #/stock/query 預覽",
   "memberSections": ["etf", "stock", "option"],
   "memberScripts": [
     "modules/etf/pack.js",
@@ -8,7 +8,6 @@
     "modules/stock/tw.js",
     "modules/stock/tw-strategy.js",
     "modules/stock/tw-research.js",
-    "modules/stock/query.js",
     "modules/stock/earnings.js",
     "modules/stock/us-strategy.js",
     "modules/option/calculator.js",
@@ -16,5 +15,5 @@
     "modules/option/strategy.js"
   ],
   "memberDatasets": ["etf_upcoming", "etf_compare", "etf_research", "earnings", "sp500", "disposition", "tw_strategy", "tw_research"],
-  "adminScripts": ["modules/admin/admin.js"]
+  "adminScripts": ["modules/admin/admin.js", "modules/stock/query.js"]
 }
