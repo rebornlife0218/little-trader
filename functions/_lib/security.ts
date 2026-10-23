@@ -54,7 +54,7 @@ export const PER_MINUTE = { guest: 10, member: 60 } as const;
 export const PER_MINUTE_TRACK = 30;   // 瀏覽紀錄(api/track)另外計，換頁快也不會卡到一般 API
 // 需要登入的資料檔(data/<資料集>/，functions/data/_middleware.ts)：每個帳號每分鐘的下載上限，防止登入後用程式整批抓。
 // 一般瀏覽一頁只載入 1～5 個檔；頁面程式(modules/)不計，因為每次開網頁會一次載入 11 支
-export const PER_MINUTE_DATA = 60;
+export const PER_MINUTE_DATA = 100;
 
 export async function rateLimit(env: Env, id: Identity, ip: string, waitUntil: (p: Promise<unknown>) => void,
                                 bucket: { prefix: string; limit: number } | null = null): Promise<Response | null> {
