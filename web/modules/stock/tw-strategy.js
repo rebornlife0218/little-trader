@@ -99,7 +99,8 @@
   // 策略清單(依做多 / 做空分組)：新增策略時在 strats 加一筆(run = 畫面函式)，尚未完成的設 soon: true(卡片顯示「努力建置中」)
   const SIDES = [
     { key: 'long', name: '做多', desc: '買進股票，賺上漲的錢', strats: [
-      { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去半年波動最小的股票，持有一個月', run: (...a) => lowvol(...a) },
+      { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去半年波動最小的股票，持有一個月', run: (...a) => lowvol(...a),
+        topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
       { key: 'margin', name: '融資都沒退，算我輸嗎', desc: '不公開，輸入密碼後查看', run: eventStrat('margin') },
     ] },
     { key: 'short', name: '做空', desc: '放空股票，賺下跌的錢', strats: [
@@ -114,7 +115,7 @@
     section: 'stock', group: '台股', key: 'tw-strategy', name: '策略', title: '台股策略',
     desc: '依做多、做空分組的策略，一律與買進持有 0050 比較報酬與風險',
     groups: SIDES.map(sd => ({ name: sd.name, desc: sd.desc, items: sd.strats.map(f => ({
-      key: f.key, name: f.name, desc: f.desc, tags: f.key === 'margin' ? '🔒 需要密碼' : '', run: f.run,
+      key: f.key, name: f.name, desc: f.desc, tags: f.key === 'margin' ? '🔒 需要密碼' : '', run: f.run, topics: f.topics,
     })) })),
   });
 

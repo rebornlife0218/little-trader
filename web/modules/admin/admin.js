@@ -8,34 +8,64 @@
   const who = r => `${r.kind === 'member' ? '👤 ' : ''}${esc(r.kind === 'guest' ? '訪客 ' + String(r.who).slice(0, 8) : r.who)}`;
   const secName = k => k === 'home' ? '首頁' : (LT.SECTIONS.find(s => s.key === k) || {}).name || k;
 
-  /* 最受歡迎的主題：區塊 › 頁面 › 細項(最多三層)，用 <details> 一層一層點開；同一層依瀏覽次數排序
-     區塊、頁面是「換頁」的次數；細項是切換到那個畫面的次數，上層 = 底下所有細項的加總 */
+  /* 最受歡迎的主題：區塊 › 頁面 › 細項，用 <details> 一層一層點開
+     1. 先依網站目前的結構列出所有主題(還沒有人看過的顯示 0)：側欄的頁面、目錄頁的分組與項目(LT.catalog)、
+        頁面註冊時的 topics(分頁、指數、章節…；名稱和頁面裡 LT.view 記錄的一樣)
+     2. 再把瀏覽次數填進去；結構裡找不到的紀錄(改版前的舊頁面或舊名稱)另外列在「舊版紀錄」
+     區塊、頁面是「換頁」的次數；細項是切換到那個畫面的次數，上層 = 底下所有細項的加總；同一層依瀏覽次數排序 */
   function topicTree(S) {
-    const kids = (rows, match) => rows.filter(match).sort((a, b) => b.n - a.n);
-    const cells = r => `<span class="tr-n">${n0(r.n)}</span><span class="tr-p">${n0(r.people)}</span><span class="tr-m">${n0(r.member)} / ${n0(r.guest)}</span>`;
-    const node = (name, r, children, extra = '') => children
-      ? `<details class="tr-node"><summary><span class="tr-name">${name}${extra}</span>${cells(r)}</summary><div class="tr-kids">${children}</div></details>`
-      : `<div class="tr-node tr-leaf"><span class="tr-name">${name}${extra}</span>${cells(r)}</div>`;
-    const [L1, L2, L3] = S.levels;
-    const level = (sec, page, depth, prefix) => {
-      const rows = [L1, L2, L3][depth];
-      if (!rows) return '';
-      const same = r => r.section === sec && r.page === page && [r.l1, r.l2].slice(0, depth).every((v, i) => v === prefix[i]);
-      const key = ['l1', 'l2', 'l3'][depth];
-      return kids(rows, same).map(r => {
-        const sub = level(sec, page, depth + 1, [...prefix, r[key]]);
-        return node(esc(r[key]), r, sub);
-      }).join('');
+    const ZERO = { n: 0, people: 0, member: 0, guest: 0 };
+    const mk = (name, known) => ({ name, known, r: null, kids: new Map() });
+    const root = mk('', true);
+    const at = (path, name, known) => {                 // 依路徑找節點，沒有就建立
+      let nd = root;
+      path.forEach((k, i) => {
+        if (!nd.kids.has(k)) nd.kids.set(k, mk(i === path.length - 1 && name ? name : k, known));
+        nd = nd.kids.get(k);
+      });
+      return nd;
     };
-    const html = kids(S.sections, () => true).filter(r => r.section !== 'home').map(sec => {
-      const pages = kids(S.pages, r => r.section === sec.section).map(pg => node(esc(pg.title || pg.page), pg, level(sec.section, pg.page, 0, []))).join('');
-      return node(esc(secName(sec.section)), sec, pages, sec.locked ? ` <small class="mute">訪客被擋 ${n0(sec.locked)}</small>` : '');
-    }).join('');
-    const home = S.sections.find(r => r.section === 'home');
+    const addTopics = (path, topics) => (topics || []).forEach(t => {
+      if (typeof t === 'string') at([...path, t], t, true);
+      else { at([...path, t.name], t.name, true); addTopics([...path, t.name], t.items); }
+    });
+    // 1. 網站目前的結構
+    LT.SECTIONS.forEach(sec => {
+      at([sec.key], secName(sec.key), true);
+      LT.listPages().filter(pg => pg.section === sec.key && pg.mount && !pg.redirect && pg.key !== 'admin').forEach(pg => {
+        const pp = [sec.key, pg.key];
+        at(pp, pg.name, true);
+        if (pg.catalog) pg.catalog.groups.forEach(g => g.items.filter(it => !it.soon).forEach(it => {
+          const ip = [...pp, ...(g.name ? [g.name] : []), it.name];
+          if (g.name) at([...pp, g.name], g.name, true);
+          at(ip, it.name, true);
+          addTopics(ip, it.topics);
+        }));
+        addTopics(pp, pg.topics);
+      });
+    });
+    at(['home'], '首頁', true);
+    // 2. 填入瀏覽次數
+    S.sections.forEach(r => { at([r.section], secName(r.section), false).r = r; });
+    S.pages.forEach(r => { at([r.section, r.page], r.title || r.page, false).r = r; });
+    S.levels.forEach((rows, d) => rows.forEach(r => {
+      const labels = ['l1', 'l2', 'l3'].slice(0, d + 1).map(k => r[k]);
+      at([r.section, r.page, ...labels], labels[d], false).r = r;
+    }));
+    // 輸出：已知的依次數排序；舊版紀錄(結構裡沒有的)放在同一層最後
+    const cells = r => `<span class="tr-n">${n0(r.n)}</span><span class="tr-p">${n0(r.people)}</span><span class="tr-m">${n0(r.member)} / ${n0(r.guest)}</span>`;
+    const order = nd => [...nd.kids.values()].sort((a, b) => (b.known - a.known) || ((b.r || ZERO).n - (a.r || ZERO).n));
+    const render = nd => {
+      const r = nd.r || ZERO, kids = order(nd).map(render).join('');
+      const extra = (nd.r && nd.r.locked ? ` <small class="mute">訪客被擋 ${n0(nd.r.locked)}</small>` : '') + (nd.known ? '' : ' <small class="mute">(舊版紀錄)</small>');
+      const cls = r.n ? '' : ' tr-zero';
+      return kids
+        ? `<details class="tr-node${cls}"><summary><span class="tr-name">${esc(nd.name)}${extra}</span>${cells(r)}</summary><div class="tr-kids">${kids}</div></details>`
+        : `<div class="tr-node tr-leaf${cls}"><span class="tr-name">${esc(nd.name)}${extra}</span>${cells(r)}</div>`;
+    };
     return `<div class="adm-tree">
       <div class="tr-head"><span class="tr-name">主題</span><span class="tr-n">瀏覽次數</span><span class="tr-p">人數</span><span class="tr-m">登入 / 訪客</span></div>
-      ${html || '<p class="mute">沒有資料</p>'}
-      ${home ? node('首頁', home, '') : ''}
+      ${order(root).map(render).join('')}
     </div>`;
   }
 
@@ -61,7 +91,7 @@
             <div class="stat"><div class="v">${n0(T.viewers)}</div><div class="l">瀏覽人數(不重複)</div></div>
           </div>
           <div class="panel"><h3 style="margin-top:0;">最受歡迎的主題 <small class="mute">(點 ▸ 一層一層展開)</small></h3>${topicTree(S)}
-            <p class="note">區塊、頁面的次數是進入那一頁的次數；頁面底下的細項(分頁、研究、下拉選單)是切換到那個畫面的次數，每一層是底下所有細項的加總，快速連續切換只算最後停下來的畫面。
+            <p class="note">列出網站上所有的主題，還沒有人看過的顯示 0(灰色)；結構裡已經沒有的舊頁面或舊名稱標「舊版紀錄」。區塊、頁面的次數是進入那一頁的次數；頁面底下的細項(分頁、研究、下拉選單)是切換到那個畫面的次數，每一層是底下所有細項的加總，快速連續切換只算最後停下來的畫面。
               「訪客被擋」：沒登入的人點進需要登入的區塊的次數，可以看出大家想看但被擋住的主題。</p></div>
           <div class="panel"><h3 style="margin-top:0;">每日請求數</h3><div id="admChart"></div></div>
           <div class="adm-grid">

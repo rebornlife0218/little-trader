@@ -554,6 +554,7 @@
 
   LT.register({
     section: 'stats', key: 'basic', name: '初級統計學',
+    topics: CHAPTERS.map((c, i) => `第 ${i + 1} 章 ${c.title}`),   // 後台熱門主題列出的子項目(同 mount 裡 LT.view 記錄的名稱)
     async mount(el, ctx) {
       const n = parseInt((location.hash.split('/')[3] || '1'), 10);
       const idx = Math.min(Math.max(1, n || 1), CHAPTERS.length) - 1;

@@ -28,6 +28,7 @@
   }
 
   LT.register({
+    topics: ['市場指標', 'T 字報價與未平倉', 'Black-Scholes 計算器'],   // 後台熱門主題列出的子項目(同下方三個分頁的名稱)
     section: 'option', key: 'market', name: '選擇權市場概況',
     async mount(el, ctx) {
       el.innerHTML = `<div class="panel"><div class="empty"><p>正在載入選擇權資料…</p></div></div>`;

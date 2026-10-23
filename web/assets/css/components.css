@@ -543,3 +543,4 @@
   .cat-back:hover{text-decoration:underline;}
   .cat-crumb{color:var(--amber);margin-right:8px;}
   .cat-crumb::after{content:'›';margin-left:8px;color:var(--mute);}
+  .adm-tree .tr-zero > summary, .adm-tree .tr-leaf.tr-zero{opacity:.5;}

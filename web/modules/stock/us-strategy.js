@@ -48,14 +48,15 @@
 
   // 策略清單：新增策略時加一筆(並把 run 指到它的畫面函式)，尚未完成的設 soon: true(卡片顯示「努力建置中」)
   const FAMILIES = [
-    { key: 'sp500', name: 'S&P500 季度換股', desc: '每季依上一季的表現，從當時的 S&P500 成分股挑選股票持有一季' },
+    { key: 'sp500', name: 'S&P500 季度換股', desc: '每季依上一季的表現，從當時的 S&P500 成分股挑選股票持有一季',
+      topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
     { key: 'more', name: '其他策略', desc: '更多美股策略', soon: true },
   ];
   // 目錄頁(LT.catalog)：策略卡片，點進去是單一策略(網址 #/stock/us-strategy/<策略>)
   LT.catalog({
     section: 'stock', group: '美股', key: 'us-strategy', name: '策略', title: '美股策略',
     desc: '選擇要看的策略，與買進持有 SPY 比較報酬與風險',
-    groups: [{ name: '', items: FAMILIES.map(f => ({ key: f.key, name: f.name, desc: f.desc, soon: f.soon, run: (el, ctx) => sp500(el, ctx) })) }],
+    groups: [{ name: '', items: FAMILIES.map(f => ({ key: f.key, name: f.name, desc: f.desc, soon: f.soon, topics: f.topics, run: (el, ctx) => sp500(el, ctx) })) }],
   });
 
   /* ---------- S&P500 季度換股 ---------- */

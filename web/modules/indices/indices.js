@@ -1649,5 +1649,7 @@ function mountIndices(container, theme){
   state.theme = theme;
   if (!_indicesBooted){ _indicesBooted = true; init(); } else { render(); }
 }
-LT.register({ section:'index', key:'crash', name:'大盤漲跌分析', mount: el=>mountIndices(el,'crash') });
-LT.register({ section:'index', key:'candle', name:'K棒型態分析', mount: el=>mountIndices(el,'candle') });
+// topics：後台熱門主題列出的子項目(名稱要和 render() 裡 LT.view 記錄的一樣)
+LT.register({ section:'index', key:'crash', name:'大盤漲跌分析', mount: el=>mountIndices(el,'crash'),
+  topics: MODES.filter(m=>m.key!=='m4').map(m=>({ name:m.name, items:INDICES.map(c=>c.name) })) });   // 模式四還在建置中，先不列
+LT.register({ section:'index', key:'candle', name:'K棒型態分析', mount: el=>mountIndices(el,'candle'), topics: INDICES.map(c=>c.name) });
