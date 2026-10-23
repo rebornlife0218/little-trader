@@ -12,7 +12,7 @@
       <div class="pk-pane" data-pane="save">${C && E ? `
         <div class="panel">
           <h3>一、常存的 ETF 績效比較</h3>
-          <div class="pk-picks" id="pkPicks">${twList.map(x => `<label><input type="checkbox" value="${x.code}" checked> <b>${x.code}</b> ${esc(x.name)}<small>${x.kind}</small></label>`).join('')}</div>
+          <div class="pk-picks" id="pkPicks">${twList.map(x => `<label title="${esc(x.name)}"><input type="checkbox" value="${x.code}" checked><i class="pk-dot" style="background:${colorOf(x.code)}"></i><b>${x.code}</b><span class="pk-name">${esc(x.name)}</span><small>${x.kind}</small></label>`).join('')}</div>
           <p class="note" id="pkCommonNote" style="margin-top:6px;"></p>
           <div id="pkEtfChart"></div>
           <div id="pkEtfLegend"></div>

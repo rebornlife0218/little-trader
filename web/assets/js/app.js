@@ -124,7 +124,7 @@ const LT = (() => {
         .then(j => { list = j.symbols; document.getElementById('sideSymList').innerHTML = list.map(x => `<option value="${esc(x.symbol)} ${esc(x.name)}">`).join(''); })
         .catch(() => { list = null; });
     };
-    const go = () => {
+    const search = () => {
       const v = input.value.trim();
       if (!v) return;
       const m = v.match(/^([0-9A-Za-z]{4,6})(\s|$)/);
@@ -136,12 +136,12 @@ const LT = (() => {
       go(`stock/query/${encodeURIComponent(code)}`);
     };
     input.addEventListener('focus', loadList);
-    // 從建議清單選了一檔(值是「代號 名稱」)就直接查
-    input.addEventListener('input', e => { if (!e.inputType && list && /^[0-9A-Za-z]{4,6} /.test(input.value)) go(); });
-    form.onsubmit = e => { e.preventDefault(); go(); };
+    // 從建議清單選了一檔(值是「代號 名稱」)就直接查；桌機 Chrome 選建議時沒有 inputType，Android 是 insertReplacementText
+    input.addEventListener('input', e => { if ((!e.inputType || e.inputType === 'insertReplacementText') && list && /^[0-9A-Za-z]{4,6} /.test(input.value)) search(); });
+    form.onsubmit = e => { e.preventDefault(); search(); };
     form.querySelector('.ss-ico').onclick = () => {
       if (document.documentElement.classList.contains('side-collapsed') && window.innerWidth > 860) { toggleSidebar(); setTimeout(() => input.focus(), 250); }
-      else if (input.value.trim()) go(); else input.focus();
+      else if (input.value.trim()) search(); else input.focus();
     };
     // 手機：要在點擊的當下 focus(不能放在 setTimeout 裡)，手機瀏覽器才會跳出鍵盤
     document.getElementById('topSearch').onclick = () => { document.body.classList.add('nav-open'); input.focus({ preventScroll: true }); };
@@ -164,10 +164,10 @@ const LT = (() => {
     })();
   }
   // 瀏覽紀錄：每次換頁送一筆到 api/track(後台的「最受歡迎的主題」)；備援站沒有後端就不送
-  function track(section, page, title, isLocked, path) {
+  function track(section, page, title, isLocked, trail) {
     if (!auth.api) return;
     try {
-      navigator.sendBeacon('api/track', new Blob([JSON.stringify({ section, page, title, locked: !!isLocked, path: path || [] })], { type: 'application/json' }));
+      navigator.sendBeacon('api/track', new Blob([JSON.stringify({ section, page, title, locked: !!isLocked, path: trail || [] })], { type: 'application/json' }));
     } catch (e) {}
   }
   /* 頁面裡的細項(分頁、下拉選單)：頁面在切換時呼叫 LT.view('ETF研究', '主動式ETF', 'A 系列 ETF 跟單')，最多三層。
@@ -175,13 +175,13 @@ const LT = (() => {
   let viewTimer = null, lastView = '';
   function view(...labels) {
     const page = current;
-    const path = labels.filter(Boolean).map(s => String(s).trim().slice(0, 40)).slice(0, 3);
+    const trail = labels.filter(Boolean).map(s => String(s).trim().slice(0, 40)).slice(0, 3);
     clearTimeout(viewTimer);
     viewTimer = setTimeout(() => {
-      const key = path.join(' › ');
-      if (!page || page !== current || !path.length || key === lastView) return;
+      const key = trail.join(' › ');
+      if (!page || page !== current || !trail.length || key === lastView) return;
       lastView = key;
-      track(page.section, page.key, page.name, false, path);
+      track(page.section, page.key, page.name, false, trail);
     }, 600);
   }
   // 第一次來訪：選擇用 Google 登入或以訪客身分繼續(記住選擇，不再詢問)

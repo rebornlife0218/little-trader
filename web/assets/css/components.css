@@ -445,6 +445,14 @@
   .pk-picks label{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);font-size:12.5px;cursor:pointer;}
   .pk-picks label small{color:var(--mute);font-size:11px;}
   .pk-picks input{accent-color:var(--amber);}
+  .pk-dot{width:10px;height:3px;border-radius:2px;flex:0 0 auto;}   /* 和走勢圖線條同色，手機上兼當圖例 */
+  /* 手機：勾選鈕只留代號與色點(名稱在下方表格)，圖下方的圖例拿掉，圖表不用往下滑很久才看到 */
+  @media (max-width:640px){
+    .pk-picks{gap:6px;}
+    .pk-picks label{padding:5px 8px;font-size:12px;}
+    .pk-picks .pk-name, .pk-picks label small{display:none;}
+    #pkEtfLegend{display:none;}
+  }
   details.pk-more{margin-top:10px;}
   details.pk-more summary{cursor:pointer;color:var(--amber);font-size:13px;font-weight:600;}
   table.pk-kind td:first-child{white-space:nowrap;}

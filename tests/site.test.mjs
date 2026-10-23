@@ -84,6 +84,15 @@ test('index.html：<script> 都加 defer、只載入本站的檔案', () => {
   assert.match(html, /<base href="\/">/, 'index.html 要有 <base href="/">(部署時改寫成備援站的子目錄)');
 });
 
+test('app.js 裡沒有同名的函式或變數遮蔽 LT 的公開函式(例如搜尋框裡另宣告 go，會讓換頁失效)', () => {
+  const s = readFileSync(join(WEB, 'assets/js/app.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');   // 去掉註解
+  const exported = s.match(/return \{ get auth\(\)[^\n]*\};/)[0].match(/\b[a-zA-Z_]\w*\b/g);
+  for (const name of new Set(exported)) {
+    const decl = s.match(new RegExp(`(?:\\b(?:const|let|var|function)\\s+${name}\\b)|(?:[,(]\\s*${name}\\s*(?:=[^=>]|[,)]\\s*=>))`, 'g')) || [];
+    assert.ok(decl.length <= 1, `app.js 宣告了 ${decl.length} 次 ${name}：${decl.join(' / ')}`);
+  }
+});
+
 test('網頁程式沒有 CDN 或外部腳本', () => {
   for (const f of walk(WEB).filter(f => /\.(js|html)$/.test(f) && !f.includes('vendor'))) {
     const s = readFileSync(f, 'utf8');
