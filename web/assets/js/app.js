@@ -6,11 +6,11 @@
 const LT = (() => {
   // 側欄區塊(順序即側欄順序)；新增區塊直接在這裡加一筆，desc 顯示在首頁
   const SECTIONS = [
-    { key: 'index', name: '指數', desc: '全球主要指數的急跌反彈與K棒型態統計' },
-    { key: 'etf', name: 'ETF', desc: 'ETF大禮包(0050 vs 勞退基金、折溢價)與即將發行的新 ETF' },
-    { key: 'stock', name: '股票', desc: '台股處置股、隔日沖、策略、其他研究，美股財報行事曆與策略' },
-    { key: 'option', name: '選擇權', desc: '臺指選擇權與台指期：隱含波動率、籌碼、價差與策略損益' },
-    { key: 'stats', name: '統計學', desc: '統計學與計量方法的學習資源' },
+    { key: 'index', name: '指數', desc: '全球 10 大指數的急跌反彈、均線、週期與 K 棒型態統計；台指期貨的價差、轉倉與法人未平倉' },
+    { key: 'etf', name: 'ETF', desc: 'ETF 介紹與折溢價、怎麼存 ETF(績效比較、配息課稅、0050 vs 勞退基金)、ETF 研究，以及即將發行的新 ETF' },
+    { key: 'stock', name: '股票', desc: '台股處置股、策略回測與其他研究；美股財報行事曆與 S&P500 換股策略回測' },
+    { key: 'option', name: '選擇權', desc: '臺指選擇權的隱含波動率、P/C ratio、T 字報價與結算日曆；24 種策略損益圖與 Black-Scholes 計算器' },
+    { key: 'stats', name: '統計學', desc: '初級統計學 13 章：觀念、公式、R 範例、台股實例與互動模擬' },
     { key: 'other', name: '其他', desc: '研究與交易時常用的網站推薦' },
   ];
   // 資料集(= pipeline/<key>/、data 分支的 <key>/)；新增資料集在這裡加一筆，首頁會顯示更新狀態

@@ -44,12 +44,12 @@ pipeline/                           資料抓取，一個資料集一個資料�
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
-  etf_compare/update.py             0050 vs 勞退基金(勞動基金運用局、Yahoo Finance)
+  etf_compare/update.py             常存 ETF 比較、0050 vs 勞退基金(勞動基金運用局；台股 ETF 股價用本機 PostgreSQL，2016 年以前 Yahoo Finance)
   disposition/update.py             台股處置股(處置名單與股價：本機 PostgreSQL；加權指數用 indices 資料集、櫃買指數用櫃買中心；只在本機執行)
   tw_strategy/update.py             台股低波動策略回測(本機 PostgreSQL 的 CMoney 日資料；只在本機執行)，最後呼叫 events.py
   tw_strategy/events.py             台股事件型策略的共用引擎(每天選股、隔天開盤進場、持有幾天出場；漲跌停進不了場或出不了場；本金 100 萬的整數股資金模擬與交易成本，低波動也共用)：融資都沒退(做多)、大盤跌個股逆勢漲(做空)，每個策略一個 JSON
   tw_strategy/private_strategies.py 不公開的策略(條件、網頁說明、密碼；不進版控，只在本機，要自己備份)：輸出時整份加密，網頁輸入密碼後解密
-  run_local.py                      本機資料集(tw_strategy、disposition)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
+  run_local.py                      本機資料集(tw_strategy、disposition、etf_compare)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署
   tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
   etf_research/update.py            ETF大禮包「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
@@ -107,7 +107,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 |---|---|---|---|
 | indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給 ETF大禮包的長期回測) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
-| etf_compare | 勞動基金運用局、Yahoo Finance、臺灣證券交易所(除權除息計算結果表) | 週一~五 09:00 | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；台股 ETF 的配息用證交所官方資料，Yahoo 缺 2013 年以前的配息) |
+| etf_compare | 勞動基金運用局；台股 ETF 股價：本機 PostgreSQL `cm.tw_daily`(2016 年起)，之前用 Yahoo Finance(0050、0056、006208，從上市日起)；ARKK：Yahoo Finance；臺灣證券交易所(除權除息計算結果表) | 週一~五 23:45、週二~六 12:15(本機排程) | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬，用下面每日資料的月底值)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；排除沒有成交的日子；台股 ETF 的還原股價用證交所除息資料自己算，Yahoo 的還原股價缺 2013 年以前的配息、2014 年的除息也算錯) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
 | disposition | 本機 PostgreSQL `cm.tw_disposition`(處置名單)、`cm.tw_daily`(股價)；櫃買中心(櫃買指數) | 週一~五 23:45、週二~六 12:15(本機排程) | `events.json`(2026/7 起每個處置事件：期間、新制/舊制、第一天開收、處置前 5 日、處置期間、出關後 5 日與同期大盤報酬) |
 | tw_research | 本機 PostgreSQL `cm.tw_daily`、`cm.tw_monthly_revenue`、`cm.tw_company_info` | 不定期(研究更新時手動執行) | 每個研究一個 JSON：`rev_pre.json` 營收公告前布局(不限市值與市值四分位 Q1～Q4 的前 10、前 5 檔與全部合格股票淨值、交易統計、進場日敏感度、綜合分數十分位、因子 IC)、`rev_growth.json` 營收成長特徵(3 種持有期 × 3 種分數組合的淨值與持有檔數、特徵 IC t 值、公告前後累積超額報酬)、`rev_drop.json` 營收衰退開低(日內 / T+1 × 全部 / 均額 ≥ 1 千萬的淨值與持有檔數、分組報酬)、`rev_turn.json` 營收由負轉正(5 日 / 10 日 / 20 日 × 各種門檻與持續成長對照組的淨值與持有檔數、四種營收變化的累積超額報酬與每筆報酬)；都含 `d`(日期，第一天 = 期初)、`b0050`(0050 淨值)、`report`(報告 Markdown，不含建議)；淨值期初 = 1，本金 100 萬整數股、已扣成本，資金規則同 tw_strategy(有新股票進場時再平衡；寫明檔數的用 1/N 上限)。不發佈 csv、png 與原始股價 |
@@ -118,7 +118,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。
 
-本機資料集(tw_strategy、disposition)：
+本機資料集(tw_strategy、disposition、etf_compare)：
 - 資料庫在本機(localhost:9457)，GitHub Actions 連不到，所以沒有 `data-<資料集>.yml`；由 Windows 工作排程器「LittleTrader_local」在 cm 同步(`CM_PostgreSQL_Sync`：週一~五 23:30、週二~六 12:00；CMoney 台股日資料約 21:30 進 repo)之後以 `pythonw.exe` 執行 `pipeline/run_local.py`，cm 同步還在跑會先等它結束。不能用 Git Bash：電腦睡眠(新式待命)時排程會在背景執行，msys 的 bash.exe 在這個狀態下啟動失敗(0xC0000142)，所以發佈步驟(同 `publish_data.sh`)在 run_local.py 裡用 Python 呼叫 git.exe。輸出記錄在 `~/.cache/little-trader/local.log`。
 - 兩個排程都設定「喚醒電腦執行」與「錯過時間就補跑」(2026-10-17 實測)：插電睡眠時會在背景準時執行、螢幕不會亮，執行完自動回到睡眠；用電池時，從開始功能表選「睡眠」後排程不會執行，要等下次喚醒電腦才補跑(補跑正常)；但閒置自動關閉螢幕(Windows 記為「閒置逾時」進入新式待命)時，程式與排程都照常執行。所以本機的電源設定為：睡眠「永不」、閒置關閉螢幕(電池 5 分鐘、插電 10 分鐘)、電源鍵 =「關閉顯示器」、闔上螢幕 =「不執行任何動作」；離開時按電源鍵或放著讓螢幕自己關，不要選睡眠。建立排程時要取消「只在插電時才啟動」(`New-ScheduledTaskSettingsSet` 預設是勾選的)。
 - 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。

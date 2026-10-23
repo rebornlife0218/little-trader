@@ -21,7 +21,7 @@
 ## 資料
 
 - 台股資料來自本機 PostgreSQL 的 `cm` schema，由 `C:\Users\User\Projects\PostgreSQL\cm_sync.py` 從 GitHub `rebornlife0218/Seeking_Alpha` 的 `CM/` 同步；同步後用 `cm_verify.py` 比對列數與抽樣值。
-- 本機資料集(tw_strategy、disposition)由 `pipeline/run_local.py` 產生、發佈並觸發部署；GitHub Actions 連不到本機資料庫。
+- 本機資料集(tw_strategy、disposition、etf_compare)由 `pipeline/run_local.py` 產生、發佈並觸發部署；GitHub Actions 連不到本機資料庫。
 - 用新欄位前，先確認單位、定義與涵蓋期間(例如張數欄位的單位是張還是股、從哪一年開始有資料)，有疑問就用已知個股(如 2330)手算核對。
 
 ## 選股回測原則

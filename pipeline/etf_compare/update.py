@@ -3,10 +3,13 @@
   compare.json：0050 與勞退基金(新制)的每月報酬
   etfs.json：常存 ETF(與 ARKK)的每日收盤、股利再投入的還原股價、每股配息，供績效比較、單筆 vs 定期定額回測
     台股 ETF 的配息用臺灣證券交易所「除權除息計算結果表」(Yahoo 的配息資料不完整)
+  - 台股 ETF 收盤價：本機 PostgreSQL 的 cm.tw_daily(2016 年起)；資料庫開始之前沿用 Yahoo Finance(0050、0056、006208，從上市日起)
+    兩邊都排除沒有成交的日子；cm 的收盤價沒有分割調整，用 fix_unadjusted_splits 換算
   - 勞退基金：勞動基金運用局公告的「最近月份收益率」(當年度截至該月的累計收益率，每年 1 月重新起算)
     換成每月報酬：1 月 = 當月數字；其他月 = (1 + 本月累計) ÷ (1 + 上月累計) − 1
-  - 0050：Yahoo Finance 月底收盤(價格報酬)與還原股價(Adj Close，股利再投入的總報酬)
-排程：.github/workflows/data-etf_compare.yml；本機手動：python pipeline/etf_compare/update.py
+  - 0050：上述每日收盤與股利再投入還原股價的月底值
+  - ARKK(美股)：Yahoo Finance 收盤與還原股價
+排程：本機 pipeline/run_local.py(要連本機資料庫，GitHub Actions 連不到)；手動：python pipeline/run_local.py etf_compare
 """
 import io
 import re
@@ -21,7 +24,7 @@ import yfinance as yf
 from requests.adapters import HTTPAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from common import dataset_dir, write_json, write_meta  # noqa: E402
+from common import dataset_dir, pg_connect, write_json, write_meta  # noqa: E402
 
 DATASET = 'etf_compare'
 LPF_URL = 'https://www.blf.gov.tw/49200/49255/49261/49269/49279/73028/post'
@@ -108,10 +111,12 @@ ETFS = [
     ('00940', '00940.TW', '元大台灣價值高息', '高股息', 'TWD'),
     ('ARKK', 'ARKK', 'ARK Innovation ETF', '主題型(美股)', 'USD'),
 ]
+# 資料庫(2016 年起)之前就上市、要用 Yahoo 補前段的台股 ETF：上市日(Yahoo 會把上市前的募集期也列進來)
+LISTED = {'0050': '2003-06-30', '0056': '2007-12-26', '006208': '2012-07-17'}
 
 
 def download(ticker, **kw):
-    """Yahoo 日資料(收盤與還原股價)，已修正未調整的分割。"""
+    """Yahoo 日資料(收盤與還原股價，排除沒有成交的日子)，已修正未調整的分割。"""
     for i in range(4):
         try:
             df = yf.download(ticker, auto_adjust=False, progress=False, threads=False, **kw)
@@ -124,7 +129,44 @@ def download(ticker, **kw):
         raise RuntimeError(f'無法下載 {ticker} 股價')
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
-    return fix_unadjusted_splits(df[['Close', 'Adj Close']].dropna())
+    df = df[['Close', 'Adj Close', 'Volume']].dropna()
+    # 沒有成交 = 成交量 0 且價格和前後一天相同(上市前募集期的固定價格也是)；
+    # Yahoo 2008 年的成交量缺(記為 0)但價格每天在變，那些日子仍視為有成交
+    flat = df['Close'].eq(df['Close'].shift(1)) | df['Close'].eq(df['Close'].shift(-1))
+    return fix_unadjusted_splits(df[~((df['Volume'] == 0) & flat)][['Close', 'Adj Close']])
+
+
+def db_close(codes):
+    """cm.tw_daily 的收盤價(排除沒有成交的日子)：({代號: DataFrame[Close]}, 資料庫第一天)，已換算成分割後的單位"""
+    with pg_connect() as conn, conn.cursor() as cur:
+        cur.execute('SELECT min("日期") FROM cm.tw_daily')
+        start = pd.Timestamp(cur.fetchone()[0])
+        cur.execute('SELECT "股票代號", "日期", "收盤價" FROM cm.tw_daily '
+                    'WHERE "股票代號" = ANY(%s) AND "成交量" > 0 AND "收盤價" > 0 ORDER BY 1, 2', (codes,))
+        rows = pd.DataFrame(cur.fetchall(), columns=['code', 'date', 'Close'])
+    rows['date'] = pd.to_datetime(rows['date'])
+    rows['Close'] = rows['Close'].astype(float)
+    out = {}
+    for code, g in rows.groupby('code'):
+        df = g.set_index('date')[['Close']].assign(**{'Adj Close': g['Close'].values})
+        print(f'{code}：', end='')
+        out[code] = fix_unadjusted_splits(df)[['Close']]
+    return out, start
+
+
+def tw_close(code, ticker, db, db_start):
+    """資料庫開始之後用資料庫；之前上市的(LISTED)從上市日到資料庫開始前沿用 Yahoo，並檢查接合處兩邊的價格一致"""
+    d = db[code]
+    if code not in LISTED:
+        return d
+    y = download(ticker, start=LISTED[code])[['Close']]
+    early = y[(y.index >= LISTED[code]) & (y.index < db_start)]
+    both = d.join(y, rsuffix='_y', how='inner').head(20)
+    gap = (both['Close'] / both['Close_y'] - 1).abs().median()
+    if not gap < 0.005:
+        raise RuntimeError(f'{code} 資料庫與 Yahoo 的價格對不上(接合處差 {gap:.2%})')
+    print(f'{code}：{early.index[0].date()}～{early.index[-1].date()} 用 Yahoo({len(early)} 天)，之後用資料庫')
+    return pd.concat([early, d])
 
 
 TWT49U = 'https://www.twse.com.tw/rwd/zh/exRight/TWT49U'
@@ -172,15 +214,15 @@ def total_return(df, events):
 
 def fetch_etfs():
     exdiv = fetch_exdiv()
+    db, db_start = db_close([code for code, *_, cur in ETFS if cur == 'TWD'])
     out = {'list': [], 'daily': {}}
     for code, ticker, name, kind, cur in ETFS:
-        df = download(ticker, period='max')
         if cur == 'TWD':
+            df = tw_close(code, ticker, db, db_start)
             adj, divs = total_return(df, exdiv.get(code, []))
-            yahoo_tr = df['Adj Close'].iloc[-1] / df['Adj Close'].iloc[0] - 1
-            mine_tr = adj.iloc[-1] / adj.iloc[0] - 1
-            print(f'{code} 總報酬：官方除息資料 {mine_tr:.1%}、Yahoo 還原股價 {yahoo_tr:.1%}(配息 {len(divs)} 次)')
+            print(f'{code} 總報酬 {adj.iloc[-1] / adj.iloc[0] - 1:.1%}(配息 {len(divs)} 次)')
         else:
+            df = download(ticker, period='max')
             adj, divs = df['Adj Close'], []
         out['list'].append({'code': code, 'name': name, 'kind': kind, 'currency': cur, 'start': df.index[0].strftime('%Y-%m-%d'),
                             'source': '臺灣證券交易所除權息資料' if cur == 'TWD' else 'Yahoo 還原股價'})
@@ -194,19 +236,20 @@ def fetch_etfs():
     return out
 
 
-def fetch_0050(start):
-    df = download('0050.TW', start=start)
-    me = df.resample('ME').last().dropna()
-    ret = me.pct_change().dropna()
+def monthly_0050(daily):
+    """0050 每月報酬 {'YYYY-MM': (價格報酬, 總報酬)}，用每日收盤與股利再投入還原股價的月底值"""
+    df = pd.DataFrame({'c': daily['c'], 'a': daily['a']}, index=pd.to_datetime(daily['d']))
+    ret = df.resample('ME').last().dropna().pct_change().dropna()
     ret.index = ret.index.strftime('%Y-%m')
-    return {ym: (float(r['Close']), float(r['Adj Close'])) for ym, r in ret.iterrows()}
+    return {ym: (float(r['c']), float(r['a'])) for ym, r in ret.iterrows()}
 
 
 def main():
     ytd = fetch_lpf()
     lpf = ytd_to_monthly(ytd)
     first = min(lpf)
-    etf = fetch_0050(f'{int(first[:4]) - 1}-12-01')
+    etfs = fetch_etfs()
+    etf = monthly_0050(etfs['daily']['0050'])
     months = [m for m in lpf if m in etf and lpf[m] is not None]
     print(f'勞退基金 {len(ytd)} 個月({first}～{max(lpf)})，0050 {len(etf)} 個月，共同 {len(months)} 個月')
     out = dataset_dir(DATASET)
@@ -217,9 +260,9 @@ def main():
         'etf_price': [round(etf[m][0], 6) for m in months],        # 0050 價格報酬(不含股利)
         'etf_total': [round(etf[m][1], 6) for m in months],        # 0050 總報酬(股利再投入)
     })
-    write_json(out / 'etfs.json', fetch_etfs())
-    write_meta(DATASET, '勞動基金運用局 勞退基金收益率、Yahoo Finance(ETF 股價)、臺灣證券交易所(除息資料)', LPF_URL,
-               '每天 09:00(台北時間；勞退基金每月初公告前兩個月的收益率)', months=len(months))
+    write_json(out / 'etfs.json', etfs)
+    write_meta(DATASET, '勞動基金運用局 勞退基金收益率、CMoney(台股 ETF 股價；2016 年以前 Yahoo Finance)、臺灣證券交易所(除息資料)', LPF_URL,
+               '週一~五 23:45、週二~六 12:15(台北時間，本機排程；勞退基金每月初公告前兩個月的收益率)', months=len(months))
 
 
 if __name__ == '__main__':

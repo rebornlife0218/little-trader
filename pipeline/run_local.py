@@ -19,7 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = 'rebornlife0218/little-trader'
-DATASETS = ['tw_strategy', 'disposition']
+DATASETS = ['tw_strategy', 'disposition', 'etf_compare']
 LOG = Path.home() / '.cache' / 'little-trader' / 'local.log'
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 log = logging.getLogger('run_local')

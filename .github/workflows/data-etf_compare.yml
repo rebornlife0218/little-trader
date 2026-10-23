@@ -1,10 +1,8 @@
 name: 資料 · 0050 vs 勞退基金
 
-# 資料集 etf_compare：pipeline/etf_compare/update.py → data 分支的 etf_compare/
+# 資料集 etf_compare：已改由本機 pipeline/run_local.py 更新(台股 ETF 股價來自本機資料庫，GitHub Actions 連不到)
+# 不再排程；手動執行會因為連不到資料庫而失敗
 on:
-  schedule:
-    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
-    - cron: '0 1 * * 1-5'     # 台北 週一~週五 09:00(勞退基金每月初公告；0050 用月底收盤)
   workflow_dispatch:
 
 permissions:
