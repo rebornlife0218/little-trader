@@ -124,3 +124,7 @@ footer.copy .foot-src{display:inline-block;margin-top:6px;font-size:11px;color:v
   .side-collapsed .side-search input{display:block;}
   .side-search input{font-size:16px;}   /* 小於 16px 時 iPhone 一點輸入框就會放大畫面 */
 }
+/* 側欄：每個區塊名稱前一個主題色小點(data-sec，見 components.css「區塊主題」)；目前頁面的左邊線用該區塊的顏色 */
+.side-title > span:first-child::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sec);margin-right:9px;vertical-align:2px;}
+.side-link.active{border-left-color:var(--sec);}
+.side-collapsed .side-title > span:first-child::before{display:none;}

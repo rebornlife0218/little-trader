@@ -49,6 +49,7 @@
   // 策略清單：新增策略時加一筆(並把 run 指到它的畫面函式)，尚未完成的設 soon: true(卡片顯示「努力建置中」)
   const FAMILIES = [
     { key: 'sp500', name: 'S&P500 季度換股', desc: '每季依上一季的表現，從當時的 S&P500 成分股挑選股票持有一季',
+      summary: '買上一季的贏家長期贏過 SPY；買上季輸家、高夏普最佳化則落後',
       topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
     { key: 'more', name: '其他策略', desc: '更多美股策略', soon: true },
   ];
@@ -56,7 +57,7 @@
   LT.catalog({
     section: 'stock', group: '美股', key: 'us-strategy', name: '策略', title: '美股策略',
     desc: '選擇要看的策略，與買進持有 SPY 比較報酬與風險',
-    groups: [{ name: '', items: FAMILIES.map(f => ({ key: f.key, name: f.name, desc: f.desc, soon: f.soon, topics: f.topics, run: (el, ctx) => sp500(el, ctx) })) }],
+    groups: [{ name: '', items: FAMILIES.map(f => ({ key: f.key, name: f.name, desc: f.desc, summary: f.summary, soon: f.soon, topics: f.topics, run: (el, ctx) => sp500(el, ctx) })) }],
   });
 
   /* ---------- S&P500 季度換股 ---------- */
@@ -72,7 +73,35 @@
       const tabs = LT.tabs({ cls: 'us-tabs', remember: VIEW_KEY, view: ctx.view, onChange: k => { view = k; draw(); },
         items: [{ key: 'all', name: '總覽比較', desc: '四種策略與 SPY 並列' }, ...STRATS.map(s => ({ key: s.key, name: s.name, desc: s.idea }))] });
 
+      // 報告結構(CLAUDE.md「研究報告」)：一句話結論 → 一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
       el.querySelector('#usBody').innerHTML = `
+        <div class="doc lt-hero"><blockquote><p id="usHero"></p></blockquote></div>
+        <div class="panel">
+          <div class="doc">
+            <h3 class="md-h2">一、研究目的</h3>
+            <p>每季依上一季的表現，從當時的 S&amp;P500 成分股挑股票持有一季，能不能贏過買進持有 SPY？比較四種常見的想法：</p>
+            <ul>${STRATS.map(s => `<li><b>${esc(s.name)}</b>：${esc(s.short)}。${esc(s.idea)}</li>`).join('')}</ul>
+            <h3 class="md-h2">二、資料處理</h3>
+            <p><b>倖存者偏差</b>：如果只用「現在」的成分股或只用還在交易的股票回測，破產、被併購、被剔除的公司都不會出現，結果會偏好。本回測每季使用當時真實的成分股名單，但免費資料仍有缺口：</p>
+            <h4 class="md-h3">每季可取得股價的成分股比例</h4>
+          </div>
+          <div id="usCov"></div>
+          <div class="doc">
+            <p>2000 年代初期約六成，2012 年後約九成以上；只能從可取得股價的股票中選股。</p>
+            <ul>
+              <li><b>已下市公司的股價</b>：已下市、被併購的成分股另外補上歷史股價，回測結果都已包含這些公司；仍查不到股價的公司無法納入(見上圖的比例)。</li>
+              <li><b>代號沿用問題</b>：有些已下市公司的代號被別家公司拿去用(例如 El Paso 的 EP，現在是小型股 Empire Petroleum)，查到的會是新公司的股價。本回測用成交金額篩掉這種情況，但兩家都是大型股的少數情況(例如舊 AT&amp;T 與 SBC 的 T)無法完全排除。</li>
+              <li><b>下市的處理</b>：持有期間股票下市，以最後一個價格轉為現金(不計利息)；破產公司的最後價格通常已接近 0。</li>
+            </ul>
+            <h3 class="md-h2">三、研究方法</h3>
+            <ul>
+              <li><b>換股</b>：每季最後一個交易日收盤，依上一季的報酬或夏普值選股，以收盤價換股、持有一季。</li>
+              <li><b>交易成本</b>：每次換股扣「單邊成本 × 換手率」，期初視為全部買進；單邊成本可在下方調整。</li>
+              <li><b>比較基準</b>：SPY 買進持有，另列全部成分股等權重；夏普值扣除同期的無風險利率。</li>
+            </ul>
+          </div>
+        </div>
+        <h2 class="sec-h">四、實證結果與分析</h2>
         <div class="panel">
           ${tabs.html}
           <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
@@ -83,20 +112,10 @@
         </div>
         <div id="usView"></div>
         <div class="panel">
-          <h3>資料夠嚴謹嗎？</h3>
           <div class="doc">
-            <p><b>倖存者偏差</b>：如果只用「現在」的成分股或只用還在交易的股票回測，破產、被併購、被剔除的公司都不會出現，結果會偏好。本回測每季使用當時真實的成分股名單，但免費資料仍有缺口：</p>
-          </div>
-          <h4>每季可取得股價的成分股比例</h4>
-          <div id="usCov"></div>
-          <div class="doc">
-            <p>2000 年代初期約六成，2012 年後約九成以上；只能從可取得股價的股票中選股。</p>
-            <ul>
-              <li><b>已下市公司的股價</b>：已下市、被併購的成分股另外補上歷史股價，回測結果都已包含這些公司；仍查不到股價的公司無法納入(見上圖的比例)。</li>
-              <li><b>代號沿用問題</b>：有些已下市公司的代號被別家公司拿去用(例如 El Paso 的 EP，現在是小型股 Empire Petroleum)，查到的會是新公司的股價。本回測用成交金額篩掉這種情況，但兩家都是大型股的少數情況(例如舊 AT&amp;T 與 SBC 的 T)無法完全排除。</li>
-              <li><b>下市的處理</b>：持有期間股票下市，以最後一個價格轉為現金(不計利息)；破產公司的最後價格通常已接近 0。</li>
-              <li><b>沒有計入</b>：稅、借券與流動性；換股價格用季末收盤價，實際交易會有滑價。</li>
-            </ul>
+            <h3 class="md-h2" style="margin-top:4px;">五、結論</h3>
+            <ul id="usConcl"></ul>
+            <p><b>限制</b>：沒有計入稅、借券與流動性；換股價格用季末收盤價，實際交易會有滑價。歷史回測不代表未來。</p>
           </div>
         </div>`;
 
@@ -245,8 +264,19 @@
         charts(C, [k, 'spy', 'ew'], [k, 'spy'], k);
       }
 
+      // 一句話結論與結論：依目前選的回測起點與成本，由回測數字產生
+      function conclude(C) {
+        const { st } = C, S = st.spy, best = STRATS.slice().sort((a, b) => st[b.key].sharpe - st[a.key].sharpe)[0], x = st[best.key];
+        const beatN = STRATS.filter(s => st[s.key].mult > S.mult).length, tot = v => pct(v - 1, 0);
+        $('#usHero').innerHTML = `<b>一句話結論</b>：${C.y0} 年起，四種策略中風險調整後最好的是「${esc(best.name)}」(夏普值 ${x.sharpe.toFixed(2)}，SPY ${S.sharpe.toFixed(2)})；`
+          + `四種策略有 ${beatN} 種總報酬贏過 SPY 的 ${tot(S.mult)}。`;
+        $('#usConcl').innerHTML = STRATS.map(s => { const y = st[s.key];
+          return `<li><b>${esc(s.name)}</b>：總報酬 ${tot(y.mult)}、年化 ${pct(y.ret, 1)}、夏普值 ${y.sharpe.toFixed(2)}、最大回撤 ${pct(y.mdd, 0)}，${y.mult > S.mult ? '贏過' : '輸給'} SPY。</li>`; }).join('')
+          + `<li><b>SPY 買進持有</b>：總報酬 ${tot(S.mult)}、年化 ${pct(S.ret, 1)}、夏普值 ${S.sharpe.toFixed(2)}、最大回撤 ${pct(S.mdd, 0)}。</li>`;
+      }
       function draw() {
         const C = calc();
+        conclude(C);
         if (view === 'all') renderAll(C); else renderOne(C, view);
         LTChart.bars($('#usCov'), { x: C.Q.map(q => q.q), label: '可取得股價的成分股比例', height: 180, yMin: 0, yMax: 1,
           xFmt: (v, tip) => tip ? v : v.endsWith('Q1') && +v.slice(0, 4) % 5 === 0 ? v.slice(0, 4) : '', yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v, i) => `${(v * 100).toFixed(0)}%(${C.Q[i].usable} / ${C.Q[i].members} 檔)`,

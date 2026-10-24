@@ -277,6 +277,10 @@ LT.register({
   - 頁面的 key 不要和網站資料夾撞名(`api`、`assets`、`content`、`data`、`modules`)，自動測試會檢查。
 - **不列在側欄的頁面**：註冊時加 `hidden: true`(例如後台)，只能用網址開。
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
+- **區塊主題**：app.js 換頁時設定 `<html data-sec="區塊">`，`components.css` 的「區塊主題」依此給 `--sec`(主題色)與 `--motif`(頁首右側的主題圖樣，SVG 遮罩)；側欄每個區塊也有 `data-sec`。頁面裡要用區塊色時寫 `var(--sec)`。頁首右側有選單等元件時不顯示圖樣。
+- **無障礙**：次要文字 `--mute` 在暗色、淺色主題對底色與面板都 ≥ 4.5:1(自動測試會檢查)；全站有 `:focus-visible` 焦點框；觸控裝置與手機寬度下，按鈕、連結、輸入框、展開列至少 44px 高；尊重「減少動態效果」。
+- **首頁**(`modules/home/home.js`)：開場是網站介紹(線條小圖示)與加權指數近 60 日迷你 K 線(公開的 indices 資料集)；「研究重點」列出目錄頁項目的 `summary`(會員才看得到，不公開的策略不列)；最後是各區塊的入口，套用各自的主題色與圖樣。
+- **策略頁**：低波動選股、事件型策略(tw-strategy.js 的 eventStrat)、S&P500 季度換股也照研究報告的結構(一句話結論 → 研究目的 → 資料處理 → 研究方法 → 四、實證結果與分析 → 五、結論；事件型另有六、延伸：最近的訊號)；一句話結論與結論由網頁依回測數字產生。章節標題在面板之間用 `<h2 class="sec-h">`。
 - **字型**：用 CSS 變數 `--font-body`(內文，中文優先的 Noto Sans TC)、`--font-display`(標題，Space Grotesk)、`--font-num`(數字)，不要直接寫字型名稱；數字預設等寬(`tabular-nums`)。canvas 圖表的座標字用 IBM Plex Mono。
 - **研究報告**：結構見 CLAUDE.md「研究報告」；報告是 Markdown(資料集的 `report`)時，開頭的 `> ` 引言就是一句話結論(樣式 `.doc blockquote`)；直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)用 `<blockquote>` 與 `<h3 class="md-h2">` 照同樣的結構寫。
 - **分享素材**：`node scripts/share/make-share.mjs [--pdf] [--ig] [研究 key …]`，需要本機 `web/data/` 有各研究的資料與 `.dev.vars` 的 `SESSION_SECRET`；會在本機開網站、以會員身分打開研究頁面印成 PDF(只印「研究報告」，沒有報告區塊的研究印整頁)，並截出 IG 圖卡。新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。

@@ -93,6 +93,20 @@ test('app.js 裡沒有同名的函式或變數遮蔽 LT 的公開函式(例如�
   }
 });
 
+test('文字對比：次要文字、強調色在暗色與淺色主題都 ≥ 4.5:1', () => {
+  const css = readFileSync(join(WEB, 'assets/css/components.css'), 'utf8');
+  const block = sel => { const i = css.indexOf(sel + '{'); return css.slice(i, css.indexOf('}', i)); };
+  const tok = (b, name) => (b.match(new RegExp(`--${name}:(#[0-9A-Fa-f]{6})`)) || [])[1];
+  const lum = h => { const c = [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255).map(x => x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4); return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  for (const [theme, b] of [['暗色', block('  :root')], ['淺色', block('  :root[data-theme="light"]')]]) {
+    for (const fg of ['mute', 'dim', 'text', 'amber']) for (const bg of ['bg', 'panel']) {
+      const r = ratio(tok(b, fg), tok(b, bg));
+      assert.ok(r >= 4.5, `${theme} --${fg} 對 --${bg} 只有 ${r.toFixed(2)}:1`);
+    }
+  }
+});
+
 test('網頁程式沒有 CDN 或外部腳本', () => {
   for (const f of walk(WEB).filter(f => /\.(js|html)$/.test(f) && !f.includes('vendor'))) {
     const s = readFileSync(f, 'utf8');

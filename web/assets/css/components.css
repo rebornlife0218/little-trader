@@ -14,7 +14,7 @@
     --grid:#1a1f2a;
     --text:#E7EAEE;
     --dim:#8B93A1;
-    --mute:#5B6472;
+    --mute:#828B9A;   /* 次要文字：對比 ≥ 4.5:1(底色與面板) */
     --up:#F0565B;
     --up-soft:rgba(240,86,91,.14);
     --down:#2ECC71;
@@ -45,13 +45,13 @@
     --grid:#ECEEF2;
     --text:#1B1F27;
     --dim:#4E5663;
-    --mute:#8A919C;
+    --mute:#5F6671;
     --up:#D92D33;
     --up-soft:rgba(217,45,51,.10);
     --down:#14965A;
     --down-soft:rgba(20,150,90,.10);
-    --amber:#B9780A;
-    --amber-soft:rgba(185,120,10,.08);
+    --amber:#966106;   /* 淺色主題的琥珀色加深，當文字也有 4.5:1 */
+    --amber-soft:rgba(156,101,8,.08);
     --on-amber:#FFFFFF;
     --blue:#2F66D0;
     --candle-up:#D92D33;
@@ -222,28 +222,6 @@
   .reco p{margin:0;flex:1;font-size:13px;line-height:1.75;color:var(--dim);}
   .reco-foot{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mute);font-family:var(--font-num);}
   .reco-foot .go{color:var(--amber);font-family:var(--font-body);font-weight:600;}
-
-  /* 首頁 */
-  .hero{display:flex;align-items:center;gap:20px;padding:26px 24px;margin-bottom:18px;background:var(--panel);border:1px solid var(--border);border-radius:14px;}
-  .hero-logo{width:84px;height:84px;flex:0 0 84px;}
-  .hero h1{margin:0;font-size:30px;}
-  .hero h1 span{color:var(--amber);}
-  .hero p{margin:6px 0 0;color:var(--dim);font-size:14px;}
-  .hero-intro{list-style:none;margin:8px 0 0;padding:0;color:var(--dim);font-size:14px;line-height:1.9;}
-  .hero-intro a{color:var(--amber);word-break:break-all;}
-  .home-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin-bottom:2px;}
-  .home-card h2{margin:0 0 4px;font-size:18px;}
-  .home-card p{margin:0 0 12px;font-size:12.5px;}
-  .home-links{display:flex;flex-direction:column;gap:6px;}
-  .home-links a{color:var(--text);text-decoration:none;font-size:13.5px;padding:6px 10px;border-radius:7px;background:var(--panel2);border:1px solid var(--border);}
-  .home-links a:hover{border-color:var(--amber);}
-  .home-sub{font-size:11.5px;font-weight:600;color:var(--mute);margin-top:4px;}
-  .home-sub:first-child{margin-top:0;}
-  .home-links .soon-tag{font-size:10.5px;color:var(--mute);font-style:italic;}
-  .home-data{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:6px 0;border-bottom:1px solid var(--grid);}
-  .home-data:last-child{border-bottom:none;}
-  .home-data b{min-width:90px;color:var(--text);font-size:13px;}
-  @media (max-width:640px){ .hero{flex-direction:column;text-align:center;} }
 
   /* 大盤漲跌分析：模式分頁 */
   .mode-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:16px;}
@@ -570,3 +548,86 @@
   .cat-crumb{color:var(--amber);margin-right:8px;}
   .cat-crumb::after{content:'›';margin-left:8px;color:var(--mute);}
   .adm-tree .tr-zero > summary, .adm-tree .tr-leaf.tr-zero{opacity:.5;}
+
+  /* ==================== 區塊主題(app.js 依網址設定 <html data-sec>) ====================
+     每個區塊一個主題色(取自既有的均線配色，避開代表漲跌的紅綠)與頁首右側的主題圖樣：
+     指數 K 棒、ETF 一籃子、股票 走勢線、選擇權 損益圖、統計學 常態分配、其他 書籤 */
+  :root{ --sec:var(--sec-index); --sec-index:#F0B94D; --sec-etf:#5FD0C5; --sec-stock:#5B8DEF; --sec-option:#B07CF0; --sec-stats:#F5923B; --sec-other:#F06FB0; }
+  :root[data-theme="light"]{ --sec-index:#966106; --sec-etf:#0B7D74; --sec-stock:#2F66D0; --sec-option:#8E4FD8; --sec-stats:#A0500A; --sec-other:#B8326F; }
+  [data-sec="index"]{--sec:var(--sec-index);} [data-sec="etf"]{--sec:var(--sec-etf);} [data-sec="stock"]{--sec:var(--sec-stock);}
+  [data-sec="option"]{--sec:var(--sec-option);} [data-sec="stats"]{--sec:var(--sec-stats);} [data-sec="other"]{--sec:var(--sec-other);}
+  header.top{position:relative;}
+  header.top > div{position:relative;z-index:1;}
+  header.top::before{content:'';position:absolute;left:0;bottom:-1px;width:56px;height:2px;background:var(--sec);border-radius:2px;}
+  header.top::after{content:'';position:absolute;right:0;top:-8px;width:200px;height:72px;background:var(--sec);opacity:.16;pointer-events:none;
+    -webkit-mask:var(--motif) no-repeat right center / contain;mask:var(--motif) no-repeat right center / contain;}
+  [data-sec="index"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='13' y1='24' x2='13' y2='52'/%3E%3Crect x='8' y='30' width='10' height='16' rx='2' fill='black'/%3E%3Cline x1='31' y1='18' x2='31' y2='44'/%3E%3Crect x='26' y='24' width='10' height='14' rx='2' fill='black'/%3E%3Cline x1='49' y1='22' x2='49' y2='52'/%3E%3Crect x='44' y='28' width='10' height='18' rx='2' fill='black'/%3E%3Cline x1='67' y1='12' x2='67' y2='40'/%3E%3Crect x='62' y='18' width='10' height='16' rx='2' fill='black'/%3E%3Cline x1='85' y1='16' x2='85' y2='40'/%3E%3Crect x='80' y='22' width='10' height='12' rx='2' fill='black'/%3E%3Cline x1='103' y1='6' x2='103' y2='36'/%3E%3Crect x='98' y='12' width='10' height='18' rx='2' fill='black'/%3E%3Cline x1='121' y1='10' x2='121' y2='36'/%3E%3Crect x='116' y='16' width='10' height='14' rx='2' fill='black'/%3E%3Cline x1='139' y1='2' x2='139' y2='30'/%3E%3Crect x='134' y='8' width='10' height='16' rx='2' fill='black'/%3E%3Cline x1='157' y1='6' x2='157' y2='30'/%3E%3Crect x='152' y='12' width='10' height='12' rx='2' fill='black'/%3E%3C/svg%3E");}
+  [data-sec="etf"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='46' y='22' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Crect x='66' y='22' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Crect x='86' y='22' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Crect x='106' y='22' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Crect x='56' y='8' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Crect x='76' y='8' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Crect x='96' y='8' width='16' height='12' rx='2' fill='black' stroke='none'/%3E%3Cpath d='M30 36 H150 L138 60 H42 Z'/%3E%3C/svg%3E");}
+  [data-sec="stock"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='4,52 22,44 38,48 56,30 72,36 90,22 106,28 124,14 140,20 158,8 176,12'/%3E%3Cline x1='4' y1='60' x2='176' y2='60' stroke-dasharray='3 5'/%3E%3C/svg%3E");}
+  [data-sec="option"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='4' y1='46' x2='176' y2='46' stroke-dasharray='3 5'/%3E%3Cpolyline points='4,54 96,54 170,6' stroke-width='3'/%3E%3Ccircle cx='96' cy='54' r='3' fill='black'/%3E%3C/svg%3E");}
+  [data-sec="stats"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='14' y1='4' x2='14' y2='60' stroke-width='0.6'/%3E%3Cline x1='36' y1='4' x2='36' y2='60' stroke-width='0.6'/%3E%3Cline x1='58' y1='4' x2='58' y2='60' stroke-width='0.6'/%3E%3Cline x1='80' y1='4' x2='80' y2='60' stroke-width='0.6'/%3E%3Cline x1='102' y1='4' x2='102' y2='60' stroke-width='0.6'/%3E%3Cline x1='124' y1='4' x2='124' y2='60' stroke-width='0.6'/%3E%3Cline x1='146' y1='4' x2='146' y2='60' stroke-width='0.6'/%3E%3Cline x1='168' y1='4' x2='168' y2='60' stroke-width='0.6'/%3E%3Cpath d='M6 58 C 50 58, 62 6, 90 6 C 118 6, 130 58, 174 58' stroke-width='2.5'/%3E%3C/svg%3E");}
+  [data-sec="other"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M70 6 H110 V58 L90 44 L70 58 Z'/%3E%3Cpath d='M120 14 H150 V54 L135 44 L120 54 Z' stroke-width='1.5'/%3E%3C/svg%3E");}
+  @media (max-width:640px){ header.top::after{width:120px;height:48px;opacity:.12;} }
+  .cat-group-h{color:var(--sec);}
+  .crumbs span[aria-current]{color:var(--sec);}
+
+  /* ==================== 無障礙：鍵盤焦點、觸控尺寸、減少動態 ==================== */
+  :focus-visible{outline:2px solid var(--amber) !important;outline-offset:2px;}
+  @media (pointer:coarse), (max-width:860px){
+    .side-link, .side-title, .btnrow-l button, .mode-tab, .login-btn, .acct-link, .topbar button, .theme-toggle, .cat-back, .pk-picks label{min-height:44px;}
+    .side-link{display:flex;align-items:center;}
+    select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]){min-height:44px;}
+    .crumbs a{display:inline-block;padding:13px 2px;}
+    #content button, .chap-list a, .home-mkt-f a, .chap-nav, input[type="range"]{min-height:44px;}
+    .chap-list a, .home-mkt-f a, .chap-nav{display:inline-flex;align-items:center;}
+    #content summary{display:flex;align-items:center;min-height:44px;cursor:pointer;}
+  }
+  @media (prefers-reduced-motion: reduce){ *, *::before, *::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important;} }
+
+  /* ==================== 首頁(modules/home/home.js) ==================== */
+  .home-hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:28px;align-items:center;padding:28px;margin-bottom:28px;background:var(--panel);border:1px solid var(--border);border-radius:16px;}
+  .home-brand{display:flex;align-items:center;gap:16px;margin-bottom:14px;}
+  .home-brand img{width:72px;height:72px;flex:0 0 72px;}
+  .home-brand h1{margin:0;font-family:var(--font-display);font-size:clamp(28px, 3vw, 38px);line-height:1.1;}
+  .home-brand h1 span{color:var(--amber);}
+  .home-brand p{margin:4px 0 0;color:var(--dim);font-size:14px;}
+  .home-intro{list-style:none;margin:0;padding:0;display:grid;gap:8px;}
+  .home-intro li{display:grid;grid-template-columns:22px 1fr;gap:10px;align-items:start;color:var(--dim);font-size:14.5px;line-height:1.7;}
+  .home-intro svg{width:20px;height:20px;margin-top:3px;color:var(--amber);}
+  .home-intro a{color:var(--amber);word-break:break-all;}
+  .home-mkt{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px 16px 10px;}
+  .home-mkt-h{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;}
+  .home-mkt-h b{font-size:13px;color:var(--dim);font-weight:600;}
+  .home-mkt-h small{font-size:12px;color:var(--mute);}
+  .home-mkt-v{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+  .home-mkt-v strong{font-family:var(--font-display);font-size:30px;}
+  .home-mkt-v span{font-size:14px;font-weight:600;}
+  .home-mkt svg{display:block;width:100%;height:150px;margin-top:6px;}
+  .home-mkt-f{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);}
+  .home-mkt-f a{color:var(--amber);text-decoration:none;}
+  .home-h2{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;font-size:18px;}
+  .home-h2 small{font-size:13px;font-weight:500;color:var(--mute);}
+  .home-latest{margin-bottom:30px;}
+  .home-latest .cat-row em{white-space:nowrap;}
+  .home-lock{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:16px 4px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);color:var(--dim);font-size:14px;}
+  .home-secs{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;}
+  .home-sec{position:relative;overflow:hidden;padding:20px 20px 18px;background:var(--panel);border:1px solid var(--border);border-radius:14px;}
+  .home-sec::before{content:'';position:absolute;left:0;top:0;right:0;height:3px;background:var(--sec);}
+  .home-sec::after{content:'';position:absolute;right:12px;top:14px;width:96px;height:32px;background:var(--sec);opacity:.22;pointer-events:none;
+    -webkit-mask:var(--motif) no-repeat right center / contain;mask:var(--motif) no-repeat right center / contain;}
+  .home-sec h2{position:relative;margin:0 0 6px;padding-right:104px;font-size:19px;color:var(--sec);}
+  .home-sec > p{position:relative;margin:0 0 14px;font-size:13px;line-height:1.7;color:var(--dim);max-width:30em;}
+  .home-links{position:relative;display:flex;flex-wrap:wrap;gap:8px;}
+  .home-links a{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:999px;color:var(--text);text-decoration:none;font-size:13.5px;background:var(--panel2);border:1px solid var(--border);}
+  .home-links a:hover{border-color:var(--sec);color:var(--sec);}
+  .home-links .soon-tag{margin-left:6px;font-size:11px;color:var(--mute);}
+  .home-sub{flex-basis:100%;font-size:12px;font-weight:600;color:var(--mute);margin-top:2px;}
+  .home-sec .lock-tag{position:relative;}
+  @media (pointer:coarse), (max-width:860px){ .home-links a{min-height:44px;} }
+  @media (max-width:860px){ .home-hero{grid-template-columns:1fr;padding:20px;} }
+
+  /* 策略頁的章節標題(四、實證結果與分析 …)：在多個面板之間，標示接下來屬於報告的哪一段 */
+  .sec-h{margin:30px 0 12px;font-size:17px;color:var(--sec);display:flex;align-items:center;gap:10px;}
+  .sec-h::after{content:'';flex:1;height:1px;background:var(--border);}
+  .lt-hero{margin-bottom:6px;}
+  header.top:has(> :nth-child(2))::after{display:none;}   /* 頁首右側有選單等操作元件時，不放主題圖樣，避免疊在一起 */

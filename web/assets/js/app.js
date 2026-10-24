@@ -350,7 +350,7 @@ const LT = (() => {
         : `<a href="${sec.key}" class="side-link soon ${active && active.section === sec.key && !active.key ? 'active' : ''}">建置中</a>`;
       const here = active && active.section === sec.key;
       const open = here || openSections.has(sec.key);
-      return `<div class="side-group ${open ? 'open' : ''} ${here ? 'here' : ''}">
+      return `<div class="side-group ${open ? 'open' : ''} ${here ? 'here' : ''}" data-sec="${sec.key}">
         <button class="side-title" onclick="LT.toggleSection('${sec.key}')" aria-expanded="${open}">
           <span>${sec.name}</span><span class="side-count">${locked(sec.key) ? '🔒' : list.length || ''}</span><span class="side-chev">▸</span>
         </button>
@@ -384,6 +384,7 @@ const LT = (() => {
     const main = document.getElementById('content');
     main.innerHTML = '';
     window.scrollTo(0, 0);
+    document.documentElement.dataset.sec = (page || sec).section || sec.key;   // 區塊主題色與頁首圖樣(components.css「區塊主題」)
     if (page) {
       current = page;
       if (!openSections.has(page.section)) { openSections.add(page.section); saveOpenSections(); }
@@ -416,6 +417,7 @@ const LT = (() => {
     window.scrollTo(0, 0);
     renderSidebar(null);
     renderCrumbs(null);
+    document.documentElement.dataset.sec = 'home';
     document.title = 'Little Trader 小交易員的研究室';
     home.mount(main, { alive: () => seq === routeSeq });
     track('home', '', '首頁', false);

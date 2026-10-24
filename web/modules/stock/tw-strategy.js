@@ -99,12 +99,12 @@
   // 策略清單(依做多 / 做空分組)：新增策略時在 strats 加一筆(run = 畫面函式)，尚未完成的設 soon: true(卡片顯示「努力建置中」)
   const SIDES = [
     { key: 'long', name: '做多', desc: '買進股票，賺上漲的錢', strats: [
-      { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去半年波動最小的股票，持有一個月', run: (...a) => lowvol(...a),
+      { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去半年波動最小的股票，持有一個月', summary: '波動和回撤都比 0050 低，但報酬遠遠落後 0050', run: (...a) => lowvol(...a),
         topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
-      { key: 'margin', name: '融資都沒退，算我輸嗎', desc: '不公開，輸入密碼後查看', run: eventStrat('margin') },
+      { key: 'margin', name: '融資都沒退，算我輸嗎', desc: '不公開，輸入密碼後查看', summary: '不公開，輸入密碼後查看', run: eventStrat('margin') },
     ] },
     { key: 'short', name: '做空', desc: '放空股票，賺下跌的錢', strats: [
-      { key: 'against', name: '大盤跌個股逆勢漲就是欠踹', desc: '大盤大跌時逆勢大漲、借券賣出創新高的股票，隔天開盤放空、當天收盤回補', run: eventStrat('against') },
+      { key: 'against', name: '大盤跌個股逆勢漲就是欠踹', desc: '大盤大跌時逆勢大漲、借券賣出創新高的股票，隔天開盤放空、當天收盤回補', summary: '隔天放空、當天回補能賺到錢，但總報酬遠輸 0050', run: eventStrat('against') },
     ] },
   ];
 
@@ -113,7 +113,7 @@
     section: 'stock', group: '台股', key: 'tw-strategy', name: '策略', title: '台股策略',
     desc: '依做多、做空分組的策略，一律與買進持有 0050 比較報酬與風險',
     groups: SIDES.map(sd => ({ name: sd.name, desc: sd.desc, items: sd.strats.map(f => ({
-      key: f.key, name: f.name, desc: f.desc, tags: f.key === 'margin' ? '🔒 需要密碼' : '', run: f.run, topics: f.topics,
+      key: f.key, name: f.name, desc: f.desc, summary: f.summary, tags: f.key === 'margin' ? '🔒 需要密碼' : '', run: f.run, topics: f.topics,
     })) })),
   });
 
@@ -129,37 +129,48 @@
     const tabs = LT.tabs({ cls: 'tw-tabs', remember: VIEW_KEY, view: ctx.view, onChange: k => { view = k; draw(); },
       items: [{ key: 'all', name: '總覽比較', desc: '兩種低波動組合與 0050 並列' }, ...STRATS.map(s => ({ key: s.key, name: s.name, desc: s.short }))] });
 
+    // 報告結構(CLAUDE.md「研究報告」)：一句話結論 → 一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
     el.querySelector('#twBody').innerHTML = `
+      <div class="doc lt-hero"><blockquote><p id="twHero"></p></blockquote></div>
       <div class="panel">
-        ${tabs.html}
         <div class="doc">
-          <p><b>選股規則</b>：</p>
+          <h3 class="md-h2">一、研究目的</h3>
+          <p>研究上常說「低波動異常」：波動小的股票，長期報酬不一定比較差，風險調整後反而更好。這份回測要看：在台股每月挑出波動最小的股票，報酬和風險跟買進持有 0050 比起來如何？</p>
+          <h3 class="md-h2">二、資料處理</h3>
+          <ul>
+            <li><b>範圍</b>：上市櫃普通股(不含 ETF、存託憑證)，包含期間內已下市櫃的公司；持有期間下市，以最後收盤價轉為現金(不計利息)。</li>
+            <li><b>流動性條件</b>：選股日當天有成交、過去半年至少 ${P.min_traded * 100}% 的日子有成交、每日成交金額中位數至少 ${(P.min_value / 1000).toFixed(0)} 百萬元。沒成交的日子價格不變，這種股票的波動「看起來」很低，不加條件會選到一堆幾乎買不到的冷門股。</li>
+            <li><b>報酬</b>：用還原股價計算(含現金股利再投入)，0050 採股息再投入、期初以整數股買進後持有。</li>
+            <li><b>期間</b>：資料從 2016 年 1 月開始，需要先累積半年的資料計算波動，回測從 ${esc(B.m[0].start)} 開始到最新交易日。</li>
+          </ul>
+          <h4 class="md-h3">每月合格股票數</h4>
+        </div>
+        <div id="twCov"></div>
+        <div class="doc">
+          <h3 class="md-h2">三、研究方法</h3>
           <ul>
             <li><b>選股</b>：每月最後一個交易日收盤後，計算每檔普通股過去 ${P.lookback} 個交易日(約半年)<b>5 日報酬的標準差</b>，由小到大排序，取最小的 ${P.top_n} 檔或 ${P.top_pct * 100}%，等權重。</li>
             <li><b>進出場</b>：下一個交易日<b>開盤</b>先賣出不再入選的股票、再買進新入選的股票，持有到下個月第一個交易日開盤換股。</li>
             <li><b>資金分配</b>：每檔的目標金額 = 換股前一天收盤的總資產 ÷ 選到的檔數(低波動 10 檔每檔 10%、低波動 10% 每檔約 1%)；續抱的股票也調整到目標金額(多的賣掉、少的補買)。持有期間不再平衡，權重隨股價漂移。</li>
-            <li><b>流動性條件</b>：選股日當天有成交、過去半年至少 ${P.min_traded * 100}% 的日子有成交、每日成交金額中位數至少 ${(P.min_value / 1000).toFixed(0)} 百萬元。沒成交的日子價格不變，這種股票的波動「看起來」很低，不加條件會選到一堆幾乎買不到的冷門股。</li>
+            <li><b>漲跌停與沒有成交</b>：以原始價格判斷。要賣出時開盤是跌停價或當天沒有成交，視為賣不掉，延到下一個交易日開盤再賣(可能連續延後)；要買進時開盤是漲停價或沒有成交，延後一天，隔天仍買不到就放棄，這個月少一檔、資金留在現金。續抱股票的調整當天做不到就不調整。</li>
           </ul>
+          <p class="note">${COST_NOTE}${MONEY_NOTE}</p>
         </div>
-        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
+      </div>
+      <h2 class="sec-h">四、實證結果與分析</h2>
+      <div class="panel">
+        ${tabs.html}
+        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
           <div class="paramitem"><label for="twScale">走勢圖縱軸</label><select id="twScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
         </div>
-        <p class="note">${COST_NOTE}${MONEY_NOTE}</p>
       </div>
       <div id="twView"></div>
       <div class="panel">
-        <h3>回測作法</h3>
         <div class="doc">
-          <ul>
-            <li><b>範圍</b>：上市櫃普通股(不含 ETF、存託憑證)，包含期間內已下市櫃的公司；持有期間下市，以最後收盤價轉為現金(不計利息)。</li>
-            <li><b>報酬</b>：用還原股價計算(含現金股利再投入)，0050 採股息再投入、期初以整數股買進後持有。</li>
-            <li><b>漲跌停與沒有成交</b>：以原始價格判斷。要賣出時開盤是跌停價或當天沒有成交，視為賣不掉，延到下一個交易日開盤再賣(可能連續延後)；要買進時開盤是漲停價或沒有成交，延後一天，隔天仍買不到就放棄，這個月少一檔、資金留在現金。續抱股票的調整當天做不到就不調整。</li>
-            <li><b>期間</b>：SQL 資料從 2016 年 1 月開始，需要先累積半年的資料計算波動，回測從 ${esc(B.m[0].start)} 開始到最新交易日。</li>
-          </ul>
-          <p class="mute">仍未計入：處置股的分盤交易、零股與整股的價差；換股以開盤價(加減一個升降單位)成交，實際成交價可能不同。</p>
+          <h3 class="md-h2" style="margin-top:4px;">五、結論</h3>
+          <ul id="twConcl"></ul>
+          <p><b>限制</b>：仍未計入處置股的分盤交易、零股與整股的價差；換股以開盤價(加減一個升降單位)成交，實際成交價可能不同。歷史回測不代表未來。</p>
         </div>
-        <h4>每月合格股票數</h4>
-        <div id="twCov"></div>
       </div>`;
 
     const $ = s => el.querySelector(s);
@@ -301,8 +312,19 @@
       charts(C, [k, 'b0050', 'ew'], [k, 'b0050'], k);
     }
 
+    // 一句話結論與結論：依回測數字產生(資料更新時自動跟著變)
+    function conclude(C) {
+      const S = C.st.b0050, lv = C.st.lv10p, t10 = C.st.lv10, E = C.st.ew;
+      $('#twHero').innerHTML = `<b>一句話結論</b>：每月買過去半年波動最小的股票，${lv.vol < S.vol ? '波動確實比 0050 低' : '波動沒有比 0050 低'}(年化 ${(lv.vol * 100).toFixed(1)}% vs ${(S.vol * 100).toFixed(1)}%)，`
+        + `但總報酬 ${totalRet(lv)}，${lv.mult > S.mult ? '贏過' : '落後'} 0050 的 ${totalRet(S)}(低波動 10%，${periodTxt(C)})。`;
+      $('#twConcl').innerHTML = `
+        <li><b>風險較低</b>：低波動 10% 年化波動 ${(lv.vol * 100).toFixed(1)}%、最大回撤 ${pct(lv.mdd, 1)}；0050 是 ${(S.vol * 100).toFixed(1)}%、${pct(S.mdd, 1)}。</li>
+        <li><b>報酬${lv.mult > S.mult ? '較高' : '落後'}</b>：低波動 10% 總報酬 ${totalRet(lv)}、低波動 10 檔 ${totalRet(t10)}，0050 ${totalRet(S)}；夏普值 ${lv.sharpe.toFixed(2)}、${t10.sharpe.toFixed(2)} vs 0050 ${S.sharpe.toFixed(2)}。</li>
+        <li><b>和全部股票等權重比</b>：等權重夏普值 ${E.sharpe.toFixed(2)}，低波動 10% ${lv.sharpe > E.sharpe ? '風險調整後比較好' : '風險調整後沒有比較好'}。</li>`;
+    }
     function draw() {
       const C = calc();
+      conclude(C);
       if (view === 'all') renderAll(C); else renderOne(C, view);
       LTChart.bars($('#twCov'), { x: C.M.map(m => m.m), label: '合格股票數', height: 180, yMin: 0,
         xFmt: (v, tip) => tip ? v : v.endsWith('-01') ? v.slice(0, 4) : '', yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`,
@@ -388,38 +410,52 @@
     const exitTxt = P.exit === 'open' ? `第 ${P.hold + 1} 個交易日開盤${T0.out}` : P.hold === 1 ? `當天收盤${T0.out}` : `第 ${P.hold} 個交易日收盤${T0.out}`;
     WHY.time = P.exit === 'close' && P.hold === 1 ? `收盤${T0.out}` : '持有期滿';
     const meta = { s: { name: cfg.name, color: NAV_COLOR.s }, b0050: { name: '0050 買進持有', color: NAV_COLOR.b0050 } };
+    // 報告結構：一句話結論 → 一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論 → 六、延伸(每日選股)
     el.innerHTML = `
+      <div class="doc lt-hero"><blockquote><p id="evHero"></p></blockquote></div>
       <div class="panel">
-        <h3>${esc(cfg.title)}</h3>
-        <p><b>想法</b>：${cfg.idea}</p>
         <div class="doc">
+          <h3 class="md-h2">一、研究目的</h3>
+          <p>${cfg.idea}這份回測要看：照這個規則操作，扣掉成本後能不能贏過買進持有 0050？</p>
+          <h3 class="md-h2">二、資料處理</h3>
+          <ul>
+            <li><b>範圍與價格</b>：上市櫃普通股(不含 ETF、存託憑證)，包含已下市櫃的公司；報酬${P.tp != null ? '與停利停損' : ''}都用還原股價(含除權息)，0050 採股息再投入。</li>
+            <li><b>期間</b>：資料從 2016 年 1 月開始，回測從第一個訊號 ${esc(B.d[0])} 開始到最新交易日。</li>
+            ${cfg.caveat ? `<li><b>資料時點</b>：${cfg.caveat}</li>` : ''}
+          </ul>
+          <h3 class="md-h2">三、研究方法</h3>
           <p><b>選股規則</b>：每天收盤後，以下 ${cfg.conds.length} 個條件<b>同時</b>成立(張數單位皆為張)${cfg.exclude ? `，並排除${cfg.exclude.join('、')}` : ''}：</p>
           <ol>${cfg.conds.map(c => `<li>${c}</li>`).join('')}</ol>
           <p><b>進出場</b>：隔一個交易日<b>開盤</b>${T0.in}；${P.tp != null ? `盤中${long ? '漲' : '跌'}到 ${P.tp * 100}% 停利、${long ? '跌' : '漲'}到 ${P.sl * 100}% 停損(跳空越過則以開盤價出場，同一天兩者都碰到以停損計)；否則持有 ${P.hold} 個交易日，` : ''}${exitTxt}。同一檔股票同時只持有一筆。</p>
           <p><b>資金分配</b>：本金 100 萬元。先算出整段期間平均一天持有幾檔(只算有部位的日子，約 ${(1 / B.cap).toFixed(1)} 檔)，每檔上限 = 總資產的 ${(B.cap * 100).toFixed(0)}%(= 1 ÷ 平均持有檔數)。有新股票進場的那天<b>再平衡</b>：每檔目標金額 = 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)(含新進場的，不含當天要出場的)，開盤先把超過目標的舊部位減碼、再買新股票、最後補足低於目標的舊部位，開盤漲跌停或沒有成交的部位不調整；現金不夠時新股票平分剩下的現金，訊號全部進場${B.nocash ? `(連一股都買不起而放棄的有 ${B.nocash.toLocaleString()} 筆)` : ''}。買賣都以一股的價格(含滑價與手續費)無條件捨去到整數股；沒有新股票進場的日子不調整，沒用到的資金持有現金(不計利息)。有加減碼時，每筆報酬 = 這檔收回的錢 ÷ 投入的錢 − 1。${long ? '' : '放空時視為拿出同樣金額當保證金，損益 = −股價漲跌幅 × 放空金額。'}</p>
         </div>
-        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
-          ${long ? '' : '<div class="paramitem"><label for="evFee">借券費(年利率，%)</label><input id="evFee" type="number" min="0" max="20" step="0.1" value="0.1"></div>'}
-          <div class="paramitem"><label for="evScale">走勢圖縱軸</label><select id="evScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
-        </div>
-        <p class="note">${COST_NOTE}${long ? '' : '借券費 = 放空金額 × 年利率 × 持有日曆天數 ÷ 365，可在上方調整。'}</p>
-      </div>
-      <div id="evPicks"></div>
-      <div id="evView"></div>
-      <div class="panel">
-        <h3>回測作法</h3>
         <div class="doc">
           <ul>
             <li><b>淨值計算</b>：每天收盤的總資產 = 現金 ＋ 各部位市值${long ? '' : '(放空部位的市值 = 放空金額 × (1 − 股價漲跌幅))'}，期初 = 第一個訊號日收盤的 100 萬元；同一天先處理開盤出場、再進場，最後處理盤中停利停損與收盤出場。${long ? '' : '借券費依每天收盤放空部位占總資產的比例扣除。'}</li>
-            <li><b>範圍與價格</b>：上市櫃普通股(不含 ETF、存託憑證)，包含已下市櫃的公司；報酬${P.tp != null ? '與停利停損' : ''}都用還原股價(含除權息)，0050 採股息再投入。</li>
             <li><b>漲跌停</b>：${long ? '進場日開盤就是漲停價，視為<b>買不到</b>，延後一天開盤買進；隔天開盤仍是漲停價就放棄這筆' : '進場日開盤就是跌停價，視為<b>空不到</b>，這筆放棄；開盤是<b>漲停價</b>也不放空、這筆取消(空在漲停價不合理)'}。要${T0.out}時(開盤或收盤)剛好是${T0.lock}價，視為<b>${T0.lockOut}</b>，延到下一個交易日同一時點再${T0.out}(可能連續延後)。漲停價 = 前一日收盤 × 1.1、跌停價 = × 0.9，依升降單位取到可成交的價格；以原始價格判斷。</li>
             <li><b>沒有成交</b>：沒有成交的日子不能當作進出場價格。進場日沒有成交${long ? '同樣延後一天，隔天仍沒有成交就放棄' : '就放棄'}；要出場時沒有成交就延到下一個交易日；持有期間下市櫃，以最後收盤價轉為現金。</li>
             ${(cfg.notes || []).map(n => `<li>${n}</li>`).join('')}
-            <li><b>期間</b>：SQL 資料從 2016 年 1 月開始，回測從第一個訊號 ${esc(B.d[0])} 開始。</li>
           </ul>
-          <p class="mute">仍未計入：盤中漲跌停鎖死時的停利停損成交、處置股的分盤交易；${cfg.caveat}</p>
+          <p class="note">${COST_NOTE}${long ? '' : '借券費 = 放空金額 × 年利率 × 持有日曆天數 ÷ 365，可在下方調整。'}</p>
         </div>
-      </div>`;
+      </div>
+      <h2 class="sec-h">四、實證結果與分析</h2>
+      <div class="panel">
+        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
+          ${long ? '' : '<div class="paramitem"><label for="evFee">借券費(年利率，%)</label><input id="evFee" type="number" min="0" max="20" step="0.1" value="0.1"></div>'}
+          <div class="paramitem"><label for="evScale">走勢圖縱軸</label><select id="evScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
+        </div>
+      </div>
+      <div id="evView"></div>
+      <div class="panel">
+        <div class="doc">
+          <h3 class="md-h2" style="margin-top:4px;">五、結論</h3>
+          <ul id="evConcl"></ul>
+          <p><b>限制</b>：仍未計入盤中漲跌停鎖死時的停利停損成交、處置股的分盤交易。歷史回測不代表未來。</p>
+        </div>
+      </div>
+      <h2 class="sec-h">六、延伸：最近的訊號</h2>
+      <div id="evPicks"></div>`;
     const $ = s => el.querySelector(s);
     // pipeline 的淨值與單筆報酬已扣手續費、交易稅、滑價；做空再依年利率扣借券費(淨值依前一天收盤的放空比例 × 日曆天數)
     const DAY = 864e5, cd = i => (Date.parse(B.d[i]) - Date.parse(B.d[i - 1])) / DAY;
@@ -443,6 +479,12 @@
       const sk = k => (B.skipped || []).filter(b => b[3] === k).length;
       const rows = yearTable(B.d, i0, navs.s, navs.b0050).map(r => { const yt = done.filter(t => t.x.startsWith(r.yr)); return { ...r, n: yt.length, w: yt.filter(t => t.net > 0).length }; });
       const yWin = rows.filter(r => r.r > r.b).length;
+      // 一句話結論與結論：依回測數字產生
+      $('#evHero').innerHTML = `<b>一句話結論</b>：${esc(cfg.name)}${long ? '' : '(放空)'}的總報酬 ${totalRet(x)}、夏普值 ${x.sharpe.toFixed(2)}，${x.mult > S.mult ? '贏過' : '輸給'}同期 0050 的 ${totalRet(S)}(夏普值 ${S.sharpe.toFixed(2)})；${rows.length} 年中有 ${yWin} 年贏 0050。`;
+      $('#evConcl').innerHTML = `
+        <li><b>${x.mult > S.mult ? '贏過' : '輸給'} 0050</b>：總報酬 ${totalRet(x)} vs ${totalRet(S)}，最大回撤 ${pct(x.mdd, 1)} vs ${pct(S.mdd, 1)}。</li>
+        <li><b>每筆交易</b>：${ts.n.toLocaleString()} 筆，勝率 ${(ts.win * 100).toFixed(0)}%，每筆平均 ${pct(ts.mean, 2)}、中位數 ${pct(ts.median, 2)}(扣成本${long ? '' : '與借券費'})。</li>
+        <li><b>資金使用</b>：${(held * 100).toFixed(0)}% 的交易日有部位，有部位時平均 ${avgPos.toFixed(1)} 檔。</li>`;
       $('#evView').innerHTML = `
         <div class="panel">
           <h3>回測績效</h3>
