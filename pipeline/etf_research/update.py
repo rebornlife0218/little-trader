@@ -52,11 +52,26 @@ def report():
     s = re.sub(r'^\| 程式 \|.*\n', '', s, flags=re.M)
     s = re.sub(r'結果在 output/[^。]*。', '', s)
     s = re.sub(r'^各檔所有持有期.*\n\n?', '', s, flags=re.M)
-    s = re.sub(r'\bCM ?(?=ETF|台股|的)', '', s)          # 資料庫的來源不在網頁上註記
     s = re.sub(r'｜資料：[^｜\n]*', '', s)               # 網頁不顯示資料來源
     left = re.findall(r'[\w./-]+\.(?:py|csv|parquet)', s)
     if left:
         raise SystemExit(f'報告還有本機檔案名稱：{left}')
+    return clean_wording(s)
+
+
+def clean_wording(s):
+    """報告的用詞：資料庫(CM)的名稱不在網頁上註記，簡單講過就好；「建倉期」不另外命名，直接講不算訊號。
+    研究資料夾不在時(只改用詞)，也可以直接套用在已發佈的 etf_follow.json 的 report 上"""
+    # 研究設計的「資料」：只列 ETF，商品種類的限制放在代號後面
+    s = re.sub(r'CM ?「ETF持股明細表」，(只用商品種類[^。|]*)。(\d+ 檔 ETF：[^|]*?) *\|', r'\2，\1 |', s)
+    s = re.sub(r' ?CM ?「[^」]*」的?', '', s)
+    s = re.sub(r'\bCM ?(?=ETF|台股|的)', '', s)
+    s = s.replace('是建倉期，不算訊號', '不算訊號')
+    s = s.replace('**訊號數**（建倉期後）', '**訊號數**（不含上市後前 10 個揭露日）')
+    s = re.sub(r'建倉期（(\d+) 天）', r'不算訊號的期間（上市後前 \1 個揭露日）', s)
+    left = re.findall(r'.{0,20}(?:\bCM\b|CMoney|建倉期).{0,20}', s)
+    if left:
+        raise SystemExit(f'報告還有 CM 或建倉期：{left}')
     return s
 
 
