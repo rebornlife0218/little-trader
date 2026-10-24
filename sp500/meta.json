@@ -1,0 +1,21 @@
+{
+  "dataset": "sp500",
+  "updated_at": "2026-10-24 13:12",
+  "version": "202610241312",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "S&P500 歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo",
+    "url": "https://github.com/fja05680/sp500"
+  },
+  "schedule": "每週六更新(美股收盤後)",
+  "files": [
+    "backtest.json"
+  ],
+  "price_sources": {
+    "yahoo": 520,
+    "tiingo": 7,
+    "none": 5,
+    "reused": []
+  },
+  "rf_last": 0.0403
+}

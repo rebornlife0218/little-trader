@@ -1,0 +1,12 @@
+{
+  "dataset": "tw_strategy",
+  "updated_at": "2026-10-24 14:26",
+  "version": "202610241426",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "PostgreSQL",
+    "url": ""
+  },
+  "schedule": "週一~五 23:45、週二~六 12:15(本機排程)",
+  "asof": "2026-10-22"
+}

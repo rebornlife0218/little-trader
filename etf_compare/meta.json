@@ -1,0 +1,12 @@
+{
+  "dataset": "etf_compare",
+  "updated_at": "2026-10-24 14:33",
+  "version": "202610241433",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "勞動基金運用局 勞退基金收益率、Yahoo Finance(2016 年以前的台股 ETF 股價、ARKK)、臺灣證券交易所(除息資料)",
+    "url": "https://www.blf.gov.tw/49200/49255/49261/49269/49279/73028/post"
+  },
+  "schedule": "週一~五 23:45、週二~六 12:15(台北時間，本機排程；勞退基金每月初公告前兩個月的收益率)",
+  "months": 166
+}
