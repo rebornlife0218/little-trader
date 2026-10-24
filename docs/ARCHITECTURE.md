@@ -60,8 +60,8 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_strategy/events.py             台股事件型策略的共用引擎(每天選股、隔天開盤進場、持有幾天出場；漲跌停進不了場或出不了場；本金 100 萬的整數股資金模擬與交易成本，低波動也共用)：融資都沒退(做多)、大盤跌個股逆勢漲(做空)，每個策略一個 JSON
   tw_strategy/private_strategies.py 不公開的策略(條件、網頁說明、密碼；不進版控，只在本機，要自己備份)：輸出時整份加密，網頁輸入密碼後解密
   run_local.py                      本機資料集(tw_strategy、disposition、etf_compare)：等 cm 同步 → 更新 → 發佈到 data 分支 → 觸發一次部署；失敗時跳 Windows 通知
-  tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
-  etf_research/update.py            「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；研究結果不每日更新，只在本機手動執行
+  tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，依 CLAUDE.md「研究報告」的結構，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
+  etf_research/update.py            「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；網頁版報告依「研究報告」結構重新編排，存在 etf_research/reports/etf_follow.md(有這份就用這份，研究數字改變時要同步更新)；研究結果不每日更新，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
   price_query/sync.py               股票查詢的資料：cm schema → Cloudflare D1(本機執行，只上傳有變動的部分)
 
@@ -77,6 +77,7 @@ migrations/                         D1 資料表(users、guest_links、query_log
 scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)、各頁面的 HTML(標題與分享預覽)、sitemap.xml、GitHub Pages 的公開版
 scripts/site-map.mjs                在 Node 裡載入頁面程式，列出所有頁面與網址(build-site.mjs 與自動測試共用)
 scripts/check-freshness.mjs         本機排程的資料多久沒更新(check-local.yml 呼叫)
+scripts/share/                      研究的分享素材(本機執行)：make-share.mjs 產生 PDF/<研究>.pdf 與 IG/<研究>/1～5.png；ig-card.mjs 是圖卡版面、ig-topics.mjs 是各研究的圖卡內容
 tests/                              自動測試(npm test，node:test)：site(頁面註冊、權限清單、defer、外部腳本、#/ 舊網址)、build(部署流程)、functions(來源檢查、會員權限)
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose；esbuild 給自動測試打包 functions/)
 
@@ -262,6 +263,8 @@ LT.register({
   });
   ```
 
+  項目可以加 `summary`(研究的一句話結論精簡版，不寫會隨資料變動的數字)：分組裡有 summary 時改成條列，標題下面直接寫結論。研究內容畫完後，報告開頭的一句話結論(`> **一句話結論**：…`)如果不在第一個區塊，會自動搬到內容最上方(app.js 的 `hoistConclusion`)。
+
   `<區塊>/<頁面>` 是分組的卡片列表，`<區塊>/<頁面>/<項目>` 是單一內容(上方的麵包屑可以回到列表，可分享、加書籤)；`run(el, ctx)` 畫內容，`ctx.alive()` 同一般頁面，內容裡還有分頁時呼叫 `ctx.view('分頁名稱')`。後台的熱門主題自動記到「分組 › 項目」。目前用在 ETF研究、台股其他研究、台股策略、美股策略。
 - **股票代號連結**：表格裡的台股代號用 `LT.stockLink(代號, 顯示文字)`，點了跳到股票查詢並直接查那一檔，查詢頁有按鈕可以跳回來(目前用在處置股、策略)。
 - **後台熱門主題的完整清單**：後台的「最受歡迎的主題」會先列出網站上所有主題(還沒人看過的顯示 0)，來源是側欄的頁面、目錄頁的分組與項目，以及註冊時的 `topics`(頁面裡的分頁、指數、章節等子項目，字串或 `{ name, items }`，名稱要和 `LT.view` 記錄的一樣；目錄頁的項目也可以加 `topics`)。新增分頁或子項目時記得一起加。
@@ -274,6 +277,9 @@ LT.register({
   - 頁面的 key 不要和網站資料夾撞名(`api`、`assets`、`content`、`data`、`modules`)，自動測試會檢查。
 - **不列在側欄的頁面**：註冊時加 `hidden: true`(例如後台)，只能用網址開。
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
+- **字型**：用 CSS 變數 `--font-body`(內文，中文優先的 Noto Sans TC)、`--font-display`(標題，Space Grotesk)、`--font-num`(數字)，不要直接寫字型名稱；數字預設等寬(`tabular-nums`)。canvas 圖表的座標字用 IBM Plex Mono。
+- **研究報告**：結構見 CLAUDE.md「研究報告」；報告是 Markdown(資料集的 `report`)時，開頭的 `> ` 引言就是一句話結論(樣式 `.doc blockquote`)；直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)用 `<blockquote>` 與 `<h3 class="md-h2">` 照同樣的結構寫。
+- **分享素材**：`node scripts/share/make-share.mjs [--pdf] [--ig] [研究 key …]`，需要本機 `web/data/` 有各研究的資料與 `.dev.vars` 的 `SESSION_SECRET`；會在本機開網站、以會員身分打開研究頁面印成 PDF(只印「研究報告」，沒有報告區塊的研究印整頁)，並截出 IG 圖卡。新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
 

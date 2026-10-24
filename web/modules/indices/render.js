@@ -69,7 +69,7 @@ function renderCandleTheme(){
               const open = state.openPattern===p.key;
               return `<tr class="patrow ${open?'open':''}" onclick="togglePattern('${p.key}')">
                 <td class="kcell">${candleSVG(p.shape, p.vol, 0.75)}</td>
-                <td style="font-family:'Inter',sans-serif;font-weight:600;">${p.name}</td>
+                <td style="font-family:var(--font-body);font-weight:600;">${p.name}</td>
                 <td>${biasTag(p.bias)}</td>
                 <td>${s.count}</td>
                 <td class="${s.win10>=0.5?'up':'down'}">${Number.isNaN(s.win10)?'—':(s.win10*100).toFixed(0)+'%'}</td>

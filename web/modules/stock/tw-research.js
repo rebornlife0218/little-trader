@@ -10,10 +10,10 @@
   const SERIES = { rev: { name: '營收系列', color: 'var(--amber)' } };
   const CATS = [
     { key: 'revenue', name: '營收', desc: '月營收公告前後的股價行為與選股', studies: [
-      { key: 'rev_pre', name: '營收公告前布局', series: 'rev', desc: '月底先買進預期營收會好的股票，營收公告後隔天開盤賣出', run: (...a) => revPre(...a) },
-      { key: 'rev_growth', name: '營收成長特徵', series: 'rev', desc: '營收年增率 > 10% 公告後，哪些特徵最能區分後續報酬', run: (...a) => revGrowth(...a) },
-      { key: 'rev_drop', name: '營收衰退開低', series: 'rev', desc: '營收衰退公告後隔天開低 5% 以上，開盤買進', run: (...a) => revDrop(...a) },
-      { key: 'rev_turn', name: '營收由負轉正', series: 'rev', desc: '營收年增率由負轉正公告後做多，和持續成長、持續衰退比較', run: (...a) => revTurn(...a) },
+      { key: 'rev_pre', name: '營收公告前布局', series: 'rev', desc: '月底先買進預期營收會好的股票，營收公告後隔天開盤賣出', summary: '營收可以事先預測，但不限市值時輸給 0050；只在市值第二小的一群裡選股，才和 0050 相當', run: (...a) => revPre(...a) },
+      { key: 'rev_growth', name: '營收成長特徵', series: 'rev', desc: '營收年增率 > 10% 公告後，哪些特徵最能區分後續報酬', summary: '好營收公告後隔天才買，平均是虧的；剛轉強的公司比一直很強的好', run: (...a) => revGrowth(...a) },
+      { key: 'rev_drop', name: '營收衰退開低', series: 'rev', desc: '營收衰退公告後隔天開低 5% 以上，開盤買進', summary: '開低買進只在冷門股有效，實際很難買到量，遠輸 0050', run: (...a) => revDrop(...a) },
+      { key: 'rev_turn', name: '營收由負轉正', series: 'rev', desc: '營收年增率由負轉正公告後做多，和持續成長、持續衰退比較', summary: '市場對轉正的反應最大，但隔天開盤才買已經太晚，持有 20 日仍輸 0050', run: (...a) => revTurn(...a) },
     ] },
     { key: 'factor', name: '因子', desc: '橫斷面因子選股', studies: [] },
     { key: 'event', name: '事件', desc: '特定事件前後的股價表現', studies: [] },
@@ -26,7 +26,7 @@
     section: 'stock', group: '台股', key: 'tw-research', name: '其他研究', title: '台股其他研究',
     desc: '依主題分類的研究；同一個顏色代表同一系列的研究。回測一律和買進持有 0050 比較',
     groups: CATS.map(c => ({ name: c.name, desc: c.desc, items: c.studies.map(x => ({
-      key: x.key, name: x.name, desc: x.desc, tags: tag(x.series), run: (el, ctx) => x.run(el, ctx, x),
+      key: x.key, name: x.name, desc: x.desc, summary: x.summary, tags: tag(x.series), run: (el, ctx) => x.run(el, ctx, x),
     })) })),
   });
 

@@ -84,7 +84,7 @@
              用現貨價反推：買權 IV ${pct(impliedVol('C', row.c[0], S, K, T, r))}、賣權 IV ${pct(impliedVol('P', row.p[0], S, K, T, r))}。`
           : (e ? `所選契約沒有履約價 ${K.toLocaleString()} 的報價(履約價間距通常為 50 或 100 點)。` : '');
         $('bsGreeks').innerHTML = `<thead><tr><th>Greek</th><th>買權 Call</th><th>賣權 Put</th><th>意義</th></tr></thead><tbody>
-          ${GREEKS.map(([k, name, desc]) => `<tr><td>${name}</td>${[gc[k], gp[k]].map(x => `<td class="${x < 0 ? 'down' : 'up'}">${fmt(x, k === 'gamma' ? 6 : 4)}</td>`).join('')}<td style="text-align:left;font-family:Inter,sans-serif;">${desc}</td></tr>`).join('')}</tbody>`;
+          ${GREEKS.map(([k, name, desc]) => `<tr><td>${name}</td>${[gc[k], gp[k]].map(x => `<td class="${x < 0 ? 'down' : 'up'}">${fmt(x, k === 'gamma' ? 6 : 4)}</td>`).join('')}<td style="text-align:left;font-family:var(--font-body);">${desc}</td></tr>`).join('')}</tbody>`;
         heat('heatC', 'C', S, K, T, r); heat('heatP', 'P', S, K, T, r);
         curves(S, K, T, r, v);
       }

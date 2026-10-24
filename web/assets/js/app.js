@@ -211,7 +211,8 @@ const LT = (() => {
   function setHome(page) { home = page; }
 
   /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
-     LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, tags, soon, run(el, ctx) }] }] })
+     LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, summary, tags, soon, run(el, ctx) }] }] })
+       summary(選填)：研究的一句話結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
        - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
        - <區塊>/<頁面>/<項目>    單一內容：上方的麵包屑可以回到列表，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
                                   ctx.view(...) 可再記一層細項(例如策略裡的分頁)
@@ -229,7 +230,9 @@ const LT = (() => {
           el.innerHTML = `<header class="top"><div><h1>${esc(def.title || def.name)}</h1>${def.desc ? `<p>${esc(def.desc)}</p>` : ''}</div></header>
             ${def.groups.map(g => `<section class="cat-group">
               ${g.name ? `<h2 class="cat-group-h">${esc(g.name)}${g.desc ? ` <small>${esc(g.desc)}</small>` : ''}</h2>` : ''}
-              <div class="cat-grid">${g.items.length ? g.items.map(x => x.soon
+              <div class="cat-grid ${g.items.some(x => x.summary) ? 'is-list' : ''}">${g.items.length ? g.items.map(x => x.summary && !x.soon
+                ? `<a class="cat-row" href="${base}/${encodeURIComponent(x.key)}" title="${esc(x.desc || '')}"><b>${esc(x.name)}</b><span>${esc(x.summary)}</span>${x.tags ? `<em>${x.tags}</em>` : ''}</a>`
+                : x.soon
                 ? `<div class="cat-card soon"><b>${esc(x.name)}</b><span>${esc(x.desc || '')}</span><em>努力建置中</em></div>`
                 : `<a class="cat-card" href="${base}/${encodeURIComponent(x.key)}"><b>${esc(x.name)}</b><span>${esc(x.desc || '')}</span>${x.tags ? `<em>${x.tags}</em>` : ''}</a>`).join('')
                 : '<div class="cat-card soon"><b>努力建置中</b></div>'}</div>
@@ -242,9 +245,20 @@ const LT = (() => {
           <div class="cat-body"></div>`;
         const label = [it.groupName, it.name].filter(Boolean);
         view(...label);
-        it.run(el.querySelector('.cat-body'), { alive: ctx.alive, view: (...more) => view(...label, ...more) });
+        const body = el.querySelector('.cat-body');
+        Promise.resolve(it.run(body, { alive: ctx.alive, view: (...more) => view(...label, ...more) })).then(() => { if (ctx.alive()) hoistConclusion(body); });
       },
     });
+  }
+  // 研究報告的「一句話結論」(報告開頭的 > 引言)：報告放在頁面下方時，搬到內容最上方，一打開就看得到
+  // (印 PDF 時再放回報告開頭，見 scripts/share/make-share.mjs)
+  function hoistConclusion(body) {
+    const q = body.querySelector('.panel .doc > blockquote:first-child');
+    if (!q || q.closest('.panel') === body.firstElementChild) return;
+    const box = document.createElement('div');
+    box.className = 'doc lt-hero';
+    box.appendChild(q);
+    body.prepend(box);
   }
   function listPages() { return pages.slice(); }
 

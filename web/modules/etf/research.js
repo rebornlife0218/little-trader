@@ -14,11 +14,11 @@
   const RSERIES = { how: { name: '投資方式', color: 'var(--amber)' }, active: { name: '主動式 ETF', color: '#B07CF0' } };
   const RCATS = [
     { key: 'how', name: '投資方式', desc: 'ARKK 研究、單筆 vs 定期定額 vs 逢低買入', studies: [
-      { key: 'arkk', name: 'ARKK 研究', series: 'how', desc: '主題型 ETF 追高的代價：基金賺錢，投資人卻賠錢' },
-      { key: 'lsi', name: '單筆 vs 定期定額 vs 逢低買入', series: 'how', desc: '已經有一筆錢，一次投入、分批投入，還是等下跌再買' },
+      { key: 'arkk', name: 'ARKK 研究', series: 'how', desc: '主題型 ETF 追高的代價：基金賺錢，投資人卻賠錢', summary: '基金 5 年年化 +41%，投資人追高進場，實際只賺 +10%' },
+      { key: 'lsi', name: '單筆 vs 定期定額 vs 逢低買入', series: 'how', desc: '已經有一筆錢，一次投入、分批投入，還是等下跌再買', summary: '一次投入約 2/3 的時間贏過分批投入，等下跌再買平均更差' },
     ] },
     { key: 'active', name: '主動式 ETF', desc: 'A 系列 ETF 跟單', studies: [
-      { key: 'etf_follow', name: 'A 系列 ETF 跟單', series: 'active', desc: '主動式 ETF 每天公布持股，經理人加碼、調整、新納入之後跟著買，有沒有超額報酬' },
+      { key: 'etf_follow', name: 'A 系列 ETF 跟單', series: 'active', desc: '主動式 ETF 每天公布持股，經理人加碼、調整、新納入之後跟著買，有沒有超額報酬', summary: '抱到經理人減碼才賣才有超額報酬，主要來自 00981A；組合起來仍輸 0050' },
     ] },
   ];
   const tagOf = s => `<span class="series-tag"><i style="background:${RSERIES[s].color}"></i>${esc(RSERIES[s].name)}</span>`;
@@ -200,10 +200,25 @@
       body.innerHTML = `
         <div class="panel">
           <h3>ARKK 研究：基金賺錢，投資人卻賠錢 ${tagOf('how')}</h3>
+          <div class="doc">
+            <blockquote><p><b>一句話結論</b>：ARKK 基金本身 5 年年化 +41.3%，但多數投資人在大漲後才追高買進，同期實際只賺到年化 +9.9%；主題型 ETF 追高的代價很大。</p></blockquote>
+            <h3 class="md-h2">一、研究目的</h3>
+            <p>ARK Innovation ETF(ARKK)是美國最知名的主題型 ETF，2020 年大漲後吸引大量資金湧入，接著在 2021～2022 年大幅下跌。這份整理要看：基金帳面上的報酬，和投資人實際拿到的報酬差多少？為什麼？</p>
+            <h3 class="md-h2">二、資料處理</h3>
+            <ul>
+              <li><b>研究數字</b>：引用晨星(Morningstar)分析師 Amy C. Arnott 的研究(2021-12-21)，以及晨星截至 2023 年的 10 年「毀損投資人財富」研究。</li>
+              <li><b>股價</b>：ARKK 的還原股價(美元，含配息)取月底資料。</li>
+            </ul>
+            <h3 class="md-h2">三、研究方法</h3>
+            <ul>
+              <li><b>基金報酬</b>(時間加權)：假設一開始投入後一直持有，是基金公布的報酬。</li>
+              <li><b>投資人報酬</b>(金額加權)：考慮資金何時流入、流出，代表所有投資人合計實際賺到的報酬。兩者的差距就是「進出場時機」造成的。</li>
+            </ul>
+            <h3 class="md-h2">四、實證結果與分析</h3>
+          </div>
           <div id="pkArkkChart"></div>
           <p class="note" id="pkArkkNote"></p>
           <div class="doc">
-            <p>ARK Innovation ETF(ARKK)是美國最知名的主題型 ETF，2020 年大漲後吸引大量資金湧入，接著在 2021～2022 年大幅下跌。晨星(Morningstar)分析師 Amy C. Arnott 的研究比較了<b>基金報酬</b>(時間加權，假設一開始投入一直持有)與<b>投資人報酬</b>(金額加權，考慮資金何時進出)：</p>
             <div class="tablewrap"><table class="stattable">
               <thead><tr><th>研究</th><th>期間</th><th>基金報酬</th><th>投資人報酬</th></tr></thead>
               <tbody>
@@ -214,7 +229,12 @@
             <ul>
               <li><b>為什麼差這麼多</b>：大部分資金是在大漲之後、接近高點時才買進，緊接著遇到大跌；早期少數人賺到的大漲，多數投資人並沒有參與到。</li>
               <li><b>財富毀損</b>：晨星另一份研究(截至 2023 年的 10 年)估計，ARKK 讓投資人損失約 71 億美元，名列「毀損最多投資人財富的基金」第 3 名；ARK 旗下基金合計約 143 億美元，是損失最多的基金公司。</li>
-              <li><b>研究給的教訓</b>：三位數的報酬不會持續、要先了解風險、<b>考慮定期定額</b>——分批投入可以避免一次在高點投入大筆資金。</li>
+            </ul>
+            <h3 class="md-h2">五、結論</h3>
+            <ul>
+              <li><b>三位數的報酬不會持續</b>：熱門主題大漲後湧入的資金，常常剛好遇到下跌。</li>
+              <li><b>要先了解風險</b>：主題型 ETF 集中在單一題材，波動和回撤都比市值型 ETF 大。</li>
+              <li><b>考慮定期定額</b>：分批投入可以避免一次在高點投入大筆資金(單筆和分批的比較見「單筆 vs 定期定額 vs 逢低買入」)。</li>
             </ul>
             <p class="mute" style="font-size:12px;">資料來源：${ARKK_REFS.map(r => `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.name)}</a>`).join('；')}。上圖為 ARKK 的還原股價(美元)，研究數字引用自原文。</p>
           </div>
@@ -236,15 +256,27 @@
         <div class="panel">
           <h3>單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD) ${tagOf('how')}</h3>
           <div class="doc">
+            <blockquote><p><b>一句話結論</b>：已經有一筆錢時，一次投入大約 2/3 的時間贏過分批投入(定期定額)，等下跌才買(逢低買入)平均更差；怕一次投入的波動，不如先調低股票比重再一次投入。</p></blockquote>
+            <h3 class="md-h2">一、研究目的</h3>
+            <p>手上已經有一筆錢，要一次投入、分批投入，還是等市場下跌再買？這份研究整理國外研究的結論，並用台股自己驗證。三種做法：</p>
             <ul>
               <li><b>單筆投入</b>(Lump Sum Investing，LSI)：手上有一筆錢，一次全部投入。</li>
               <li><b>定期定額</b>(Dollar-Cost Averaging，DCA)：把同一筆錢分成幾份(例如 12 個月)分批投入，沒投入的錢先放現金。</li>
               <li><b>逢低買入</b>(Buy the Dip，BTD)：拿著現金等市場從高點下跌一定幅度(例如 10%、20%)再一次投入，帶有擇時的意味。</li>
             </ul>
             <p>注意：這裡比較的是「<b>已經有一筆錢</b>，要怎麼進場」；每個月薪水入帳就投入的定期定額，其實是有錢就馬上投入，等同單筆投入。</p>
-          </div>
-          <h4>研究怎麼說</h4>
-          <div class="doc">
+            <h3 class="md-h2">二、資料處理</h3>
+            <ul>
+              <li><b>國外研究</b>：引用 PWL Capital(Ben Felix，2020；Felix 與 Warwick，2021)與 Vanguard(2012)的研究結果。</li>
+              <li><b>台股驗證</b>：加權報酬指數(2003 起，含股息)、加權指數(1999 起，不含股息)與常存 ETF 的還原股價，都取月底資料；最後一個月還沒結束時只用完整月份。</li>
+            </ul>
+            <h3 class="md-h2">三、研究方法</h3>
+            <ul>
+              <li><b>滾動期間</b>：每個月都當成一個起點，比較持有到期間結束的年化報酬，統計單筆贏過其他做法的比例。</li>
+              <li><b>定期定額</b>每月投入 1/N；<b>逢低買入</b>在指數從歷史高點下跌達門檻的那個月一次投入，期間內沒跌到門檻就一直拿著現金；等待中的現金依設定的年利率計息(細節見下方說明)。</li>
+            </ul>
+            <h3 class="md-h2">四、實證結果與分析</h3>
+            <h4 class="md-h3">1. 國外研究：單筆約 2/3 的時間贏</h4>
             <p>PWL Capital 的 Ben Felix(2020)用 6 個國家的股市，比較每個月起點的<b>滾動 10 年</b>結果：定期定額分 12 個月投入、等待中的現金賺一個月國庫券利息。</p>
           </div>
           <div class="tablewrap"><table class="stattable">
@@ -259,9 +291,8 @@
               <li><b>逢低買入</b>：Felix 與 Warwick(2021)以總報酬指數下跌 10%、20% 為進場訊號比較，逢低買入的平均年化報酬明顯落後單筆投入，門檻越深落後越多；它確實改善了最差的情況，但那是因為平均持有大量現金(風險較低)換來的。</li>
               <li><b>行為面</b>：很多人仍偏好定期定額，因為「行動後虧損」的後悔比「沒行動錯過」更痛苦，分批投入可以降低心理壓力。研究的建議是：如果怕一次投入的波動，代表目前的股票比重太高，與其分批進場，不如<b>選一個承受得了的資產配置(例如股債比例)後一次投入</b>——分批進場投完後，承擔的風險還是一樣。</li>
             </ul>
-            <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.pwlcapital.com/resources/dollar-cost-averaging-vs-lump-sum-investing/" target="_blank" rel="noopener">PWL Capital · Dollar-Cost Averaging vs Lump Sum Investing(Ben Felix，2020)</a>；<a href="https://pwlcapital.com/buy-the-dip/" target="_blank" rel="noopener">PWL Capital · Buy the Dip(Felix &amp; Warwick，2021)</a>；<a href="https://www.betashares.com.au/insights/lump-sum-investment/" target="_blank" rel="noopener">Betashares 整理</a>。</p>
           </div>
-          <h4>用台股自己驗證</h4>
+          <h4>2. 用台股自己驗證</h4>
           <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
             <div class="paramitem"><label for="rsSeries">標的</label><select id="rsSeries">${E && E.taiex_tr ? '<option value="taiex_tr">加權報酬指數(2003 起，含股息)</option>' : ''}${E && E.taiex ? '<option value="taiex">加權指數(1999 起，不含股息)</option>' : ''}${twList.map(x => `<option value="${x.code}" ${x.code === '0050' && !(E && (E.taiex || E.taiex_tr)) ? 'selected' : ''}>${x.code} ${esc(x.name)}(含股息)</option>`).join('')}</select></div>
             <div class="paramitem"><label for="rsH">持有期間</label><select id="rsH"><option value="5">5 年</option><option value="10" selected>10 年</option><option value="20">20 年</option><option value="0">至今(持有到最新)</option></select></div>
@@ -277,6 +308,15 @@
           ${LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }])}
           <ul class="insight" id="rsInsight"></ul>
           <p class="note">以月底資料計算：每個月都當成一個起點，比較持有到期間結束的年化報酬(滾動期間)；選「至今」時每個起點都持有到最新一個完整月份，越晚的起點持有越短(至少 3 年)，年化報酬的波動也越大。定期定額每月投入 1/N；逢低買入在指數從歷史高點(資料起點以來)下跌達門檻的那個月一次投入，起點時已經跌超過門檻就立刻進場(和單筆相同，不計輸贏)，期間內沒跌到門檻就一直拿著現金；等待中的現金依設定的年利率計息。加權指數為價格指數(不含股息)；加權報酬指數(臺灣證券交易所編製)與 ETF 為股息再投入的總報酬，不計手續費與稅。</p>
+          <div class="doc">
+            <h3 class="md-h2">五、結論</h3>
+            <ul>
+              <li><b>單筆投入的勝率較高</b>：國外研究約 2/3 的時間贏過定期定額，台股的結果見上方(可以調整標的與持有期間)。</li>
+              <li><b>逢低買入平均更差</b>：門檻越深，拿著現金的時間越長，錯過的漲幅越多。</li>
+              <li><b>怕波動就調整資產配置</b>：與其分批進場，不如選一個承受得了的股債比例後一次投入。</li>
+            </ul>
+            <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.pwlcapital.com/resources/dollar-cost-averaging-vs-lump-sum-investing/" target="_blank" rel="noopener">PWL Capital · Dollar-Cost Averaging vs Lump Sum Investing(Ben Felix，2020)</a>；<a href="https://pwlcapital.com/buy-the-dip/" target="_blank" rel="noopener">PWL Capital · Buy the Dip(Felix &amp; Warwick，2021)</a>；<a href="https://www.betashares.com.au/insights/lump-sum-investment/" target="_blank" rel="noopener">Betashares 整理</a>。</p>
+          </div>
         </div>`;
       const seriesOf = key => {
         if (key === 'taiex' || key === 'taiex_tr') {   // 加權指數 / 報酬指數：日資料 → 月底
@@ -331,7 +371,7 @@
     section: 'etf', key: 'research', name: 'ETF研究',
     desc: '投資方式、主動式 ETF 跟單；同一個顏色代表同一系列的研究',
     groups: RCATS.map(c => ({ name: c.name, desc: c.desc, items: c.studies.map(x => ({
-      key: x.key, name: x.name, desc: x.desc, tags: tagOf(x.series), run: (el, ctx) => study(el, ctx, x.key),
+      key: x.key, name: x.name, desc: x.desc, summary: x.summary, tags: tagOf(x.series), run: (el, ctx) => study(el, ctx, x.key),
     })) })),
   });
   // 舊網址 etf/pack、etf/pack/<研究>(ETF大禮包)：轉到新的頁面

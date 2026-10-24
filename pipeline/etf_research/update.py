@@ -45,7 +45,12 @@ def csv(name):
 
 
 def report():
-    """研究資料夾的 報告.md → 網頁版：去掉標題(網頁顯示)、圖片改成檔名(網頁依 JSON 畫圖)、拿掉程式與輸出檔的說明"""
+    """研究資料夾的 報告.md → 網頁版：去掉標題(網頁顯示)、圖片改成檔名(網頁依 JSON 畫圖)、拿掉程式與輸出檔的說明
+    網頁版報告依「一句話結論、研究目的、資料處理、研究方法、實證結果與分析、結論、延伸」重新編排過，存在 reports/etf_follow.md，
+    有這份就直接用；研究更新(數字改變)後要同步改這份，或刪掉改回由研究資料夾的 報告.md 轉檔"""
+    edited = HERE / 'reports' / 'etf_follow.md'
+    if edited.exists():
+        return clean_wording(edited.read_text(encoding='utf-8'))
     s = (SRC / '報告.md').read_text(encoding='utf-8')
     s = re.sub(r'^# .*\n+', '', s, count=1)
     s = s.replace('](output/', '](')
