@@ -18,6 +18,7 @@ const read = f => readFileSync(f, 'utf8');
 test('_routes.json：API、會員程式與會員資料集經過 functions', () => {
   const r = JSON.parse(read(join(site, '_routes.json')));
   assert.ok(r.include.includes('/api/*'));
+  assert.ok(r.include.includes('/s/*'), '分享連結 /s/ 要經過 functions');
   for (const f of [...ACCESS.memberScripts, ...ACCESS.adminScripts]) assert.ok(r.include.includes('/' + f), f);
   for (const d of ACCESS.memberDatasets) assert.ok(r.include.includes(`/data/${d}/*`), d);
 });

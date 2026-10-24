@@ -59,6 +59,16 @@ export const onRequestGet: PagesFunction<Env, string, Data> = async ({ request, 
       FROM page_views WHERE ts >= ?1 AND ${cols.split(', ').pop()} IS NOT NULL AND subject NOT IN ${ADMINS}
       GROUP BY section, page, ${cols}`).bind(since)),
   ]);
+  // 分享紀錄(全部期間)：誰分享了哪份報告、被點開幾次、哪些會員登入後看了、其中透過這個連結才第一次登入的人數
+  // 「新會員」= 第一次登入的時間在分享之後，且在第一次看這份報告前 30 分鐘內(點連結 → 登入 → 看報告)
+  const shares = await db.prepare(`
+    SELECT s.code, s.path, s.title, s.clicks, datetime(s.created_at, '+8 hours') AS created, su.email AS sharer,
+           COUNT(v.uid) AS viewers, COALESCE(SUM(v.n), 0) AS views,
+           SUM(CASE WHEN u.created_at >= s.created_at AND u.created_at >= datetime(v.first_at, '-30 minutes') THEN 1 ELSE 0 END) AS new_members,
+           GROUP_CONCAT(COALESCE(u.email, v.uid), '、') AS who
+    FROM share_links s LEFT JOIN users su ON su.uid = s.uid
+    LEFT JOIN share_views v ON v.code = s.code LEFT JOIN users u ON u.uid = v.uid
+    GROUP BY s.code ORDER BY s.created_at DESC LIMIT 200`).all().catch(() => ({ results: [] }));   // 還沒建立資料表時不影響其他統計
   return json({ days, totals: totals.results[0], users: users.results, symbols: symbols.results, daily: daily.results, recent: recent.results,
-                sections: sections.results, pages: pages.results, levels: [lv1.results, lv2.results, lv3.results] });
+                sections: sections.results, pages: pages.results, levels: [lv1.results, lv2.results, lv3.results], shares: shares.results });
 };

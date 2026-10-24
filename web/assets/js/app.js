@@ -241,8 +241,11 @@ const LT = (() => {
         }
         document.title = `${it.name} · Little Trader`;
         crumbs(it.name);
-        el.innerHTML = `<header class="top"><div><h1>${esc(it.name)}</h1><p>${it.groupName ? `<span class="cat-crumb">${esc(it.groupName)}</span>` : ''}${esc(it.desc || '')}${it.tags ? ` ${it.tags}` : ''}</p></div></header>
+        const canShare = auth.kind === 'member' && auth.api && !/需要密碼/.test(it.tags || '');
+        el.innerHTML = `<header class="top"><div><h1>${esc(it.name)}</h1><p>${it.groupName ? `<span class="cat-crumb">${esc(it.groupName)}</span>` : ''}${esc(it.desc || '')}${it.tags ? ` ${it.tags}` : ''}</p></div>
+            ${canShare ? `<div class="share-box"><button type="button" class="share-btn">${SHARE_ICON}分享</button><span class="share-msg" role="status"></span></div>` : ''}</header>
           <div class="cat-body"></div>`;
+        if (canShare) el.querySelector('.share-btn').onclick = () => share(`${base}/${encodeURIComponent(it.key)}`, it, el.querySelector('.share-msg'));
         const label = [it.groupName, it.name].filter(Boolean);
         view(...label);
         const body = el.querySelector('.cat-body');
@@ -250,8 +253,25 @@ const LT = (() => {
       },
     });
   }
+  /* ---------- 分享研究報告：產生專屬連結(api/share)，打開的人要登入 Google 才看得到；後台記錄誰分享、誰看了 ----------
+     手機用系統的分享選單(LINE、FB…)，電腦複製連結 */
+  const SHARE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
+  async function share(path, it, msg) {
+    const say = t => { msg.textContent = t; clearTimeout(msg._t); msg._t = setTimeout(() => { msg.textContent = ''; }, 4000); };
+    let url;
+    try {
+      const r = await fetch('api/share', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path, title: it.name }) });
+      if (!r.ok) throw new Error(r.status);
+      url = (await r.json()).url;
+    } catch (e) { say('無法產生分享連結，請稍後再試'); return; }
+    const title = `${it.name} · Little Trader`, text = it.summary || it.desc || '';
+    if (navigator.share && matchMedia('(pointer:coarse)').matches) {
+      try { await navigator.share({ title, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(url); say('已複製分享連結，對方登入 Google 後就能看'); }
+    catch (e) { window.prompt('複製這個分享連結：', url); }
+  }
   // 研究報告的「一句話結論」(報告開頭的 > 引言)：報告放在頁面下方時，搬到內容最上方，一打開就看得到
-  // (印 PDF 時再放回報告開頭，見 scripts/share/make-share.mjs)
   function hoistConclusion(body) {
     const q = body.querySelector('.panel .doc > blockquote:first-child');
     if (!q || q.closest('.panel') === body.firstElementChild) return;

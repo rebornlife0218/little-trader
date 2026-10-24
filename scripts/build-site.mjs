@@ -1,5 +1,5 @@
 // 部署前處理(.github/workflows/deploy.yml 呼叫)：node scripts/build-site.mjs <網站目錄> <公開版目錄> [公開版的根目錄，例如 /little-trader/]
-//   1. <網站目錄>/_routes.json：只有 api/ 與會員限定的程式、資料經過 functions/ 檢查，其他靜態檔直接送出(省 Functions 用量)
+//   1. <網站目錄>/_routes.json：只有 api/、分享連結 s/ 與會員限定的程式、資料經過 functions/ 檢查，其他靜態檔直接送出(省 Functions 用量)
 //   2. 各頁面的 HTML(例如 stock/tw-strategy/lowvol.html)：內容同 index.html，只換標題、說明與分享預覽(LINE、FB、搜尋引擎看得到)；
 //      清單來自頁面程式(scripts/site-map.mjs)。沒有列出的網址(例如 stock/query/2330)由 Cloudflare Pages 回傳 index.html
 //   3. sitemap.xml、robots.txt
@@ -14,7 +14,7 @@ const [site, pub, pubBase = '/'] = process.argv.slice(2);
 if (!site || !pub) throw new Error('用法：node scripts/build-site.mjs <網站目錄> <公開版目錄> [公開版的根目錄]');
 const scripts = [...A.memberScripts, ...A.adminScripts];
 
-const routesJson = { version: 1, include: ['/api/*', ...scripts.map(p => '/' + p), ...A.memberDatasets.map(d => `/data/${d}/*`)], exclude: [] };
+const routesJson = { version: 1, include: ['/api/*', '/s/*', ...scripts.map(p => '/' + p), ...A.memberDatasets.map(d => `/data/${d}/*`)], exclude: [] };
 writeFileSync(join(site, '_routes.json'), JSON.stringify(routesJson, null, 2));
 console.log(`_routes.json：${routesJson.include.length} 條路徑經過 functions`);
 

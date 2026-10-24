@@ -12,4 +12,3 @@ node_modules/
 
 # 分享素材(scripts/share/make-share.mjs 產生，只留在本機)
 /IG/
-/PDF/

@@ -22,6 +22,8 @@ export { sessionCookie, readSession } from '${ROOT}functions/_lib/auth';
 export { ACCESS } from '${ROOT}functions/_lib/types';
 export { onRequest as modulesMw } from '${ROOT}functions/modules/_middleware';
 export { onRequest as dataMw } from '${ROOT}functions/data/_middleware';
+export { onRequestPost as sharePost } from '${ROOT}functions/api/share';
+export { onRequestGet as shareOpen } from '${ROOT}functions/s/[code]';
 `);
 await build({ entryPoints: [entry], bundle: true, format: 'esm', platform: 'node', outfile: join(tmp, 'fn.mjs'), logLevel: 'error' });
 const F = await import(pathToFileURL(join(tmp, 'fn.mjs')).href);
@@ -77,4 +79,17 @@ test('會員資料集：訪客 401(meta.json 公開)，登入後可以下載；�
   assert.equal(r.res.status, 401);
   r = await call(F.dataMw, req('/data/indices/TAIEX.json'));
   assert.equal(r.passed, true);
+});
+
+test('分享連結：只有會員能產生，不公開的策略不能分享；代碼不對就回首頁', async () => {
+  const post = (identity, path) => F.sharePost({ request: new Request(SITE + '/api/share', { method: 'POST', body: JSON.stringify({ path, title: 'x' }) }), env, data: { identity } });
+  assert.equal((await post({ kind: 'guest', gid: 'g', quotaKey: 'g' }, 'etf/research/arkk')).status, 401);
+  const member = { kind: 'member', uid: 'u1', email: null, quotaKey: 'u1' };
+  assert.equal((await post(member, 'stock/tw-strategy/margin')).status, 400);
+  assert.equal((await post(member, '../../etc')).status, 400);
+  const open = async code => F.shareOpen({ params: { code }, env, request: new Request(SITE + '/s/' + code), waitUntil: () => {} });
+  let r = await open('bad');
+  assert.equal(r.status, 302); assert.equal(new URL(r.headers.get('Location')).pathname, '/');
+  r = await open('AbCdEf23');   // 查不到的代碼(假的資料庫查不到資料)
+  assert.equal(new URL(r.headers.get('Location')).pathname, '/'); assert.equal(r.headers.get('Set-Cookie'), null);
 });

@@ -70,14 +70,14 @@ functions/                          Cloudflare Pages Functions(後端，只在 C
   _lib/auth.ts                      Firebase ID token 驗證、會員 session cookie、訪客 id
   _lib/types.ts                     環境變數、股票查詢的期間與每日額度 POLICY
   _lib/security.ts                  API 的資安防護：來源檢查(CORS)、安全標頭、每分鐘次數限制
-  api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、symbols、prices(股票查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
+  api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、share(分享連結)、symbols、prices(股票查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
   data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
-migrations/                         D1 資料表(users、guest_links、query_logs、page_views、usage_daily、rate_minute、symbols、price_chunks、meta)
+migrations/                         D1 資料表(users、guest_links、query_logs、page_views、share_links、share_views、usage_daily、rate_minute、symbols、price_chunks、meta)
 scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)、各頁面的 HTML(標題與分享預覽)、sitemap.xml、GitHub Pages 的公開版
 scripts/site-map.mjs                在 Node 裡載入頁面程式，列出所有頁面與網址(build-site.mjs 與自動測試共用)
 scripts/check-freshness.mjs         本機排程的資料多久沒更新(check-local.yml 呼叫)
-scripts/share/                      研究的分享素材(本機執行)：make-share.mjs 產生 PDF/<研究>.pdf 與 IG/<研究>/1～5.png；ig-card.mjs 是圖卡版面、ig-topics.mjs 是各研究的圖卡內容
+scripts/share/                      研究的 IG 圖卡(本機執行)：make-share.mjs 產生 IG/<研究>/1～5.png；ig-card.mjs 是圖卡版面、ig-topics.mjs 是各研究的圖卡內容
 tests/                              自動測試(npm test，node:test)：site(頁面註冊、權限清單、defer、外部腳本、#/ 舊網址)、build(部署流程)、functions(來源檢查、會員權限)
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose；esbuild 給自動測試打包 functions/)
 
@@ -283,7 +283,9 @@ LT.register({
 - **策略頁**：低波動選股、事件型策略(tw-strategy.js 的 eventStrat)、S&P500 季度換股也照研究報告的結構(一句話結論 → 研究目的 → 資料處理 → 研究方法 → 四、實證結果與分析 → 五、結論；事件型另有六、延伸：最近的訊號)；一句話結論與結論由網頁依回測數字產生。章節標題在面板之間用 `<h2 class="sec-h">`。
 - **字型**：用 CSS 變數 `--font-body`(內文，中文優先的 Noto Sans TC)、`--font-display`(標題，Space Grotesk)、`--font-num`(數字)，不要直接寫字型名稱；數字預設等寬(`tabular-nums`)。canvas 圖表的座標字用 IBM Plex Mono。
 - **研究報告**：結構見 CLAUDE.md「研究報告」；報告是 Markdown(資料集的 `report`)時，開頭的 `> ` 引言就是一句話結論(樣式 `.doc blockquote`)；直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)用 `<blockquote>` 與 `<h3 class="md-h2">` 照同樣的結構寫。
-- **分享素材**：`node scripts/share/make-share.mjs [--pdf] [--ig] [研究 key …]`，需要本機 `web/data/` 有各研究的資料與 `.dev.vars` 的 `SESSION_SECRET`；會在本機開網站、以會員身分打開研究頁面印成 PDF(只印「研究報告」，沒有報告區塊的研究印整頁)，並截出 IG 圖卡。新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
+- **分享研究**：目錄頁的單一內容(研究、策略)在頁首有「分享」按鈕(app.js 的 `share`；登入的會員才有，要密碼的策略沒有)，呼叫 `POST api/share`(`functions/api/share.ts`)產生專屬連結 `/s/<8 碼代碼>`(同一個人分享同一份報告是同一個連結，存在 D1 的 `share_links`)。手機用系統分享選單，電腦複製連結。
+  打開連結(`functions/s/[code].ts`)：點開次數 +1(社群網站抓預覽不算)、存 `lt_ref` cookie(30 天)、轉到報告頁；報告在需要登入的區塊，沒登入的人先看到登入提示。登入後看報告時，`api/track` 依 `lt_ref` 記到 `share_views`(誰、看了幾次；分享的人自己不算)。後台「分享紀錄」列出誰分享了哪份報告、點開次數、登入後看的人與新會員(點了連結才第一次登入)。`_routes.json` 已包含 `/s/*`。
+- **IG 圖卡**：`node scripts/share/make-share.mjs [研究 key …]`，在本機開網站並截出圖卡；新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
 
