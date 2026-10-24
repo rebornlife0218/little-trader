@@ -567,6 +567,9 @@
   [data-sec="option"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='4' y1='46' x2='176' y2='46' stroke-dasharray='3 5'/%3E%3Cpolyline points='4,54 96,54 170,6' stroke-width='3'/%3E%3Ccircle cx='96' cy='54' r='3' fill='black'/%3E%3C/svg%3E");}
   [data-sec="stats"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='14' y1='4' x2='14' y2='60' stroke-width='0.6'/%3E%3Cline x1='36' y1='4' x2='36' y2='60' stroke-width='0.6'/%3E%3Cline x1='58' y1='4' x2='58' y2='60' stroke-width='0.6'/%3E%3Cline x1='80' y1='4' x2='80' y2='60' stroke-width='0.6'/%3E%3Cline x1='102' y1='4' x2='102' y2='60' stroke-width='0.6'/%3E%3Cline x1='124' y1='4' x2='124' y2='60' stroke-width='0.6'/%3E%3Cline x1='146' y1='4' x2='146' y2='60' stroke-width='0.6'/%3E%3Cline x1='168' y1='4' x2='168' y2='60' stroke-width='0.6'/%3E%3Cpath d='M6 58 C 50 58, 62 6, 90 6 C 118 6, 130 58, 174 58' stroke-width='2.5'/%3E%3C/svg%3E");}
   [data-sec="other"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M70 6 H110 V58 L90 44 L70 58 Z'/%3E%3Cpath d='M120 14 H150 V54 L135 44 L120 54 Z' stroke-width='1.5'/%3E%3C/svg%3E");}
+  /* 個別頁面的圖樣(app.js 依網址設定 <html data-page>)：財報 行事曆、ETF研究與台股其他研究 研究報告 */
+  [data-sec="stock"][data-page="earnings"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='62' y='10' width='76' height='50' rx='5'/%3E%3Cline x1='62' y1='24' x2='138' y2='24'/%3E%3Cline x1='80' y1='4' x2='80' y2='14'/%3E%3Cline x1='120' y1='4' x2='120' y2='14'/%3E%3Crect x='70' y='30' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3Crect x='86' y='30' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3Crect x='102' y='30' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3Crect x='118' y='30' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3Crect x='70' y='42' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3Crect x='86' y='42' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3Crect x='102' y='42' width='8' height='6' rx='1' fill='black'/%3E%3Crect x='118' y='42' width='8' height='6' rx='1' stroke-width='1.5'/%3E%3C/svg%3E");}
+  [data-sec="etf"][data-page="research"], [data-sec="stock"][data-page="tw-research"] {--motif:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 64' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M70 4 H112 L126 18 V60 H70 Z'/%3E%3Cpath d='M112 4 V18 H126'/%3E%3Cline x1='78' y1='14' x2='104' y2='14' stroke-width='1.5'/%3E%3Cline x1='78' y1='22' x2='118' y2='22' stroke-width='1.5'/%3E%3Cline x1='78' y1='30' x2='112' y2='30' stroke-width='1.5'/%3E%3Crect x='80' y='46' width='5' height='8' fill='black' stroke='none'/%3E%3Crect x='89' y='40' width='5' height='14' fill='black' stroke='none'/%3E%3Crect x='98' y='44' width='5' height='10' fill='black' stroke='none'/%3E%3Crect x='107' y='36' width='5' height='18' fill='black' stroke='none'/%3E%3C/svg%3E");}
   @media (max-width:640px){ header.top::after{width:120px;height:48px;opacity:.12;} }
   .cat-group-h{color:var(--sec);}
   .crumbs span[aria-current]{color:var(--sec);}
@@ -603,11 +606,11 @@
   .home-mkt-v strong{font-family:var(--font-display);font-size:30px;}
   .home-mkt-v span{font-size:14px;font-weight:600;}
   .home-mkt svg{display:block;width:100%;height:150px;margin-top:6px;}
-  .home-mkt-f{display:flex;justify-content:space-between;font-size:12px;color:var(--mute);}
+  .home-mkt-f{display:flex;justify-content:flex-end;font-size:12px;color:var(--mute);}
   .home-mkt-f a{color:var(--amber);text-decoration:none;}
   .home-h2{display:flex;align-items:baseline;gap:10px;margin:0 0 10px;font-size:18px;}
   .home-h2 small{font-size:13px;font-weight:500;color:var(--mute);}
-  .home-latest{margin-bottom:30px;}
+  .home-latest{margin-top:34px;}
   .home-latest .cat-row em{white-space:nowrap;}
   .home-lock{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:16px 4px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);color:var(--dim);font-size:14px;}
   .home-secs{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;}

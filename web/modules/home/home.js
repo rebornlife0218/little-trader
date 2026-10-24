@@ -1,4 +1,4 @@
-/* 首頁：網站介紹＋加權指數近 60 日迷你 K 線、最新研究的一句話結論、各區塊入口(依區塊主題色與圖樣)
+/* 首頁：網站介紹＋加權指數近 60 日迷你 K 線、各區塊入口(依區塊主題色與圖樣)、研究重點(各研究與策略的一句話結論)
    K 線資料是公開的 indices 資料集；最新研究取自已載入的目錄頁(LT.catalog)項目的 summary，訪客看不到研究就顯示登入提示 */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -41,7 +41,7 @@
         <div class="home-mkt-v"><strong>${Math.round(c).toLocaleString()}</strong>
           <span class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '+' : ''}${Math.round(c - p).toLocaleString()}(${ch >= 0 ? '+' : ''}${(ch * 100).toFixed(2)}%)</span></div>
         ${miniK(T)}
-        <div class="home-mkt-f"><span>紅漲綠跌，台股慣例</span><a href="index/crash">看大盤漲跌分析</a></div>`;
+        <div class="home-mkt-f"><a href="index/crash">看大盤漲跌分析</a></div>`;
     } catch (e) {
       if (ctx.alive()) box.remove();
     }
@@ -75,13 +75,6 @@
           <div class="home-mkt" id="homeMkt"><div class="page-loading"><span class="spinner"></span>載入中…</div></div>
         </section>
 
-        <section class="home-latest">
-          <h2 class="home-h2">研究重點 <small>每份研究與策略的一句話結論</small></h2>
-          ${studies.length
-            ? `<div class="cat-grid is-list">${studies.map(s => `<a class="cat-row" href="${s.href}" data-sec="${s.sec}"><b>${esc(s.name)}</b><span>${esc(s.summary)}</span><em>${esc(s.page)}</em></a>`).join('')}</div>`
-            : `<div class="home-lock"><span>ETF、股票、選擇權的研究與策略，登入 Google 就能看每份研究的結論。</span>${LT.loginButton('用 Google 登入')}</div>`}
-        </section>
-
         <h2 class="home-h2">所有內容</h2>
         <div class="home-secs">
           ${LT.SECTIONS.map(sec => {
@@ -95,7 +88,14 @@
               ${body}
             </section>`;
           }).join('')}
-        </div>`;
+        </div>
+
+        <section class="home-latest">
+          <h2 class="home-h2">研究重點 <small>每份研究與策略的一句話結論</small></h2>
+          ${studies.length
+            ? `<div class="cat-grid is-list">${studies.map(s => `<a class="cat-row" href="${s.href}" data-sec="${s.sec}"><b>${esc(s.name)}</b><span>${esc(s.summary)}</span><em>${esc(s.page)}</em></a>`).join('')}</div>`
+            : `<div class="home-lock"><span>ETF、股票、選擇權的研究與策略，登入 Google 就能看每份研究的結論。</span>${LT.loginButton('用 Google 登入')}</div>`}
+        </section>`;
       market(el.querySelector('#homeMkt'), ctx);
     },
   });

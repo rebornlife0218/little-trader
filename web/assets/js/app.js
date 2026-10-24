@@ -385,6 +385,7 @@ const LT = (() => {
     main.innerHTML = '';
     window.scrollTo(0, 0);
     document.documentElement.dataset.sec = (page || sec).section || sec.key;   // 區塊主題色與頁首圖樣(components.css「區塊主題」)
+    document.documentElement.dataset.page = page ? page.key : '';               // 個別頁面的圖樣(例如財報的行事曆)
     if (page) {
       current = page;
       if (!openSections.has(page.section)) { openSections.add(page.section); saveOpenSections(); }
@@ -418,6 +419,7 @@ const LT = (() => {
     renderSidebar(null);
     renderCrumbs(null);
     document.documentElement.dataset.sec = 'home';
+    document.documentElement.dataset.page = '';
     document.title = 'Little Trader 小交易員的研究室';
     home.mount(main, { alive: () => seq === routeSeq });
     track('home', '', '首頁', false);
