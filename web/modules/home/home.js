@@ -6,16 +6,14 @@
   const ICON = {
     eye: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
     ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
-    team: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M15 14.5c.6-.3 1.3-.5 2-.5 2.8 0 5 2.2 5 5"/>',
     bulb: '<path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
     mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/>',
   };
   const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k]}</svg>`;
   const INTRO = [
     ['eye', '用法人的眼睛看市場，用白話的語言聊發現。'],
-    ['ban', '沒有明牌！只聊市場上發現的酷東西。'],
-    ['team', '交易是場大人的遊戲，一個人走得快，一群人走得遠。'],
-    ['bulb', '相信最厲害的洞見，常常藏在最意想不到的角落。'],
+    ['ban', '不報明牌，只拆市場的真相。'],
+    ['bulb', '相信最厲害的洞見，往往藏在最意想不到的角落。'],
     ['mail', '有酷酷的想法或新發現？歡迎寄信交流：<br><a href="mailto:rebornlife0218@gmail.com">rebornlife0218@gmail.com</a>'],
   ];
 
