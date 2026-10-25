@@ -76,7 +76,7 @@ python -m http.server 8000 -d web
 | 換行(表格內) | `<br>` |
 | 註解(不會顯示) | `<!-- 這是註解 -->` |
 | 文氏圖 | `[[venn 種類\|標題\|說明]]`(見下方) |
-| 互動動畫 | `[[demo 名稱]]`(單獨一行)。可用：`inclusion-exclusion` 排容原理、`probability-tree` 機率樹、`birthday` 生日問題、`partition` 分割圖解、`targets` 準確度與精確度(打靶圖)、`dist-map` 機率模型關係圖、`z-tail` 標準常態的尾點(程式在 `web/modules/stats/demos.js`)；`dice` 擲骰子、`coin` 擲錢幣、`clt` 中央極限定理(在 `basic.js`) |
+| 互動動畫 | `[[demo 名稱]]`(單獨一行)。可用：`inclusion-exclusion` 排容原理、`probability-tree` 機率樹、`birthday` 生日問題、`partition` 分割圖解、`targets` 準確度與精確度(打靶圖)、`dist-map` 機率模型關係圖、`z-tail` 標準常態的尾點、`alpha-beta` 型一與型二錯誤的取捨(程式在 `web/modules/stats/demos.js`)；`dice` 擲骰子、`coin` 擲錢幣、`clt` 中央極限定理(在 `basic.js`) |
 
 **表格**：
 

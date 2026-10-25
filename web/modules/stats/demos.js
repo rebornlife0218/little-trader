@@ -424,5 +424,98 @@ window.LTStatDemos = (() => {
     draw();
   }
 
-  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, targets, 'dist-map': distMap, 'z-tail': zTail };
+  /* ---------- 兩種錯誤的取捨(第 9 章體溫例)：移動臨界值 c、改樣本數 n 與真實平均，看 α 與 β 此消彼長 ---------- */
+  const normCdf = z => {   // 標準常態累積機率(Abramowitz–Stegun 7.1.26，誤差 < 1.5e-7)
+    const t = 1 / (1 + 0.3275911 * Math.abs(z) / Math.SQRT2);
+    const e = 1 - t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429)))) * Math.exp(-z * z / 2);
+    return z >= 0 ? (1 + e) / 2 : (1 - e) / 2;
+  };
+  function alphaBeta(el) {
+    const MU0 = 98.6, SIG = 1, LO = 96.8, HI = 100.0, H = 266, padX = 16, padT = 50, padB = 46;
+    const CH = 230, cp = { l: 44, r: 16, t: 14, b: 40 };   // 下方 α–β 取捨曲線
+    let W = 560;
+    const tex = s => window.katex ? katex.renderToString(s, { throwOnError: false }) : s;
+    el.innerHTML = `
+      <h3>互動模擬 · 型一與型二錯誤的取捨</h3>
+      <div class="note">體溫例：${tex('H_0: \\mu = 98.6')}、${tex('H_1: \\mu < 98.6')}，${tex('\\sigma = 1')}；樣本平均 ${tex('\\bar{x}')} 小於臨界值 ${tex('c')} 就拒絕 ${tex('H_0')}。拖動下面的滑桿，看 ${tex('\\alpha')}(冤枉好人)與 ${tex('\\beta')}(縱放壞人)怎麼變。</div>
+      <div class="ab-params" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px;">
+        <div class="paramitem"><label for="abC">臨界值 c <b class="ab-cv"></b></label><input id="abC" type="range" min="97.80" max="98.60" step="0.001" value="98.40"></div>
+        <div class="paramitem"><label for="abN">樣本數 n <b class="ab-nv"></b></label><input id="abN" type="range" min="5" max="100" step="1" value="25"></div>
+        <div class="paramitem"><label for="abM">真實平均 μ（H₁ 為真時）<b class="ab-mv"></b></label><input id="abM" type="range" min="97.80" max="98.50" step="0.05" value="98.20"></div>
+      </div>
+      <div class="btnrow-l ab-set" style="margin-top:8px;"><span class="mute">把 c 設在 α =</span>${[0.10, 0.05, 0.01].map(a => `<button data-a="${a}">${a}</button>`).join('')}</div>
+      <div class="statgrid ab-stats" style="margin:12px 0;"></div>
+      <svg class="part-svg ab-svg" role="img" aria-label="H0 與 H1 下樣本平均的分配、臨界值與兩種錯誤的面積" style="max-width:640px;"></svg>
+      <svg class="part-svg ab-curve" role="img" aria-label="α 與 β 的取捨曲線" style="max-width:640px;margin-top:10px;"></svg>
+      <div class="ab-text" style="margin-top:6px;font-size:13.5px;line-height:1.9;"></div>`;
+    const $ = s => el.querySelector(s);
+    const pdf = (x, m, se) => Math.exp(-(((x - m) / se) ** 2) / 2);   // 只用相對高度(兩條曲線同一個標準誤)
+    const f3 = v => v.toFixed(3);
+    function draw() {
+      W = (el.clientWidth || 600) < 520 ? 380 : 560;
+      const c = +$('#abC').value, cs = String(+c.toFixed(3)), n = +$('#abN').value, mu1 = +$('#abM').value, se = SIG / Math.sqrt(n);
+      const alpha = normCdf((c - MU0) / se), beta = 1 - normCdf((c - mu1) / se);
+      $('.ab-cv').textContent = cs; $('.ab-nv').textContent = n; $('.ab-mv').textContent = mu1.toFixed(2);
+      $('.ab-stats').innerHTML = `
+        <div class="stat"><div class="v" style="color:var(--amber)">${f3(alpha)}</div><div class="l">α 型一錯誤：冤枉好人</div></div>
+        <div class="stat"><div class="v" style="color:var(--blue)">${f3(beta)}</div><div class="l">β 型二錯誤：縱放壞人</div></div>
+        <div class="stat"><div class="v">${f3(1 - beta)}</div><div class="l">檢定力 1 − β：將壞人定罪</div></div>`;
+
+      // 上圖：兩條抽樣分配與兩種錯誤的面積
+      const sx = x => padX + (x - LO) / (HI - LO) * (W - padX * 2), base = H - padB, sy = d => base - d * (H - padT - padB);
+      const curve = m => { const p = []; for (let i = 0; i <= 200; i++) { const x = LO + (HI - LO) * i / 200; p.push(`${sx(x).toFixed(1)},${sy(pdf(x, m, se)).toFixed(1)}`); } return p.join(' '); };
+      const area = (m, a, b, color) => {
+        if (b <= a) return '';
+        const p = []; for (let i = 0; i <= 80; i++) { const x = a + (b - a) * i / 80; p.push(`${sx(x).toFixed(1)},${sy(pdf(x, m, se)).toFixed(1)}`); }
+        return `<polygon points="${sx(a).toFixed(1)},${base} ${p.join(' ')} ${sx(b).toFixed(1)},${base}" fill="${color}" fill-opacity=".4"/>`;
+      };
+      let g = area(MU0, LO, c, 'var(--amber)') + area(mu1, c, HI, 'var(--blue)');
+      g += `<line x1="${padX}" y1="${base}" x2="${W - padX}" y2="${base}" stroke="var(--border-strong)"/>`;
+      g += `<polyline points="${curve(mu1)}" fill="none" stroke="var(--blue)" stroke-width="2.2"/>`;
+      g += `<polyline points="${curve(MU0)}" fill="none" stroke="var(--text)" stroke-width="2.2"/>`;
+      // 標籤放在峰頂上方，H₁ 往左、H₀ 往右展開；兩個峰太近時 H₀ 再往上一行
+      const near = sx(MU0) - sx(mu1) < 40;
+      g += `<text x="${sx(MU0) - 16}" y="${padT - (near ? 26 : 10)}" font-size="13" font-weight="700" text-anchor="start" fill="var(--text)">H₀：μ = 98.6</text>`;
+      g += `<text x="${sx(mu1) + 16}" y="${padT - 10}" font-size="13" font-weight="700" text-anchor="end" fill="var(--blue)">H₁：μ = ${mu1.toFixed(2)}</text>`;
+      for (let t = 97; t <= 100; t += 0.5) g += `<text x="${sx(t)}" y="${base + 17}" font-size="12" text-anchor="middle" fill="var(--mute)">${t.toFixed(1)}</text>`;
+      const xc = sx(c);
+      g += `<line x1="${xc}" y1="${base}" x2="${xc}" y2="${padT}" stroke="var(--amber)" stroke-width="1.6" stroke-dasharray="4 3"/>`;
+      g += `<text x="${xc - 6}" y="${base + 36}" font-size="12.5" text-anchor="end" fill="var(--amber)">← 拒絕 H₀</text>`;
+      g += `<text x="${xc + 6}" y="${base + 36}" font-size="12.5" text-anchor="start" fill="var(--mute)">不拒絕 H₀ →</text>`;
+      const svg = $('.ab-svg'); svg.setAttribute('viewBox', `0 0 ${W} ${H}`); svg.innerHTML = g;
+
+      // 下圖：c 從左掃到右，(α, β) 畫成一條曲線；虛線是樣本數變 4 倍時的曲線
+      const px = a => cp.l + a * (W - cp.l - cp.r), py = b => CH - cp.b - b * (CH - cp.t - cp.b);
+      const path = s => { const p = []; for (let i = 0; i <= 200; i++) { const cc = 97.0 + 1.9 * i / 200; p.push(`${px(normCdf((cc - MU0) / s)).toFixed(1)},${py(1 - normCdf((cc - mu1) / s)).toFixed(1)}`); } return p.join(' '); };
+      let h = `<line x1="${cp.l}" y1="${py(0)}" x2="${W - cp.r}" y2="${py(0)}" stroke="var(--border-strong)"/><line x1="${cp.l}" y1="${py(0)}" x2="${cp.l}" y2="${py(1)}" stroke="var(--border-strong)"/>`;
+      [0, 0.25, 0.5, 0.75, 1].forEach(v => {
+        h += `<text x="${px(v)}" y="${py(0) + 16}" font-size="12" text-anchor="middle" fill="var(--mute)">${v}</text>`;
+        h += `<text x="${cp.l - 6}" y="${py(v) + 4}" font-size="12" text-anchor="end" fill="var(--mute)">${v}</text>`;
+      });
+      h += `<text x="${(cp.l + W - cp.r) / 2}" y="${CH - 6}" font-size="12.5" text-anchor="middle" fill="var(--amber)">α(型一錯誤)</text>`;
+      h += `<text x="12" y="${(cp.t + CH - cp.b) / 2}" font-size="12.5" text-anchor="middle" fill="var(--blue)" transform="rotate(-90 12 ${(cp.t + CH - cp.b) / 2})">β(型二錯誤)</text>`;
+      if (n * 4 <= 400) h += `<polyline points="${path(SIG / Math.sqrt(n * 4))}" fill="none" stroke="var(--mute)" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+      h += `<polyline points="${path(se)}" fill="none" stroke="var(--text)" stroke-width="2"/>`;
+      h += `<circle cx="${px(alpha)}" cy="${py(beta)}" r="6" fill="var(--amber)" stroke="var(--panel2)" stroke-width="2"/>`;
+      h += `<text x="${W - cp.r}" y="${cp.t + 12}" font-size="12" text-anchor="end" fill="var(--text)">實線：n = ${n}</text>`;
+      h += `<text x="${W - cp.r}" y="${cp.t + 28}" font-size="12" text-anchor="end" fill="var(--mute)">虛線：n = ${n * 4}</text>`;
+      const curveSvg = $('.ab-curve'); curveSvg.setAttribute('viewBox', `0 0 ${W} ${CH}`); curveSvg.innerHTML = h;
+
+      $('.ab-text').innerHTML = `目前規則：${tex(`\\bar{x} < ${cs}`)} 就拒絕 ${tex('H_0')}，標準誤 ${tex(`\\sigma/\\sqrt{n} = ${se.toFixed(3)}`)}。`
+        + `<br>${tex(`\\alpha = P(\\bar{X} < ${cs} \\mid \\mu = 98.6) = ${f3(alpha)}`)}，${tex(`\\beta = P(\\bar{X} \\ge ${cs} \\mid \\mu = ${mu1.toFixed(2)}) = ${f3(beta)}`)}`
+        + `<br><span class="mute">n 固定時，c 往左移(更嚴格才定罪)α 變小、β 變大，點沿著實線移動：少冤枉好人，就會多縱放壞人。加大 n 讓兩條分配變窄，整條曲線往左下角靠近(虛線)，α 與 β 才能同時變小。</span>`;
+    }
+    el.addEventListener('input', e => { if (e.target.matches('input[type=range]')) draw(); });
+    el.addEventListener('click', e => {
+      const b = e.target.closest('.ab-set button'); if (!b) return;
+      const n = +$('#abN').value, z = { '0.1': 1.2816, '0.05': 1.6449, '0.01': 2.3263 }[b.dataset.a];
+      $('#abC').value = Math.max(97.8, MU0 - z / Math.sqrt(n)).toFixed(3);
+      draw();
+    });
+    let narrow = (el.clientWidth || 600) < 520;
+    new ResizeObserver(() => { const nw = el.clientWidth < 520; if (nw !== narrow) { narrow = nw; draw(); } }).observe(el);
+    draw();
+  }
+
+  return { 'inclusion-exclusion': inclusionExclusion, 'probability-tree': probabilityTree, birthday, partition, targets, 'dist-map': distMap, 'z-tail': zTail, 'alpha-beta': alphaBeta };
 })();
