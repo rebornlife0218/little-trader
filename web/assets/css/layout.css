@@ -1,4 +1,5 @@
 /* Little Trader 版型：左側欄(可收合) + 主內容 + 頁尾 */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}   /* 手機瀏覽器不要自動放大較寬區塊的文字(會讓同一張表格字體大小不一) */
 body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-body);font-variant-numeric:tabular-nums;text-wrap:pretty;}
 .shell{display:flex;min-height:100vh;}
 

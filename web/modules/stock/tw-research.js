@@ -87,7 +87,6 @@
   const scaleSel = id => `<div class="paramitem"><label for="${id}">走勢圖縱軸</label><select id="${id}"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>`;
   const MONEY = '本金 100 萬元，買賣金額除以成交價(含滑價與手續費)無條件捨去到整數股；沒有新股票進場的日子不調整，沒用到的資金持有現金(不計利息)。';
   // 回測規則依台股策略頁的同一套原則：漲跌停、沒有成交、下市櫃的處理
-  const RULES = '開盤漲停或沒有成交買不到，延後一天，隔天仍買不到就放棄；要賣出時跌停或沒有成交，延到下一個交易日同一時點再賣(可能連續延後)；持有期間下市櫃，以最後收盤價轉為現金。範圍是上市櫃普通股(不含 ETF、存託憑證)，包含已下市櫃的公司；報酬用還原股價(含除權息)。';
   // 每年報酬表：cols = [{ name, nav, cmp }](cmp = 和 0050 比較、粗體標示贏過)
   function yearRows(d, cols, b0050) {
     const base = W().yearTable(d, 0, cols[0].nav, b0050);
@@ -99,8 +98,7 @@
     const wins = j => rows.filter(r => r.v[j] > r.b).length;
     return `<div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th>${cols.map(c => `<th>${esc(c.name)}</th>`).join('')}<th>0050</th></tr></thead><tbody>
       ${rows.slice().reverse().map(r => `<tr><td>${r.label}</td>${r.v.map((v, j) => W().heat(v, cols[j].cmp && v > r.b)).join('')}${W().heat(r.b, false)}</tr>`).join('')}
-      <tr class="allrow"><td>贏 0050 的年數</td>${cols.map((c, j) => `<td>${c.cmp ? `${wins(j)} / ${rows.length}` : '—'}</td>`).join('')}<td>—</td></tr></tbody></table></div>
-      <p class="note">紅色越深代表漲越多、綠色越深代表跌越多；粗體底線表示當年贏過 0050。</p>`;
+      <tr class="allrow"><td>贏 0050 的年數</td>${cols.map((c, j) => `<td>${c.cmp ? `${wins(j)} / ${rows.length}` : '—'}</td>`).join('')}<td>—</td></tr></tbody></table></div>`;
   }
   // 比較表：rows = [{ name, nav, ts, main }]；S = 0050 的 stats
   function compareTable(rows, S) {
@@ -112,8 +110,7 @@
           <td class="down ${beat(x.mdd, S.mdd)}">${pct(x.mdd, 1)}</td><td class="${beat(x.ddDays, S.ddDays, false)}">${x.ddDays} 天</td>
           <td>${t ? `${t.n.toLocaleString()} 筆 / ${(t.win * 100).toFixed(0)}%` : '—'}</td><td class="${t ? cls(t.mean) : ''}">${t ? `${pct(t.mean, 2)} / ${pct(t.median, 2)}` : '—'}</td></tr>`; }).join('')}
       <tr><td>0050 買進持有</td><td>${totalRet(S)}</td><td>${pct(S.ret)}</td><td>${(S.vol * 100).toFixed(1)}%</td><td>${S.sharpe.toFixed(2)}</td><td>${S.sortino.toFixed(2)}</td><td class="down">${pct(S.mdd, 1)}</td><td>${S.ddDays} 天</td><td>—</td><td>—</td></tr>
-      </tbody></table></div>
-      <p class="note">粗體底線表示優於 0050。${W().STAT_NOTE}</p>`;
+      </tbody></table></div>`;
   }
   const extraCards = t => [
     t.fail ? W().card(`${t.fail.toLocaleString()} 筆`, '開盤漲停買不到', '放棄的訊號') : '',
@@ -140,12 +137,11 @@
           <div class="paramitem"><label for="twrGrp">組合</label><select id="twrGrp"><option value="t10">前 10 檔</option><option value="t5">前 5 檔</option></select></div>
           ${scaleSel('twrScale')}
         </div>
-        <p class="note">${W().COST_NOTE}${RULES}</p>
       </div>
       <div id="twrView"></div>
       <div class="panel"><h3>所有版本比較(21 日進場)</h3><div id="twrAll"></div></div>
       <div class="panel"><h3>綜合分數十分位(不限市值，21 日進場)</h3><div id="twrDec"></div>
-        <p class="note">每月依綜合分數把合格股票分成十組，長條為每筆平均報酬(扣成本)；分數越高，本月營收公布得越好，報酬也越高。</p></div>
+</div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
     // 市值範圍(每月的最小、最大值)：第一個月 → 最後一個月；Q1 只列上限、Q4 只列下限
@@ -154,7 +150,7 @@
       return `${v.cap.m[0].slice(0, 4)} 年 ${r(0)} → ${v.cap.m[n - 1].slice(0, 4)} 年 ${r(n - 1)}`;
     }
     function draw() {
-      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts, STAT_NOTE } = W();
+      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const V = B.versions.find(v => v.key === ver), nav = V.nav[grp], x = stats(nav), Sx = stats(B.b0050), t = V.ts[grp];
       el.querySelectorAll('.twr-ver .mode-tab').forEach(b => b.classList.toggle('active', b.dataset.v === ver));
       const ent = V.entry.filter(r => r.g === G[grp] || r.g === '全部合格股票');
@@ -162,18 +158,15 @@
         <div class="panel">
           <h3>${esc(V.name)}｜${G[grp]}</h3>
           <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(t)}${extraCards(t)}</div>
-          <p class="note">${STAT_NOTE}每筆報酬 = 賣出收回金額 ÷ 買進投入金額 − 1(扣成本)；持倉天期以交易日計。</p>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(V.name)}｜${G[grp]} vs 全部合格股票 vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
-          <p class="note">上方為累積報酬(期初 = 1)，下方為回撤(從前一個高點下跌的幅度)，已扣除交易成本；水平的部分是沒有部位、持有現金的期間。「全部合格股票」是參考組：每月把同一組所有合格股票等權買進(不取整數股)。</p>
           <h4>每年報酬</h4>
           ${yearTableHtml(B.d, [{ name: G[grp], nav, cmp: true }, { name: '全部合格股票', nav: V.nav.ew }], B.b0050)}
           <h4>進場日敏感度</h4>
           <div class="tablewrap"><table class="stattable"><thead><tr><th>進場日</th><th>組合</th><th>總報酬</th><th>年化報酬</th><th>夏普值</th><th>索提諾比率</th><th>最大回撤</th><th>每筆平均</th></tr></thead><tbody>
             ${ent.map(r => `<tr class="${r.rule === '21日' && r.g === G[grp] ? 'allrow' : ''}"><td>${esc(r.rule.replace('日', ' 日'))}</td><td>${esc(r.g)}</td><td class="${W().cls(r.ret)}">${W().pct(r.ret, 0)}</td><td>${W().pct(r.cagr)}</td><td>${r.sharpe.toFixed(2)}</td><td>${r.sortino.toFixed(2)}</td><td class="down">${W().pct(r.mdd, 1)}</td><td class="${W().cls(r.mean)}">${W().pct(r.mean, 2)}</td></tr>`).join('')}
           </tbody></table></div>
-          <p class="note">同樣的選股，進場日從 21 日延到 25 日或月底，報酬快速下降；三種進場日都用同一段期間(${esc(B.d[1])} 起)計算。</p>
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: nav, ew: V.nav.ew, b0050: B.b0050 },
         meta: { s: { name: `${V.name}｜${G[grp]}`, color: SERIES[S.series].color }, ew: { name: '全部合格股票', color: '#94a3b8' }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
@@ -213,20 +206,18 @@
           <div class="paramitem"><label for="twrS">策略</label><select id="twrS">${B.strats.map(s => `<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
           ${scaleSel('twrScale')}
         </div>
-        <p class="note">${W().COST_NOTE}${RULES}開低條件要等 T1 開盤才知道，回測假設能用開盤價(加一個升降單位)買到。</p>
       </div>
       <div id="twrView"></div>
       <div class="panel"><h3>四種策略比較</h3><div id="twrAll"></div></div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
     function draw() {
-      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts, STAT_NOTE } = W();
+      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.key === k), x = stats(T.nav), Sx = stats(B.b0050);
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(T.name)}</h3>
           <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
-          <p class="note">${STAT_NOTE}收盤跌停賣不掉要延後，所以「日內」的平均持倉天期會超過 1 天。</p>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(T.name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
@@ -275,31 +266,27 @@
           <div class="paramitem"><label for="twrG">組合</label><select id="twrG">${GS.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></div>
           ${scaleSel('twrScale')}
         </div>
-        <p class="note">${W().COST_NOTE}${RULES}</p>
       </div>
       <div id="twrView"></div>
       <div class="panel"><h3>所有組合比較</h3><div id="twrAll"></div></div>
       <div class="panel">
         <h3>營收公告前後的累積超額報酬</h3>
         <div id="twrCar"></div><div id="twrCarLegend"></div>
-        <p class="note">全部月營收公告依年增率分 8 組，第 -10 日 = 0；超額報酬 = 個股收盤到收盤報酬 − 市值加權市場報酬。描述性的事件研究，<b>未扣交易成本</b>。</p>
       </div>
       <div class="panel">
         <h3>特徵有效性：每月 IC 的 t 值</h3>
         <div id="twrIc"></div>
-        <p class="note">IC = 同一個營收月份的事件之間，特徵和報酬(扣成本)的 Spearman 相關，取各月平均再算 t 值；正值代表特徵越大、報酬越高，|t| > 2 視為顯著(粗體)。依 5 日持有期的 |t| 排序，紅色越深代表越正、綠色越深代表越負。</p>
       </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
     function draw() {
-      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts, STAT_NOTE } = W();
+      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.h === h && s.g === g), x = stats(T.nav), Sx = stats(B.b0050);
       const name = `${HN[h] || h}｜${g}`;
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(name)}</h3>
           <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
-          <p class="note">${STAT_NOTE}</p>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
@@ -360,14 +347,12 @@
           <div class="paramitem"><label for="twrG">條件</label><select id="twrG"></select></div>
           ${scaleSel('twrScale')}
         </div>
-        <p class="note">${W().COST_NOTE}${RULES}</p>
       </div>
       <div id="twrView"></div>
       <div class="panel"><h3>所有條件比較</h3><div id="twrAll"></div></div>
       <div class="panel">
         <h3>四種營收變化：公告前後的累積超額報酬</h3>
         <div id="twrCar"></div><div id="twrCarLegend"></div>
-        <p class="note">第 -10 日 = 0；超額報酬 = 個股收盤到收盤報酬 − 市值加權市場報酬。描述性的事件研究，<b>未扣交易成本</b>。</p>
         <h4>每筆交易報酬(T1 開盤買進，扣成本；每個事件獨立計算，不受資金限制)</h4>
         <div class="tablewrap"><table class="stattable"><thead><tr><th>營收變化</th><th>筆數</th><th>T+1 平均 / 勝率</th><th>5 日平均 / 勝率</th><th>10 日平均 / 勝率</th><th>20 日平均 / 勝率</th></tr></thead><tbody>
           ${B.groups.map(r => `<tr class="${r.g === '由負轉正' ? 'allrow' : ''}"><td>${esc(r.g)}</td><td>${r.n.toLocaleString()}</td>${['T+1', '5日', '10日', '20日'].map(x => `<td class="${W().cls(r[x].mean)}">${W().pct(r[x].mean, 2)} / ${(r[x].win * 100).toFixed(0)}%</td>`).join('')}</tr>`).join('')}
@@ -381,14 +366,13 @@
       $('#twrG').value = g;
     };
     function draw() {
-      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts, STAT_NOTE } = W();
+      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.h === h && s.g === g), x = stats(T.nav), Sx = stats(B.b0050);
       const name = `${HN[h] || h}｜${g}`;
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(name)}</h3>
           <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
-          <p class="note">${STAT_NOTE}</p>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>

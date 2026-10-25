@@ -3,7 +3,7 @@
      主動式 ETF：A 系列 ETF 跟單(資料集 etf_research；pipeline/etf_research/update.py；績效統計與圖表共用 tw-strategy.js 的 LTTW)
    共用函式與常存 ETF 資料的載入在 lib.js */
 (() => {
-  const { esc, pctf, cls, ym, statsOf, corr, growth, monthly, MIN_NOW, rollingStudy, pctl, TAX, taxCase, best, rateOf } = LTETF;
+  const { esc, pctf, cls, ym, corr, growth, monthly, MIN_NOW, rollingStudy, pctl, TAX, taxCase, best, rateOf } = LTETF;
   const ARKK_REFS = [
     { name: 'Morningstar · ARKK: An Object Lesson in How Not to Invest(Amy C. Arnott，2021-12-21)', url: 'https://www.morningstar.com.au/funds/arkk-an-object-lesson-in-how-not-to-invest' },
     { name: 'WealthManagement · The Top 15 Wealth-Destroying Funds of the Last Decade(引用 Morningstar，2024)', url: 'https://www.wealthmanagement.com/etfs/top-15-wealth-destroying-funds-last-decade' },
@@ -41,9 +41,6 @@
   /* ---------- ETF研究 · A 系列 ETF 跟單(資料集 etf_research；淨值與交易統計已在研究程式算好，網頁只算績效統計、畫圖與顯示報告) ---------- */
   const MC = { 加碼: 'var(--amber)', 調整: '#B07CF0', 新納入: '#5fd0c5' };   // 三種模式的顏色
   const fade = c => `color-mix(in srgb, ${c} 35%, transparent)`;
-  const EF_STAT = '夏普值 = 日報酬平均 ÷ 日報酬標準差 × √252；索提諾比率 = 年化報酬 ÷ 年化下檔波動；無風險利率以 0 計。最長連續回撤 = 淨值從前一個高點跌下來、到重新站回高點經過的交易日數(還沒站回就算到最新一天)。';
-  const EF_COST = '績效都已扣除交易成本：手續費 0.1425% 打 3 折(買賣都收)、證交稅 0.3%(賣出時收)、滑價買賣合計一個升降單位(買進 +0.5、賣出 −0.5 個升降單位，依成交價的級距，不超過漲跌停價)；0050 不扣成本。';
-  const EF_RULES = '開盤漲停或沒有成交買不到，延後一天，隔天仍買不到就放棄；要賣出時跌停或沒有成交，延到下一個交易日同一時點再賣；持有期間下市櫃，以最後收盤價轉為現金。報酬用還原股價(含除權息)。';
   // 績效統計同 LTTW.stats，只有夏普值改用日報酬平均 ÷ 標準差 × √252
   function statsC(nav) {
     const x = window.LTTW.stats(nav), r = [];
@@ -81,7 +78,6 @@
           <div class="paramitem"><label for="efHold">出場</label><select id="efHold">${Object.keys(HN).map(h => `<option value="${h}">${esc(HN[h])}</option>`).join('')}</select></div>
           <div class="paramitem"><label for="efScale">走勢圖縱軸</label><select id="efScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
         </div>
-        <p class="note">${EF_COST}${EF_RULES}</p>
       </div>
       <div id="efView"></div>
       <div class="panel"><h3>所有策略比較</h3><div id="efAll"></div></div>
@@ -95,16 +91,14 @@
       t.delist ? W.card(`${t.delist} 筆`, '持有期間下市櫃', '以最後收盤價轉現金') : '',
     ].join('');
     const yearHtml = (T, b) => `<div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th><th>策略</th><th>0050</th></tr></thead><tbody>
-      ${W.yearTable(B.d, T.i0, T.nav, b).slice().reverse().map(r => `<tr><td>${r.label}</td>${W.heat(r.r, r.r > r.b)}${W.heat(r.b, false)}</tr>`).join('')}</tbody></table></div>
-      <p class="note">紅色越深代表漲越多、綠色越深代表跌越多；粗體底線表示當年贏過 0050。</p>`;
+      ${W.yearTable(B.d, T.i0, T.nav, b).slice().reverse().map(r => `<tr><td>${r.label}</td>${W.heat(r.r, r.r > r.b)}${W.heat(r.b, false)}</tr>`).join('')}</tbody></table></div>`;
     const allTable = cur => `<div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>期間</th><th>總報酬</th><th>年化報酬</th><th>夏普值</th><th>最大回撤</th><th>交易筆數 / 勝率</th><th>每筆平均 / 中位數</th><th>平均持倉天期</th><th>0050 總報酬 / 夏普值</th></tr></thead><tbody>
       ${B.strats.map(T => { const x = statsC(T.nav), Sx = statsC(sub(T)), t = T.ts;
         return `<tr class="${T === cur ? 'allrow' : ''}" data-k="${esc(T.key)}" style="cursor:pointer"><td>${esc(`${T.mode}｜${T.group}｜${hname(T.hold)}`)}</td><td>${B.d[T.i0 + 1].replace(/-/g, '/')} 起</td>
           <td class="${W.cls(x.mult - 1)} ${W.beat(x.mult, Sx.mult)}">${W.totalRet(x)}</td><td class="${W.cls(x.ret)} ${W.beat(x.ret, Sx.ret)}">${pct(x.ret)}</td>
           <td class="${W.beat(x.sharpe, Sx.sharpe)}">${x.sharpe.toFixed(2)}</td><td class="down ${W.beat(x.mdd, Sx.mdd)}">${pct(x.mdd, 1)}</td>
           <td>${t.n.toLocaleString()} 筆 / ${(t.win * 100).toFixed(0)}%</td><td class="${W.cls(t.mean)}">${pct(t.mean, 2)} / ${pct(t.median, 2)}</td><td>${t.days.toFixed(1)} 天</td>
-          <td>${W.totalRet(Sx)} / ${Sx.sharpe.toFixed(2)}</td></tr>`; }).join('')}</tbody></table></div>
-      <p class="note">粗體底線表示優於同期 0050；點選一列可切換到該策略。各策略從第一個訊號的前一天開始計算，所以期間略有不同。${EF_STAT}</p>`;
+          <td>${W.totalRet(Sx)} / ${Sx.sharpe.toFixed(2)}</td></tr>`; }).join('')}</tbody></table></div>`;
     const fillGroup = () => {
       const gs = GROUPS.filter(g => SK(mode, g, hold));
       if (!gs.includes(group)) group = gs[0];
@@ -117,7 +111,6 @@
         <div class="panel">
           <h3>${esc(name)}</h3>
           <div class="statgrid" style="margin:12px 0;">${W.vs0050Cards(x, Sx)}${W.tradeCards(T.ts)}${extra(T.ts)}</div>
-          <p class="note">${EF_STAT}每筆報酬 = 賣出收回金額 ÷ 買進投入金額 − 1(扣成本)；持倉天期以交易日計。</p>
           <ul class="insight"><li>${W.vs0050Txt(B.d[T.i0 + 1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="efChart"></div><div id="efLegend"></div>
@@ -146,7 +139,7 @@
     const figBars = (div, parts) => {
       div.innerHTML = parts.map((p, i) => `${p.title ? `<p class="note" style="text-align:left;margin:10px 0 2px;"><b>${esc(p.title)}</b></p>` : ''}<div data-part="${i}"></div>`).join('');
       parts.forEach((p, i) => sigBars(div.querySelector(`[data-part="${i}"]`), p.x, p.series));
-      div.insertAdjacentHTML('beforeend', LTChart.legend(parts[0].series) + '<p class="note">實心 = |t| ≥ 2，淡色 = 不顯著；t 值為日期聚類，滑鼠移到長條上可看數字。</p>');
+      div.insertAdjacentHTML('beforeend', LTChart.legend(parts[0].series));
     };
     const pick = (rows, f, keys, val = 'mean', tv = 't') => keys.map(k => { const r = rows.find(x => f(x, k)); return r && r.n !== undefined && r.n < 20 ? { v: null, t: null } : r ? { v: r[val], t: r[tv] } : { v: null, t: null }; });
     const ser = (name, color, pts) => ({ name, color, v: pts.map(p => p.v), t: pts.map(p => p.t) });
@@ -217,7 +210,6 @@
             <h3 class="md-h2">四、實證結果與分析</h3>
           </div>
           <div id="pkArkkChart"></div>
-          <p class="note" id="pkArkkNote"></p>
           <div class="doc">
             <div class="tablewrap"><table class="stattable">
               <thead><tr><th>研究</th><th>期間</th><th>基金報酬</th><th>投資人報酬</th></tr></thead>
@@ -238,16 +230,13 @@
             </ul>
             <p class="mute" style="font-size:12px;">資料來源：${ARKK_REFS.map(r => `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.name)}</a>`).join('；')}。上圖為 ARKK 的還原股價(美元)，研究數字引用自原文。</p>
           </div>
-        </div>
-`;
+        </div>`;
       const ak = MO.ARKK;
       if (ak) {
-        const peakI = ak.a.reduce((b, v, i) => v > ak.a[b] ? i : b, 0), last = ak.a.length - 1;
+        const peakI = ak.a.reduce((b, v, i) => v > ak.a[b] ? i : b, 0);
         LTChart.line($('#pkArkkChart'), { x: ak.m, xType: 'date', label: 'ARKK 還原股價', height: 240, xFmt: (m, tip) => tip ? ym(m) : m.slice(2).replace('-', '/'),
           yFmt: v => '$' + Math.round(v), tipFmt: (s, v) => '$' + v.toFixed(2), series: [{ name: 'ARKK', y: ak.a, color: 'var(--amber)' }],
           points: [{ x: ak.m[peakI], y: ak.a[peakI], color: 'var(--up)', label: `高點 ${ym(ak.m[peakI])}` }] });
-        const sAll = statsOf(ak.a.slice(1).map((v, k) => v / ak.a[k] - 1), 12);
-        $('#pkArkkNote').innerHTML = `ARKK 還原股價(美元，月底)：上市以來年化 ${pctf(sAll.cagr)}；${ym(ak.m[peakI])} 的高點到 ${ym(ak.m[last])}，${pctf(ak.a[last] / ak.a[peakI] - 1, 0)}；期間最大回撤 ${pctf(sAll.mdd, 0)}。`;
       }
     }
     function lsiView(body) {
@@ -307,7 +296,6 @@
           <div id="rsLine"></div>
           ${LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }])}
           <ul class="insight" id="rsInsight"></ul>
-          <p class="note">以月底資料計算：每個月都當成一個起點，比較持有到期間結束的年化報酬(滾動期間)；選「至今」時每個起點都持有到最新一個完整月份，越晚的起點持有越短(至少 3 年)，年化報酬的波動也越大。定期定額每月投入 1/N；逢低買入在指數從歷史高點(資料起點以來)下跌達門檻的那個月一次投入，起點時已經跌超過門檻就立刻進場(和單筆相同，不計輸贏)，期間內沒跌到門檻就一直拿著現金；等待中的現金依設定的年利率計息。加權指數為價格指數(不含股息)；加權報酬指數(臺灣證券交易所編製)與 ETF 為股息再投入的總報酬，不計手續費與稅。</p>
           <div class="doc">
             <h3 class="md-h2">五、結論</h3>
             <ul>
