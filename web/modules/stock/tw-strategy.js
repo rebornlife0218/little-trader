@@ -87,11 +87,11 @@
     if (idx[idx.length - 1] !== n - 1) idx.push(n - 1);
     const xs = idx.map(i => d[i0 + i]), xFmt = xf || ((v, tip) => tip ? v : v.slice(0, 4));
     const D = Object.fromEntries(keys.map(k => { let pk = -Infinity; return [k, navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; })]; }));
-    LTChart.line(chart, { x: xs, xType: 'date', label: '累積報酬與回撤', height: 320, xFmt,
+    LTChart.line(chart, { x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
       yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),
       yTicks: log ? () => LOG_TICKS.map(Math.log10) : undefined, refY: [{ y: log ? 0 : 1 }],
       series: keys.map(k => ({ name: meta[k].name, color: meta[k].color, width: k === main ? 2.6 : 1.5, y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })),
-      lower: { height: 130, label: '回撤：從前一個高點下跌的幅度', yMax: 0, fill: true, yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
+      lower: { height: 130, label: '回撤', yMax: 0, fill: true, yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
         series: keys.map(k => ({ name: meta[k].name + ' 回撤', color: meta[k].color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } });
     legend.innerHTML = LTChart.legend(keys.map(k => meta[k]));
   }

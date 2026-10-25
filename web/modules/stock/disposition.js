@@ -8,7 +8,7 @@
   const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN;
   const median = a => { if (!a.length) return NaN; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
   const md = d => d.slice(5).replace('-', '/');
-  const d1ret = e => e.d1.prev ? e.d1.c / e.d1.prev - 1 : NaN;   // 處置第一天報酬(相對前一日收盤)
+  const d1ret = e => e.d1.o ? e.d1.c / e.d1.o - 1 : NaN;   // 處置後第一天報酬：當天開盤 → 收盤(同一天，用原始價格)
 
   function summary(E) {
     const fin = E.filter(e => e.done && e.ret != null);
@@ -61,15 +61,15 @@
           <h3>新制上路後的處置股(${md(J.new_rule)} ～ ${md(J.asof)})</h3>
           <div class="statgrid" style="margin:12px 0;">
             <div class="stat"><div class="v">${sn.n}</div><div class="l">處置事件(上市 ${NEW.filter(e => e.market === 'TWSE').length}、上櫃 ${NEW.filter(e => e.market === 'TPEx').length})，已出關 ${sn.nFin}</div></div>
-            <div class="stat"><div class="v ${cls(sn.d1)}">${pct(sn.d1, 2)}</div><div class="l">處置第一天平均報酬(中位數 ${pct(sn.d1Med, 2)})</div></div>
+            <div class="stat"><div class="v ${cls(sn.d1)}">${pct(sn.d1, 2)}</div><div class="l">處置後第一天平均報酬(中位數 ${pct(sn.d1Med, 2)})</div></div>
             <div class="stat"><div class="v ${cls(sn.ret)}">${pct(sn.ret)}</div><div class="l">處置期間平均報酬(中位數 ${pct(sn.retMed)})，上漲 ${share(sn.up, sn.nFin)}</div></div>
             <div class="stat"><div class="v ${cls(sn.mkt)}">${pct(sn.mkt)}</div><div class="l">同期大盤平均報酬</div></div>
           </div>
           <ul class="insight" id="dpInsight"></ul>
-          <p class="note">處置第一天報酬 = 處置前一天收盤 → 第一天收盤；處置期間報酬 = 處置前一天收盤 → 處置最後一天收盤(只算已出關的事件)；同期大盤：上市用加權指數、上櫃用櫃買指數，期間與該處置事件相同。只統計 8/10 以後開始的處置。股價為還原股價，不計交易成本。</p>
+          <p class="note">處置後第一天報酬 = 處置第一天開盤 → 收盤；處置期間報酬 = 處置前一天收盤 → 處置最後一天收盤(只算已出關的事件)；同期大盤：上市用加權指數、上櫃用櫃買指數，期間與該處置事件相同。只統計 8/10 以後開始的處置。處置期間與大盤的報酬用還原股價，不計交易成本。</p>
           <h4>各月份</h4>
           <div class="tablewrap"><table class="stattable">
-            <thead><tr><th>處置開始月份</th><th>事件數</th><th>第一天平均報酬</th><th>第一天中位數</th><th>已出關</th><th>期間平均報酬</th><th>期間上漲比例</th><th>同期大盤平均</th></tr></thead>
+            <thead><tr><th>處置開始月份</th><th>事件數</th><th>處置後第一天平均報酬</th><th>處置後第一天中位數</th><th>已出關</th><th>期間平均報酬</th><th>期間上漲比例</th><th>同期大盤平均</th></tr></thead>
             <tbody>${byMonth.map(s => `<tr><td>${s.m.replace('-', '/')}</td><td>${s.n}</td><td class="${cls(s.d1)}">${pct(s.d1, 2)}</td><td class="${cls(s.d1Med)}">${pct(s.d1Med, 2)}</td><td>${s.nFin}</td><td class="${cls(s.ret)}">${pct(s.ret)}</td><td>${share(s.up, s.nFin)}</td><td class="${cls(s.mkt)}">${pct(s.mkt)}</td></tr>`).join('')}</tbody>
           </table></div>
         </div>
@@ -86,7 +86,7 @@
 
       // 重點(依資料產生)
       $('#dpInsight').innerHTML = `
-        <li><b>處置第一天</b>：平均報酬 ${pct(sn.d1, 2)}，中位數 ${pct(sn.d1Med, 2)}。</li>
+        <li><b>處置後第一天</b>(開盤 → 收盤)：平均報酬 ${pct(sn.d1, 2)}，中位數 ${pct(sn.d1Med, 2)}。</li>
         <li><b>處置期間仍偏漲</b>：已出關的 ${sn.nFin} 筆平均 ${pct(sn.ret)}(中位數 ${pct(sn.retMed)})、${share(sn.up, sn.nFin)} 上漲，同期大盤平均 ${pct(sn.mkt)}。處置的冷卻效果在新制下看起來不明顯。</li>
         <li><b>樣本數較小</b>：新制只有約 ${Math.round((Date.parse(J.asof) - Date.parse(J.new_rule)) / 864e5 / 7)} 週、${sn.nFin} 筆已出關的事件，而且期間剛好遇到大盤反彈，結論可能隨更多資料而改變。</li>`;
 
@@ -105,7 +105,7 @@
       const table = () => {
         const mk = $('#dpMarket').value;
         const rows = NEW.filter(e => !mk || e.market === mk).sort((a, b) => b.start.localeCompare(a.start) || a.code.localeCompare(b.code)).slice(0, 80);
-        $('#dpTable').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>市場</th><th>處置期間</th><th>處置</th><th>第一天漲跌</th><th>處置期間報酬</th><th>同期大盤</th><th>出關後 5 日</th></tr></thead><tbody>
+        $('#dpTable').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>市場</th><th>處置期間</th><th>處置</th><th>處置後第一天漲跌</th><th>處置期間報酬</th><th>同期大盤</th><th>出關後 5 日</th></tr></thead><tbody>
           ${rows.map(e => `<tr><td>${LT.stockLink(e.code)}</td><td>${esc(e.name)}</td><td>${e.market === 'TWSE' ? '上市' : '上櫃'}</td><td>${md(e.start)}～${md(e.end)}${e.done ? '' : ' <small class="mute">進行中</small>'}</td><td>${esc(e.kind)}</td>
             <td class="${cls(d1ret(e))}">${pct(d1ret(e))}</td><td class="${cls(e.ret)}">${pct(e.ret)}</td><td class="${cls(e.mkt)}">${pct(e.mkt)}</td><td class="${cls(e.post5)}">${pct(e.post5)}</td></tr>`).join('')}</tbody>`;
       };

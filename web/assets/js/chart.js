@@ -4,7 +4,7 @@
      LTChart.bars(el, { x, series:[{ name, y, color, colors }], ... })(colors：每根長條各自的顏色，可省略)
    共通選項：height、xFmt(x)、yFmt(y)、xType:'date'|'num'、refY:[{ y, label, color }]、
             refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt、
-            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別；長條圖放不下時刻度文字自動斜放 45°)
+            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、title(主圖左上角的小標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別；長條圖放不下時刻度文字自動斜放 45°)
    右側 y 軸：series 加 axis:'right'(長條圖中畫成折線＋圓點)，搭配 y2Min、y2Max、y2Fmt；refY 也可加 axis:'right'
    下方子圖(折線圖)：lower:{ height, series:[{ name, y, color, width }], yMin, yMax, yFmt, tipFmt, label, fill }
             畫在同一張圖的下方，共用 x 軸與十字線，例如權益曲線下方接回撤(fill:true 時從 0 往下塗色)
@@ -102,6 +102,8 @@ const LTChart = (() => {
         <text x="${PAD.l - 6}" y="${L.Y(t) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(fmt(t))}</text>`).join('');
       if (L0.label) g += `<text x="${PAD.l + 4}" y="${top + 11}" font-size="10.5" fill="var(--mute)">${esc(L0.label)}</text>`;
     }
+    // 主圖左上角的小標(例如有下方子圖時，上半寫「報酬」、下半寫「回撤」)
+    if (o.title) g += `<text x="${PAD.l + 4}" y="${PAD.t + 11}" font-size="10.5" fill="var(--mute)">${esc(o.title)}</text>`;
     return { W, H, pb, r, xs, X, Y, Y2, L, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
   }
 
