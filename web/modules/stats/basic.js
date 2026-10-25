@@ -168,7 +168,7 @@
       }
     });
     box.querySelectorAll('blockquote').forEach(q => q.classList.add('callout'));
-    box.querySelectorAll('table').forEach(t => { t.classList.add('stattable', 'md-table'); t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`; });
+    LT.mdTables(box);
     // 章名已是 h2：Markdown 的 ## → h3(大節)、### → h4(小節)
     const retag = (sel, tag, cls) => box.querySelectorAll(sel).forEach(h => { const e = document.createElement(tag); e.className = cls; e.innerHTML = h.innerHTML; h.replaceWith(e); });
     retag('h3', 'h4', 'md-h3');

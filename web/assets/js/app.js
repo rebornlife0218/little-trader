@@ -534,6 +534,23 @@ const LT = (() => {
     sync();
   }
 
+  /* Markdown 轉出來的表格(統計學教材、研究報告)：包進 .tablewrap(放不下就左右捲動)，加上 stattable、md-table 樣式；
+     短的格子(看得到的字 ≤ 12 個，名稱、日期、數字、短公式)標 nw 不換行；長的格子內容包一層 .cellw，至少 8 個字寬才換行
+     (表格格子的 min-width 瀏覽器不理會，要放在格子裡的區塊上)，手機上就不會幾個字就換行或擠成直排。
+     字數只算畫面上看得到的部分：不算 KaTeX 給螢幕閱讀器的 MathML、零寬字元與空白 */
+  function mdTables(box) {
+    box.querySelectorAll('table').forEach(t => {
+      t.classList.add('stattable', 'md-table');
+      t.querySelectorAll('td').forEach(td => {
+        const c = td.cloneNode(true);
+        c.querySelectorAll('.katex-mathml').forEach(m => m.remove());
+        if (c.textContent.replace(/[\s​]/g, '').length <= 12) td.classList.add('nw');
+        else td.innerHTML = `<div class="cellw">${td.innerHTML}</div>`;
+      });
+      t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`;
+    });
+  }
+
   function start() {
     document.getElementById('copyYear').textContent = new Date().getFullYear();
     initScrollButtons();
@@ -559,5 +576,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine, mdTables };
 })();
