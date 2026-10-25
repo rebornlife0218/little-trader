@@ -81,6 +81,7 @@
             <div class="paramitem"><label for="dpMarket">市場</label><select id="dpMarket"><option value="">全部</option><option value="TWSE">上市</option><option value="TPEx">上櫃</option></select></div>
           </div>
           <div class="tablewrap"><table class="stattable" id="dpTable"></table></div>
+          <div class="btnrow-l" style="margin-top:10px;"><button id="dpMore"></button></div>
           <p class="note">「進行中」表示還沒出關，期間報酬算到 ${md(J.asof)}。只列股票(不含權證、ETF)。</p>
         </div>`;
 
@@ -101,15 +102,22 @@
           series: [{ name: '事件數', y: bins.map(b => b.n), color: 'var(--amber)' }], refX: [{ x: 0, color: 'var(--dim)' }] });
       }
 
-      // 最近的處置股
+      // 最近的處置股：先顯示最新 20 筆，按「顯示全部」再展開
+      const FIRST = 20;
+      let showAll = false;
       const table = () => {
         const mk = $('#dpMarket').value;
-        const rows = NEW.filter(e => !mk || e.market === mk).sort((a, b) => b.start.localeCompare(a.start) || a.code.localeCompare(b.code)).slice(0, 80);
+        const all = NEW.filter(e => !mk || e.market === mk).sort((a, b) => b.start.localeCompare(a.start) || a.code.localeCompare(b.code));
+        const rows = showAll ? all : all.slice(0, FIRST);
+        const more = $('#dpMore');
+        more.hidden = all.length <= FIRST;
+        more.textContent = showAll ? `收合，只顯示最新 ${FIRST} 筆` : `顯示全部 ${all.length} 筆`;
         $('#dpTable').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>市場</th><th>處置期間</th><th>處置</th><th>處置後第一天漲跌</th><th>處置期間報酬</th><th>同期大盤</th><th>出關後 5 日</th></tr></thead><tbody>
           ${rows.map(e => `<tr><td>${LT.stockLink(e.code)}</td><td>${esc(e.name)}</td><td>${e.market === 'TWSE' ? '上市' : '上櫃'}</td><td>${md(e.start)}～${md(e.end)}${e.done ? '' : ' <small class="mute">進行中</small>'}</td><td>${esc(e.kind)}</td>
             <td class="${cls(d1ret(e))}">${pct(d1ret(e))}</td><td class="${cls(e.ret)}">${pct(e.ret)}</td><td class="${cls(e.mkt)}">${pct(e.mkt)}</td><td class="${cls(e.post5)}">${pct(e.post5)}</td></tr>`).join('')}</tbody>`;
       };
       $('#dpMarket').onchange = table;
+      $('#dpMore').onclick = () => { showAll = !showAll; table(); };
       table();
     },
   });
