@@ -75,7 +75,12 @@ const LTChart = (() => {
     const idx = o.xAll ? xs.map((_, i) => i) : [...new Set(Array.from({ length: nx }, (_, k) => Math.round(k * (xs.length - 1) / (nx - 1))))];
     g += idx.map(i => {
       const x = kind === 'bars' ? X(i) : X(xs[i]);
-      if (!tilt) return `<text x="${x}" y="${H - 8}" font-size="10.5" text-anchor="middle" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`;
+      if (!tilt) {   // 最左、最右的刻度文字超出圖框時往內對齊，不被截掉
+        const t = String(xFmt(o.x[i])), half = textW(t) / 2;
+        const anchor = x + half > W - 2 ? 'end' : x - half < 2 ? 'start' : 'middle';
+        const ax = anchor === 'end' ? W - 2 : anchor === 'start' ? 2 : x;
+        return `<text x="${ax}" y="${H - 8}" font-size="10.5" text-anchor="${anchor}" fill="var(--mute)">${esc(t)}</text>`;
+      }
       const y = H - pb + 12;   // 從刻度下方往左下斜放
       return `<text x="${x + 4}" y="${y}" font-size="10.5" text-anchor="end" transform="rotate(-45 ${x + 4} ${y})" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`;
     }).join('');
@@ -100,10 +105,10 @@ const LTChart = (() => {
       g += `<line x1="${PAD.l}" x2="${W - r}" y1="${top - gap / 2}" y2="${top - gap / 2}" stroke="var(--border)"/>`;
       g += tl.map(t => `<line x1="${PAD.l}" x2="${W - r}" y1="${L.Y(t)}" y2="${L.Y(t)}" stroke="var(--grid)"/>
         <text x="${PAD.l - 6}" y="${L.Y(t) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(fmt(t))}</text>`).join('');
-      if (L0.label) g += `<text x="${PAD.l + 4}" y="${top + 11}" font-size="10.5" fill="var(--mute)">${esc(L0.label)}</text>`;
+      if (L0.label) g += `<text x="${PAD.l + 6}" y="${top + 14}" font-size="12.5" font-weight="600" fill="var(--mute)">${esc(L0.label)}</text>`;
     }
     // 主圖左上角的小標(例如有下方子圖時，上半寫「報酬」、下半寫「回撤」)
-    if (o.title) g += `<text x="${PAD.l + 4}" y="${PAD.t + 11}" font-size="10.5" fill="var(--mute)">${esc(o.title)}</text>`;
+    if (o.title) g += `<text x="${PAD.l + 6}" y="${PAD.t + 14}" font-size="12.5" font-weight="600" fill="var(--mute)">${esc(o.title)}</text>`;
     return { W, H, pb, r, xs, X, Y, Y2, L, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
   }
 
