@@ -202,7 +202,6 @@
 
   /* 說明頁 */
   .doc{font-size:14.5px;line-height:1.9;}
-  .doc > p, .doc > ul, .doc > ol{max-width:46em;}   /* 中文一行約 46 字，長報告比較好讀 */
   .doc h3{margin-top:4px;}
   .doc p{margin:0 0 10px;}
   .doc ul{margin:0 0 10px;padding-left:20px;}
@@ -271,7 +270,7 @@
   .doc h3.md-h2, .doc h4.md-h3{scroll-margin-top:16px;}
   /* 研究報告最上方的「一句話結論」(Markdown 的 > 引言) */
   .doc blockquote{margin:4px 0 26px;padding:20px 24px;background:var(--amber-soft);border:1px solid color-mix(in srgb, var(--amber) 35%, transparent);border-radius:14px;
-    font-size:clamp(16px, 1.2vw + 11px, 19px);line-height:1.75;font-weight:500;max-width:46em;}
+    font-size:clamp(16px, 1.2vw + 11px, 19px);line-height:1.75;font-weight:500;}
   .doc blockquote p{margin:0;}
   .doc blockquote b:first-child{color:var(--amber);}
   /* 重點節(標題寫 [重點])：整節加框，標題旁標「重點」 */
