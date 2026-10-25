@@ -48,7 +48,10 @@
 <figure class="md-fig twr-fig"><div data-fig="${esc(f)}"></div><figcaption>${esc(cap)}</figcaption></figure>
 `);
     box.innerHTML = marked.parse(src);
-    box.querySelectorAll('table').forEach(t => { t.classList.add('stattable', 'md-table'); t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`; });
+    box.querySelectorAll('table').forEach(t => {
+      t.classList.add('stattable', 'md-table');
+      t.querySelectorAll('td').forEach(td => { if (td.textContent.trim().length <= 16) td.classList.add('nw'); });   // 短的格子(名稱、日期、數字)不換行
+      t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`; });
     const retag = (s, tagName, c) => box.querySelectorAll(s).forEach(h => { const e = document.createElement(tagName); e.className = c; e.innerHTML = h.innerHTML; h.replaceWith(e); });
     retag('h3', 'h4', 'md-h3');
     retag('h2', 'h3', 'md-h2');

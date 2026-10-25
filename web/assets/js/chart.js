@@ -4,7 +4,7 @@
      LTChart.bars(el, { x, series:[{ name, y, color, colors }], ... })(colors：每根長條各自的顏色，可省略)
    共通選項：height、xFmt(x)、yFmt(y)、xType:'date'|'num'、refY:[{ y, label, color }]、
             refX:[{ x, label, color }]、points:[{ x, y, label, color }]、yMin、yMax、tipFmt、
-            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別)
+            yTicks(lo, hi)(自訂 y 軸刻度，例如對數座標)、xAll(每個 x 都標刻度，適合 12 個月份這種少量類別；長條圖放不下時刻度文字自動斜放 45°)
    右側 y 軸：series 加 axis:'right'(長條圖中畫成折線＋圓點)，搭配 y2Min、y2Max、y2Fmt；refY 也可加 axis:'right'
    下方子圖(折線圖)：lower:{ height, series:[{ name, y, color, width }], yMin, yMax, yFmt, tipFmt, label, fill }
             畫在同一張圖的下方，共用 x 軸與十字線，例如權益曲線下方接回撤(fill:true 時從 0 往下塗色)
@@ -41,9 +41,15 @@ const LTChart = (() => {
 
   function frame(el, o, kind) {
     const L0 = o.lower, gap = L0 ? 22 : 0, lh = L0 ? (L0.height || 120) : 0;
-    const W = Math.max(280, el.clientWidth || 600), H = (o.height || 260) + lh + gap;
+    const W = Math.max(280, el.clientWidth || 600);
     const R2 = o.series.filter(s => s.axis === 'right'), r = R2.length ? 46 : PAD.r;
     const xs = o.x.map(v => toNum(v, o.xType));
+    const xFmt = o.xFmt || (o.xType === 'date' ? v => String(v).slice(0, 7) : defaultFmt);
+    // 長條圖每個類別都標刻度(xAll)時，類別太窄(手機)放不下就把刻度文字斜放 45°，底部多留空間
+    const textW = s => [...s].reduce((w, c) => w + (c.charCodeAt(0) > 0x2e80 ? 10.5 : 6.2), 0);
+    const labelW = kind === 'bars' && o.xAll ? Math.max(...o.x.map(v => textW(String(xFmt(v))))) : 0;
+    const tilt = labelW > (W - PAD.l - r) / xs.length - 6, extra = tilt ? Math.ceil(labelW * 0.71) : 0;
+    const H = (o.height || 260) + lh + gap + extra, pb = PAD.b + extra;
     const ys = o.series.filter(s => s.axis !== 'right').flatMap(s => s.y).concat((o.refY || []).filter(q => q.axis !== 'right').map(q => q.y)).filter(Number.isFinite);
     if (kind === 'bars') ys.push(0);
     let yLo = o.yMin ?? Math.min(...ys), yHi = o.yMax ?? Math.max(...ys);
@@ -54,7 +60,7 @@ const LTChart = (() => {
     // yTicks(lo, hi)：自訂刻度(例如對數座標)，只保留範圍內的刻度
     const yt = o.yTicks ? o.yTicks(yLo, yHi).filter(v => v >= yLo && v <= yHi) : ticks(yLo, yHi);
     if (!o.yTicks) { yLo = Math.min(yLo, yt[0]); yHi = Math.max(yHi, yt[yt.length - 1]); }
-    const iw = W - PAD.l - r, ih = H - PAD.t - PAD.b - lh - gap;
+    const iw = W - PAD.l - r, ih = H - PAD.t - pb - lh - gap;
     const xLo = Math.min(...xs), xHi = Math.max(...xs);
     const band = kind === 'bars' ? iw / xs.length : 0;
     const X = kind === 'bars'
@@ -62,13 +68,17 @@ const LTChart = (() => {
       : v => PAD.l + (xHi === xLo ? iw / 2 : (v - xLo) / (xHi - xLo) * iw);
     const Y = v => PAD.t + (yHi - v) / (yHi - yLo) * ih;
     const yFmt = o.yFmt || defaultFmt;
-    const xFmt = o.xFmt || (o.xType === 'date' ? v => String(v).slice(0, 7) : defaultFmt);
     let g = yt.map(v => `<line x1="${PAD.l}" x2="${W - r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/>
       <text x="${PAD.l - 6}" y="${Y(v) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(yFmt(v))}</text>`).join('');
     // x 軸刻度：依寬度挑選約 6 個
     const nx = Math.max(2, Math.min(8, Math.floor(iw / 90)));
     const idx = o.xAll ? xs.map((_, i) => i) : [...new Set(Array.from({ length: nx }, (_, k) => Math.round(k * (xs.length - 1) / (nx - 1))))];
-    g += idx.map(i => `<text x="${kind === 'bars' ? X(i) : X(xs[i])}" y="${H - 8}" font-size="10.5" text-anchor="middle" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`).join('');
+    g += idx.map(i => {
+      const x = kind === 'bars' ? X(i) : X(xs[i]);
+      if (!tilt) return `<text x="${x}" y="${H - 8}" font-size="10.5" text-anchor="middle" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`;
+      const y = H - pb + 12;   // 從刻度下方往左下斜放
+      return `<text x="${x + 4}" y="${y}" font-size="10.5" text-anchor="end" transform="rotate(-45 ${x + 4} ${y})" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`;
+    }).join('');
     // 右側 y 軸(只標刻度文字，不另畫格線)
     let Y2 = Y;
     if (R2.length) {
@@ -92,7 +102,7 @@ const LTChart = (() => {
         <text x="${PAD.l - 6}" y="${L.Y(t) + 3.5}" font-size="10.5" text-anchor="end" fill="var(--mute)">${esc(fmt(t))}</text>`).join('');
       if (L0.label) g += `<text x="${PAD.l + 4}" y="${top + 11}" font-size="10.5" fill="var(--mute)">${esc(L0.label)}</text>`;
     }
-    return { W, H, r, xs, X, Y, Y2, L, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
+    return { W, H, pb, r, xs, X, Y, Y2, L, yLo, yHi, iw, ih, band, g, yFmt, xFmt };
   }
 
   function refs(o, f, kind) {
@@ -100,7 +110,7 @@ const LTChart = (() => {
     const yOf = r => r.axis === 'right' ? f.Y2(r.y) : f.Y(r.y);
     let g = (o.refY || []).map(r => `<line x1="${PAD.l}" x2="${f.W - f.r}" y1="${yOf(r)}" y2="${yOf(r)}" stroke="${r.color || 'var(--border-strong)'}" stroke-dasharray="4 4"/>
       ${r.label ? `<text x="${f.W - f.r - 4}" y="${yOf(r) - 4}" font-size="10.5" text-anchor="end" fill="${r.color || 'var(--mute)'}">${esc(r.label)}</text>` : ''}`).join('');
-    g += (o.refX || []).map(r => `<line x1="${xPos(r.x)}" x2="${xPos(r.x)}" y1="${PAD.t}" y2="${f.H - PAD.b}" stroke="${r.color || 'var(--border-strong)'}" stroke-dasharray="4 4"/>
+    g += (o.refX || []).map(r => `<line x1="${xPos(r.x)}" x2="${xPos(r.x)}" y1="${PAD.t}" y2="${f.H - f.pb}" stroke="${r.color || 'var(--border-strong)'}" stroke-dasharray="4 4"/>
       ${r.label ? `<text x="${xPos(r.x) + 4}" y="${PAD.t + 10}" font-size="10.5" fill="${r.color || 'var(--mute)'}">${esc(r.label)}</text>` : ''}`).join('');
     g += (o.points || []).map(p => `<circle cx="${xPos(p.x)}" cy="${f.Y(p.y)}" r="4" fill="${p.color || 'var(--text)'}" stroke="var(--panel)" stroke-width="1.5"/>
       ${p.label ? `<text x="${xPos(p.x)}" y="${f.Y(p.y) - 8}" font-size="10.5" text-anchor="middle" fill="${p.color || 'var(--text)'}">${esc(p.label)}</text>` : ''}`).join('');
@@ -140,7 +150,7 @@ const LTChart = (() => {
       el.classList.add('lt-chart');
       el.innerHTML = `<svg width="${f.W}" height="${f.H}" viewBox="0 0 ${f.W} ${f.H}" role="img" aria-label="${esc(o.label || '圖表')}">
         ${f.g}${body(f)}${refs(o, f, kind)}
-        <line class="lt-cross" y1="${PAD.t}" y2="${f.H - PAD.b}" stroke="var(--dim)" stroke-width="1" style="display:none"/>
+        <line class="lt-cross" y1="${PAD.t}" y2="${f.H - f.pb}" stroke="var(--dim)" stroke-width="1" style="display:none"/>
       </svg><div class="lt-tip"></div>`;
       hover(el, o, f, kind);
     });
