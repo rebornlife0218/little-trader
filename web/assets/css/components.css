@@ -284,10 +284,16 @@
   .doc a.xref:hover{border-bottom-style:solid;}
   .doc table.md-table{width:auto;max-width:100%;}
   .doc table.md-table td, .doc table.md-table th{text-align:left;white-space:normal;font-family:var(--font-body);text-transform:none;}
-  /* 手機上欄位多時，中文會被擠成幾個字就換行(甚至一字一行)：標題與短的格子(LT.mdTables 標 nw)不換行，
-     長的格子(內容包在 .cellw)至少 8 個字寬，放不下就由 .tablewrap 左右捲動 */
-  .doc table.md-table th, .doc table.md-table td.nw{white-space:nowrap;}
-  .doc table.md-table .cellw{min-width:8em;}
+  .doc table.md-table td:first-child{white-space:nowrap;}
+  /* 手機(≤ 640px)欄位多時，中文會被擠成幾個字就換行(甚至一字一行)：標題與短的格子(LT.mdTables 標 nw)不換行，
+     長的格子(內容包在 .cellw，含很長的第一欄)至少 8 個字寬，放不下就由 .tablewrap 左右捲動；電腦版維持原本的排版 */
+  @media (max-width:640px){
+    .doc table.md-table th, .doc table.md-table td.nw{white-space:nowrap;}
+    .doc table.md-table td:first-child:not(.nw){white-space:normal;}
+    .doc table.md-table .cellw{min-width:8em;}
+    /* 處置股「新制改了什麼」：長的說明換行，整張表同一種字型 */
+    table.stattable.dp-rules td{white-space:normal;text-align:left;font-family:var(--font-body);}
+  }
   .doc pre{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin:6px 0 12px;overflow-x:auto;line-height:1.6;}
   .doc pre code{background:none;border:0;padding:0;font-size:12px;color:var(--text);}
   .doc .katex{font-size:1.08em;}
