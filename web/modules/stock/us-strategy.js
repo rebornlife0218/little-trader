@@ -181,9 +181,9 @@
         const row = (s, strat) => { const x = st[s.key];
           const qr = strat ? qret(s.key) : null, w = qr ? qr.filter((v, j) => v > spyQ[j]).length / qr.length : null;
           return `<tr class="${strat ? 'click' : 'allrow'}" ${strat ? `data-go="${s.key}"` : ''}><td>${esc(s.name)}</td><td style="text-align:left">${esc(s.short)}</td>
-            <td class="${cls(x.ret)} ${strat ? beat(x.ret, S.ret) : ''}">${pct(x.ret)}</td><td class="${strat ? beat(x.vol, S.vol, false) : ''}">${(x.vol * 100).toFixed(1)}%</td>
+            <td>${w == null ? '—' : (w * 100).toFixed(0) + '%'}</td><td class="${cls(x.ret)} ${strat ? beat(x.ret, S.ret) : ''}">${pct(x.ret)}</td><td class="${strat ? beat(x.vol, S.vol, false) : ''}">${(x.vol * 100).toFixed(1)}%</td>
             <td class="${strat ? beat(x.sharpe, S.sharpe) : ''}">${x.sharpe.toFixed(2)}</td><td class="down ${strat ? beat(x.mdd, S.mdd) : ''}">${pct(x.mdd, 1)}</td>
-            <td class="${cls(x.mult - 1)}">${pct(x.mult - 1, 0)}</td><td>${w == null ? '—' : (w * 100).toFixed(0) + '%'}</td><td>${isStrat(s.key) ? (turnAvg(s.key) / 2 * 100).toFixed(0) + '%' : '—'}</td></tr>`; };
+            <td class="${cls(x.mult - 1)}">${pct(x.mult - 1, 0)}</td><td>${isStrat(s.key) ? (turnAvg(s.key) / 2 * 100).toFixed(0) + '%' : '—'}</td></tr>`; };
         const best = STRATS.slice().sort((a, b) => st[b.key].sharpe - st[a.key].sharpe)[0];
         const beatRet = STRATS.filter(s => st[s.key].ret > S.ret), beatSh = STRATS.filter(s => st[s.key].sharpe > S.sharpe);
         const keys = [...STRATS.map(s => s.key), 'spy', 'ew'], rows = yearRows(C, keys);
@@ -191,7 +191,7 @@
         $('#usView').innerHTML = `
           <div class="panel">
             <h3>四種策略 vs SPY</h3>
-            <div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>選股規則</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>最大回撤</th><th>總報酬</th><th>贏 SPY 的季數</th><th>每季換手率(單邊)</th></tr></thead>
+            <div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>選股規則</th><th>勝率(贏 SPY 的季數)</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>最大回撤</th><th>總報酬</th><th>每季換手率(單邊)</th></tr></thead>
               <tbody>${STRATS.map(s => row(s, true)).join('')}${BENCH.map(s => row(s, false)).join('')}</tbody></table></div>
             <p class="note">粗體底線表示優於 SPY；點選策略列可切換到該策略的分析。夏普值 = (年化報酬 − 無風險利率) ÷ 年化波動，無風險利率用期間內美國 3 個月國庫券殖利率的平均；換手率(單邊) = 每季賣出(或買進)金額占資產的比例，100% 代表整批換掉；交易成本 = 單邊成本 × (賣出 + 買進金額)，在每次換股時扣除。</p>
             <ul class="insight">
@@ -232,11 +232,11 @@
             <h3>${esc(s.name)}</h3>
             <p><b>選股規則</b>：每季最後一個交易日，${esc(s.short)}，持有一季後重新挑選。<b>想法</b>：${esc(s.idea)}</p>
             <div class="statgrid" style="margin:12px 0;">
+              ${card(`${(win / d.length * 100).toFixed(0)}%`, '勝率(贏 SPY 的季數)', `${win} / ${d.length} 季，年度 ${yWin} / ${rows.length}`)}
               ${card(pct(x.ret), '年化報酬', `SPY ${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`)}
               ${card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false))}
               ${card(x.sharpe.toFixed(2), '夏普值', `SPY ${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe))}
               ${card(pct(x.mdd, 1), '最大回撤', `SPY ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)}
-              ${card(`${(win / d.length * 100).toFixed(0)}%`, '贏 SPY 的季數', `${win} / ${d.length} 季，年度 ${yWin} / ${rows.length}`)}
               ${card(`${(turnAvg(k) / 2 * 100).toFixed(0)}%`, '每季換手率(單邊)', `每年成本約 ${(turnAvg(k) * cost * 4 * 100).toFixed(1)}%`)}
             </div>
             <ul class="insight">

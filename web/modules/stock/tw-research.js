@@ -106,13 +106,13 @@
   // 比較表：rows = [{ name, nav, ts, main }]；S = 0050 的 stats
   function compareTable(rows, S) {
     const { stats, pct, cls, beat, totalRet } = W();
-    return `<div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>組合</th><th>總報酬</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>索提諾比率</th><th>最大回撤</th><th>最長連續回撤</th><th>交易筆數 / 勝率</th><th>每筆平均 / 中位數</th></tr></thead><tbody>
+    return `<div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>組合</th><th>勝率</th><th>總報酬</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>索提諾比率</th><th>最大回撤</th><th>最長連續回撤</th><th>交易筆數</th><th>每筆平均 / 中位數</th></tr></thead><tbody>
       ${rows.map(r => { const x = stats(r.nav), t = r.ts;
-        return `<tr class="${r.main ? 'allrow' : ''}"><td>${esc(r.name)}</td><td class="${cls(x.mult - 1)} ${beat(x.mult, S.mult)}">${totalRet(x)}</td><td class="${cls(x.ret)} ${beat(x.ret, S.ret)}">${pct(x.ret)}</td>
+        return `<tr class="${r.main ? 'allrow' : ''}"><td>${esc(r.name)}</td><td>${t ? `${(t.win * 100).toFixed(0)}%` : '—'}</td><td class="${cls(x.mult - 1)} ${beat(x.mult, S.mult)}">${totalRet(x)}</td><td class="${cls(x.ret)} ${beat(x.ret, S.ret)}">${pct(x.ret)}</td>
           <td class="${beat(x.vol, S.vol, false)}">${(x.vol * 100).toFixed(1)}%</td><td class="${beat(x.sharpe, S.sharpe)}">${x.sharpe.toFixed(2)}</td><td class="${beat(x.sortino, S.sortino)}">${x.sortino.toFixed(2)}</td>
           <td class="down ${beat(x.mdd, S.mdd)}">${pct(x.mdd, 1)}</td><td class="${beat(x.ddDays, S.ddDays, false)}">${x.ddDays} 天</td>
-          <td>${t ? `${t.n.toLocaleString()} 筆 / ${(t.win * 100).toFixed(0)}%` : '—'}</td><td class="${t ? cls(t.mean) : ''}">${t ? `${pct(t.mean, 2)} / ${pct(t.median, 2)}` : '—'}</td></tr>`; }).join('')}
-      <tr><td>0050 買進持有</td><td>${totalRet(S)}</td><td>${pct(S.ret)}</td><td>${(S.vol * 100).toFixed(1)}%</td><td>${S.sharpe.toFixed(2)}</td><td>${S.sortino.toFixed(2)}</td><td class="down">${pct(S.mdd, 1)}</td><td>${S.ddDays} 天</td><td>—</td><td>—</td></tr>
+          <td>${t ? `${t.n.toLocaleString()} 筆` : '—'}</td><td class="${t ? cls(t.mean) : ''}">${t ? `${pct(t.mean, 2)} / ${pct(t.median, 2)}` : '—'}</td></tr>`; }).join('')}
+      <tr><td>0050 買進持有</td><td>—</td><td>${totalRet(S)}</td><td>${pct(S.ret)}</td><td>${(S.vol * 100).toFixed(1)}%</td><td>${S.sharpe.toFixed(2)}</td><td>${S.sortino.toFixed(2)}</td><td class="down">${pct(S.mdd, 1)}</td><td>${S.ddDays} 天</td><td>—</td><td>—</td></tr>
       </tbody></table></div>`;
   }
   const extraCards = t => [
@@ -160,7 +160,7 @@
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(V.name)}｜${G[grp]}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(t)}${extraCards(t)}</div>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx, t)}${tradeCards(t)}${extraCards(t)}</div>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(V.name)}｜${G[grp]} vs 全部合格股票 vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
@@ -220,7 +220,7 @@
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(T.name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx, T.ts)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(T.name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
@@ -289,7 +289,7 @@
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx, T.ts)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
@@ -375,7 +375,7 @@
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx, T.ts)}${tradeCards(T.ts)}${extraCards(T.ts)}</div>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
@@ -448,7 +448,7 @@
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(T.name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(t)}${cards}</div>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx, t)}${tradeCards(t)}${cards}</div>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：處置股策略 vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>

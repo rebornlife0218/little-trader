@@ -231,7 +231,7 @@ def report(key, facts):
 
 def perf_cells(x, mean=None, win=None):
     return (f"{pc(x['ret'], 0)} | {pc(x['cagr'])} | {num(x['sharpe'])} | {num(x['sortino'])} | {pc(x['mdd'], 1, False)} | {x['dd']} 天"
-            + (f" | {pc(mean, 2)} | {pc(win, 1, False)}" if mean is not None else ''))
+            + (f" | {pc(mean, 2)}" if mean is not None else '') + (f" | {pc(win, 1, False)}" if win is not None else ''))
 
 
 # ---------- 營收公告前布局 ----------
@@ -912,7 +912,7 @@ def disp(X):
     def cells(F, nm, x, ts):
         F[nm + '_ret'], F[nm + '_cagr'], F[nm + '_sharpe'], F[nm + '_sortino'] = pc(x['ret'], 1), pc(x['cagr']), num(x['sharpe']), num(x['sortino'])
         F[nm + '_mdd'], F[nm + '_vol'], F[nm + '_n'], F[nm + '_win'], F[nm + '_mean'] = pc(x['mdd'], 1, False), pc(x['vol'], 1, False), intc(ts['n']), pc(ts['win'], 1, False), pc(ts['mean'], 2)
-        F[nm + '_row'] = perf_cells(x, ts['mean'], ts['win']).replace(pc(x['ret'], 0), pc(x['ret'], 1), 1)
+        F[nm + '_row'] = perf_cells(x, ts['mean']).replace(pc(x['ret'], 0), pc(x['ret'], 1), 1)   # 勝率在報告表格的第一欄(報酬之前)
 
     F, sens = {}, []
     # 1. 主策略：新制上路後(處置起日 ≥ 2026/8/10)，期初 = 第一筆可進場日的前一天收盤
@@ -950,8 +950,8 @@ def disp(X):
             H[(u, when)] = xs
             if u is None and when == 'open':
                 G = disp_groups(Tl, resl, evs)
-            sens.append(f"| {'**' + short(u) + '**' if u == UTIL else short(u)} | {EXITS[when]} | {pc(xs['cagr'])} | {num(xs['sharpe'])} | {num(xs['sortino'])} | "
-                        f"{pc(xs['mdd'], 1, False)} | {intc(tsl['n'])} | {pc(tsl['win'], 1, False)} | {pc(tsl['mean'], 2)} |")
+            sens.append(f"| {'**' + short(u) + '**' if u == UTIL else short(u)} | {EXITS[when]} | {pc(tsl['win'], 1, False)} | {pc(xs['cagr'])} | {num(xs['sharpe'])} | {num(xs['sortino'])} | "
+                        f"{pc(xs['mdd'], 1, False)} | {intc(tsl['n'])} | {pc(tsl['mean'], 2)} |")
     F['l_start'], F['l_end'] = dl[1], dl[-1]
     F['l_cagr'], F['l_sharpe'] = pc(H[(UTIL, 'open')]['cagr']), num(H[(UTIL, 'open')]['sharpe'])
     F['l_bcagr'], F['l_bsharpe'] = pc(L0['cagr']), num(L0['sharpe'])
@@ -961,7 +961,7 @@ def disp(X):
     F['n_utils'] = len(UTILS) - 1
     F['sens_rows'] = '\n'.join(sens)
     F['n_events'], F['n_new'] = intc(len(evs)), intc(sum(e['start'] >= NEW_RULE for e in evs))
-    F['group_rows'] = '\n'.join(f"| {g['g']} | {g['k']} | {intc(g['n'])} | {pc(g['mean'], 2)} | {pc(g['median'], 2)} | {pc(g['win'], 1, False)} |" for g in G)
+    F['group_rows'] = '\n'.join(f"| {g['g']} | {g['k']} | {intc(g['n'])} | {pc(g['win'], 1, False)} | {pc(g['mean'], 2)} | {pc(g['median'], 2)} |" for g in G)
     gq = {g['k']: g for g in G if g['g'] == '融資使用率'}
     F['util_lo'], F['util_hi'] = pc(gq['< 10%']['mean'], 2), pc(gq['≥ 40%']['mean'], 2)
     out = {'d': d, 'asof': d[-1], 'b0050': navlist(b), 'util': UTIL, 'newRule': NEW_RULE.strftime('%Y-%m-%d'), 'strat': strat, 'groups': G, 'report': report('disp', F)}

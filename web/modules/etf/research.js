@@ -92,12 +92,12 @@
     ].join('');
     const yearHtml = (T, b) => `<div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th><th>策略</th><th>0050</th></tr></thead><tbody>
       ${W.yearTable(B.d, T.i0, T.nav, b).slice().reverse().map(r => `<tr><td>${r.label}</td>${W.heat(r.r, r.r > r.b)}${W.heat(r.b, false)}</tr>`).join('')}</tbody></table></div>`;
-    const allTable = cur => `<div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>期間</th><th>總報酬</th><th>年化報酬</th><th>夏普值</th><th>最大回撤</th><th>交易筆數 / 勝率</th><th>每筆平均 / 中位數</th><th>平均持倉天期</th><th>0050 總報酬 / 夏普值</th></tr></thead><tbody>
+    const allTable = cur => `<div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>策略</th><th>期間</th><th>勝率</th><th>總報酬</th><th>年化報酬</th><th>夏普值</th><th>最大回撤</th><th>交易筆數</th><th>每筆平均 / 中位數</th><th>平均持倉天期</th><th>0050 總報酬 / 夏普值</th></tr></thead><tbody>
       ${B.strats.map(T => { const x = statsC(T.nav), Sx = statsC(sub(T)), t = T.ts;
         return `<tr class="${T === cur ? 'allrow' : ''}" data-k="${esc(T.key)}" style="cursor:pointer"><td>${esc(`${T.mode}｜${T.group}｜${hname(T.hold)}`)}</td><td>${B.d[T.i0 + 1].replace(/-/g, '/')} 起</td>
-          <td class="${W.cls(x.mult - 1)} ${W.beat(x.mult, Sx.mult)}">${W.totalRet(x)}</td><td class="${W.cls(x.ret)} ${W.beat(x.ret, Sx.ret)}">${pct(x.ret)}</td>
+          <td>${(t.win * 100).toFixed(0)}%</td><td class="${W.cls(x.mult - 1)} ${W.beat(x.mult, Sx.mult)}">${W.totalRet(x)}</td><td class="${W.cls(x.ret)} ${W.beat(x.ret, Sx.ret)}">${pct(x.ret)}</td>
           <td class="${W.beat(x.sharpe, Sx.sharpe)}">${x.sharpe.toFixed(2)}</td><td class="down ${W.beat(x.mdd, Sx.mdd)}">${pct(x.mdd, 1)}</td>
-          <td>${t.n.toLocaleString()} 筆 / ${(t.win * 100).toFixed(0)}%</td><td class="${W.cls(t.mean)}">${pct(t.mean, 2)} / ${pct(t.median, 2)}</td><td>${t.days.toFixed(1)} 天</td>
+          <td>${t.n.toLocaleString()} 筆</td><td class="${W.cls(t.mean)}">${pct(t.mean, 2)} / ${pct(t.median, 2)}</td><td>${t.days.toFixed(1)} 天</td>
           <td>${W.totalRet(Sx)} / ${Sx.sharpe.toFixed(2)}</td></tr>`; }).join('')}</tbody></table></div>`;
     const fillGroup = () => {
       const gs = GROUPS.filter(g => SK(mode, g, hold));
@@ -110,7 +110,7 @@
       $('#efView').innerHTML = `
         <div class="panel">
           <h3>${esc(name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${W.vs0050Cards(x, Sx)}${W.tradeCards(T.ts)}${extra(T.ts)}</div>
+          <div class="statgrid" style="margin:12px 0;">${W.vs0050Cards(x, Sx, T.ts)}${W.tradeCards(T.ts)}${extra(T.ts)}</div>
           <ul class="insight"><li>${W.vs0050Txt(B.d[T.i0 + 1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="efChart"></div><div id="efLegend"></div>

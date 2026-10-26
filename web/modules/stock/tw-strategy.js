@@ -46,8 +46,10 @@
   const heat = (v, beatIt) => { const c = v >= 0 ? 'var(--up)' : 'var(--down)', a = Math.min(55, Math.abs(v) * 110);
     return `<td class="${beatIt ? 'beat' : ''}" style="background:color-mix(in srgb, ${c} ${a.toFixed(0)}%, transparent)">${pct(v, 1)}</td>`; };
   const totalRet = x => pct(x.mult - 1, 0);
-  // 總報酬、年化報酬、年化波動、夏普值、索提諾比率、最大回撤、最長連續回撤天期(x = 策略，S = 0050，皆為 stats() 的結果)
-  const vs0050Cards = (x, S) => [
+  // 勝率(有交易統計 t 時，單獨一張放最前面)、總報酬、年化報酬、年化波動、夏普值、索提諾比率、最大回撤、最長連續回撤天期(x = 策略，S = 0050，皆為 stats() 的結果)
+  const winCard = t => card(`${(t.win * 100).toFixed(1)}%`, '勝率', `${t.n.toLocaleString()} 筆中賺錢的比例(扣成本)`, t.win >= 0.5 ? 'up' : '');
+  const vs0050Cards = (x, S, t) => [
+    t ? winCard(t) : '',
     card(totalRet(x), '總報酬', `0050 ${totalRet(S)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
     card(pct(x.ret), '年化報酬', `0050 ${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
     card((x.vol * 100).toFixed(1) + '%', '年化波動', `0050 ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
@@ -56,9 +58,9 @@
     card(pct(x.mdd, 1), '最大回撤', `0050 ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`),
     card(`${x.ddDays} 天`, '最長連續回撤', `0050 ${S.ddDays} 天(交易日)`, beat(x.ddDays, S.ddDays, false)),
   ].join('');
-  // 交易筆數與勝率、每筆平均報酬、每筆中位數報酬、平均一天持有檔數、平均一檔持倉天期(t = tradeStats() 的結果)
+  // 交易筆數、每筆平均報酬、每筆中位數報酬、平均一天持有檔數、平均一檔持倉天期(t = tradeStats() 的結果；勝率在 vs0050Cards 的第一張)
   const tradeCards = t => [
-    card(`${t.n.toLocaleString()} 筆`, '交易筆數(已出場)', `勝率 ${(t.win * 100).toFixed(1)}%`),
+    card(`${t.n.toLocaleString()} 筆`, '交易筆數', '已出場'),
     card(pct(t.mean), '每筆平均報酬', '扣成本', cls(t.mean)),
     card(pct(t.median), '每筆中位數報酬', '扣成本', cls(t.median)),
     card(`${t.pos.toFixed(1)} 檔`, '平均一天持有檔數', t.heldPct < 0.995 ? `只算有部位的日子(占 ${(t.heldPct * 100).toFixed(0)}%)` : '每天都有部位'),
@@ -233,9 +235,9 @@
       const row = (s, strat) => { const x = st[s.key];
         const mr = strat ? mret(s.key) : null, w = mr ? mr.filter((v, j) => v > bQ[j]).length / mr.length : null;
         return `<tr class="${strat ? 'click' : 'allrow'}" ${strat ? `data-go="${s.key}"` : ''}><td>${esc(s.name)}</td><td style="text-align:left">${esc(s.short)}</td>
-          <td class="${cls(x.ret)} ${strat ? beat(x.ret, S.ret) : ''}">${pct(x.ret)}</td><td class="${strat ? beat(x.vol, S.vol, false) : ''}">${(x.vol * 100).toFixed(1)}%</td>
+          <td>${ts[s.key] ? `${(ts[s.key].win * 100).toFixed(0)}%` : '—'}</td><td class="${cls(x.ret)} ${strat ? beat(x.ret, S.ret) : ''}">${pct(x.ret)}</td><td class="${strat ? beat(x.vol, S.vol, false) : ''}">${(x.vol * 100).toFixed(1)}%</td>
           <td class="${strat ? beat(x.sharpe, S.sharpe) : ''}">${x.sharpe.toFixed(2)}</td><td class="${strat ? beat(x.sortino, S.sortino) : ''}">${x.sortino.toFixed(2)}</td><td class="down ${strat ? beat(x.mdd, S.mdd) : ''}">${pct(x.mdd, 1)}</td><td class="${strat ? beat(x.ddDays, S.ddDays, false) : ''}">${x.ddDays} 天</td>
-          <td class="${cls(x.mult - 1)}">${totalRet(x)}</td><td>${ts[s.key] ? `${ts[s.key].n.toLocaleString()} 筆 / ${(ts[s.key].win * 100).toFixed(0)}%` : '—'}</td><td class="${ts[s.key] ? cls(ts[s.key].mean) : ''}">${ts[s.key] ? `${pct(ts[s.key].mean, 1)} / ${pct(ts[s.key].median, 1)}` : '—'}</td><td>${ts[s.key] ? `${ts[s.key].pos.toFixed(0)} 檔 / ${ts[s.key].days.toFixed(0)} 天` : '—'}</td><td>${w == null ? '—' : (w * 100).toFixed(0) + '%'}</td><td>${isStrat(s.key) ? (turnAvg(s.key) / 2 * 100).toFixed(0) + '%' : '—'}</td></tr>`; };
+          <td class="${cls(x.mult - 1)}">${totalRet(x)}</td><td>${ts[s.key] ? `${ts[s.key].n.toLocaleString()} 筆` : '—'}</td><td class="${ts[s.key] ? cls(ts[s.key].mean) : ''}">${ts[s.key] ? `${pct(ts[s.key].mean, 1)} / ${pct(ts[s.key].median, 1)}` : '—'}</td><td>${ts[s.key] ? `${ts[s.key].pos.toFixed(0)} 檔 / ${ts[s.key].days.toFixed(0)} 天` : '—'}</td><td>${w == null ? '—' : (w * 100).toFixed(0) + '%'}</td><td>${isStrat(s.key) ? (turnAvg(s.key) / 2 * 100).toFixed(0) + '%' : '—'}</td></tr>`; };
       const keys = [...STRATS.map(s => s.key), 'b0050', 'ew'], rows = yearRows(C, keys);
       const wins = k => rows.filter(r => r.r[k] > r.r.b0050).length;
       const E = st.ew, lv = st.lv10p;
@@ -244,7 +246,7 @@
       $('#twView').innerHTML = `
         <div class="panel">
           <h3>低波動 vs 0050</h3>
-          <div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>組合</th><th>選股規則</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>索提諾比率</th><th>最大回撤</th><th>最長連續回撤</th><th>總報酬</th><th>交易筆數 / 勝率</th><th>每筆平均 / 中位數報酬</th><th>平均持有檔數 / 持倉天期</th><th>贏 0050 的月數</th><th>每月換手率(單邊)</th></tr></thead>
+          <div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>組合</th><th>選股規則</th><th>勝率</th><th>年化報酬</th><th>年化波動</th><th>夏普值</th><th>索提諾比率</th><th>最大回撤</th><th>最長連續回撤</th><th>總報酬</th><th>交易筆數</th><th>每筆平均 / 中位數報酬</th><th>平均持有檔數 / 持倉天期</th><th>贏 0050 的月數</th><th>每月換手率(單邊)</th></tr></thead>
             <tbody>${STRATS.map(s => row(s, true)).join('')}${BENCH.map(s => row(s, false)).join('')}</tbody></table></div>
           <p class="note">粗體底線表示優於 0050；點選策略列可切換到該策略的分析。${STAT_NOTE}換手率(單邊) = 每月賣出加買進金額占資產比例的一半。一筆交易 = 一檔股票從買進到全部賣出(中間的調整併在同一筆)；報酬 = 收回金額 ÷ 投入金額 − 1(扣成本)，持倉天期以交易日計。</p>
           <ul class="insight">
@@ -281,7 +283,7 @@
           <h3>${esc(s.name)}</h3>
           <p><b>選股規則</b>：每月最後一個交易日收盤後，${esc(s.short)}，隔天開盤進場、持有一個月。<b>想法</b>：${esc(s.idea)}</p>
           <div class="statgrid" style="margin:12px 0;">
-            ${vs0050Cards(x, S)}
+            ${vs0050Cards(x, S, ts[k])}
             ${card(`${(win / d.length * 100).toFixed(0)}%`, '贏 0050 的月數', `${win} / ${d.length} 個月，年度 ${yWin} / ${rows.length}`)}
             ${card(`${(turnAvg(k) / 2 * 100).toFixed(0)}%`, '每月換手率(單邊)', '賣出加買進金額的一半')}
             ${tradeCards(ts[k])}
@@ -499,7 +501,7 @@
         <div class="panel">
           <h3>回測績效</h3>
           <div class="statgrid" style="margin:12px 0;">
-            ${vs0050Cards(x, S)}
+            ${vs0050Cards(x, S, ts)}
             ${tradeCards(ts)}
           </div>
           <p class="note">${STAT_NOTE}每筆報酬 = 出場收回金額 ÷ 投入金額 − 1(扣手續費、交易稅、滑價${long ? '' : '與借券費'})；持倉天期以交易日計，當天進出算 1 天。</p>
@@ -520,8 +522,8 @@
           <h4>每日持有檔數</h4>
           <div id="evPos"></div>
           <h4>每年報酬</h4>
-          <div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th><th>${esc(cfg.name)}</th><th>0050</th><th>差距</th><th>出場筆數</th><th>勝率</th></tr></thead><tbody>
-            ${rows.slice().reverse().map(r => `<tr><td>${r.label}</td>${heat(r.r, r.r > r.b)}${heat(r.b, false)}<td class="${cls(r.r - r.b)}">${pct(r.r - r.b, 1)}</td><td>${r.n}</td><td>${r.n ? (r.w / r.n * 100).toFixed(0) + '%' : '—'}</td></tr>`).join('')}
+          <div class="tablewrap"><table class="stattable us-year"><thead><tr><th>年度</th><th>勝率</th><th>${esc(cfg.name)}</th><th>0050</th><th>差距</th><th>出場筆數</th></tr></thead><tbody>
+            ${rows.slice().reverse().map(r => `<tr><td>${r.label}</td><td>${r.n ? (r.w / r.n * 100).toFixed(0) + '%' : '—'}</td>${heat(r.r, r.r > r.b)}${heat(r.b, false)}<td class="${cls(r.r - r.b)}">${pct(r.r - r.b, 1)}</td><td>${r.n}</td></tr>`).join('')}
           </tbody></table></div>
           <p class="note">紅色越深代表漲越多、綠色越深代表跌越多；粗體底線表示當年贏過 0050。出場筆數與勝率以出場日所在年度計。</p>
         </div>
@@ -558,5 +560,5 @@
   }; }
 
   // 共用給其他台股頁面(tw-research.js)：績效統計與圖表的算法和這頁一致
-  window.LTTW = { stats, card, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
+  window.LTTW = { stats, card, winCard, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
 })();
