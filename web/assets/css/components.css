@@ -642,7 +642,9 @@
   .sec-h::after{content:'';flex:1;height:1px;background:var(--border);}
   .lt-hero{margin-bottom:6px;}
   /* 研究與策略的精簡版(LT.brief)：一句話結論、策略說明、累積報酬圖；淡淡的區塊色與下方的分隔線和完整報告區隔 */
-  .lt-brief{padding:18px;border-radius:18px;background:color-mix(in srgb, var(--sec) 5%, var(--panel));border:1px solid color-mix(in srgb, var(--sec) 22%, var(--border));}
+  .lt-brief{padding:18px;border-radius:18px;border:1px solid color-mix(in srgb, var(--sec) 26%, var(--border));
+    background:linear-gradient(180deg, color-mix(in srgb, var(--sec) 10%, var(--panel)) 0%, color-mix(in srgb, var(--sec) 4%, var(--panel)) 55%, var(--panel) 100%);
+    box-shadow:0 22px 44px -30px color-mix(in srgb, var(--sec) 55%, transparent);}
   .lt-brief .brief-hero{margin:0;}
   .lt-brief .brief-hero blockquote{margin:0 0 14px;}
   .brief-items{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px;}
@@ -653,8 +655,13 @@
   @media (max-width:1100px){ .brief-items{grid-template-columns:repeat(2,minmax(0,1fr));} }
   .lt-brief .brief-stats{margin:0 0 14px;}
   .brief-chart{padding:10px 12px 4px;border-radius:12px;background:var(--panel);border:1px solid var(--border);}
-  .lt-sep{border:0;height:1px;margin:34px 0 26px;background:linear-gradient(90deg, transparent, var(--border) 15%, var(--border) 85%, transparent);position:relative;overflow:visible;}
-  .lt-sep::after{content:'';position:absolute;left:50%;top:-4px;width:8px;height:8px;margin-left:-4px;border-radius:50%;background:var(--sec);}
+  .brief-recent{margin-top:16px;padding:12px 14px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--border);}
+  .brief-recent h4{margin:2px 0 4px;}
+  .brief-recent .note{margin:0 0 8px;}
+  .lt-sep{border:0;height:2px;margin:40px 0 30px;position:relative;overflow:visible;
+    background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--sec) 22%, var(--border)) 20%, color-mix(in srgb, var(--sec) 70%, transparent) 50%, color-mix(in srgb, var(--sec) 22%, var(--border)) 80%, transparent);}
+  .lt-sep::after{content:'';position:absolute;left:50%;top:-4px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--sec);
+    box-shadow:0 0 0 5px color-mix(in srgb, var(--sec) 18%, transparent), 0 0 18px color-mix(in srgb, var(--sec) 45%, transparent);}
   @media (max-width:640px){ .lt-brief{padding:12px;} .brief-items{grid-template-columns:1fr;} .brief-item.wide{grid-column:auto;} }
   header.top:has(> :nth-child(2):not(.share-box))::after{display:none;}   /* 頁首右側有選單等操作元件時，不放主題圖樣，避免疊在一起 */
 

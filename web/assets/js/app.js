@@ -289,7 +289,7 @@ const LT = (() => {
      LT.brief({ hero, items: [['邏輯', '…'], ['進出場', '…'], ['停利停損', '…'], ['持有期間', '…']], chart: 'id' }) 回傳 HTML，放在內容最上方
        hero(選填)：一句話結論的 HTML(網頁依回測數字產生時)；省略時由報告開頭的 > 一句話結論自動放進來(hoistConclusion)
        items：每項一句話，給第一次看的人；值是空的項目不顯示。第一項(邏輯)佔兩格寬，第三項之後(停利停損、持有期間)合併在同一張小卡。
-       stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
+       stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。recent(選填)：圖下方「近期明細」的容器 id(用 LT.moreTable 填入，說明文字放在 recent + 'Note')。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
      精簡版和下方報告之間用分隔線區隔(只有樣式，不加文字) */
   // 小卡：第一項(邏輯)佔兩格寬；第二項(進出場)一張；其餘(停利停損、持有期間)合併成一張
   function briefCards(items) {
@@ -304,8 +304,21 @@ const LT = (() => {
         <div class="brief-items">${briefCards(o.items.filter(x => x && x[1]))}</div>
         ${o.stats ? `<div class="statgrid brief-stats" id="${o.stats}"></div>` : ''}
         ${o.chart ? `<div class="brief-chart"><div id="${o.chart}"></div><div id="${o.chart}Legend"></div></div>` : ''}
+        ${o.recent ? `<div class="brief-recent"><h4>近期明細</h4><p class="note" id="${o.recent}Note"></p><div id="${o.recent}"></div></div>` : ''}
       </section>
       <hr class="lt-sep" aria-hidden="true">`;
+  }
+  // 近期明細等長表格：先顯示最新 n 列，按鈕展開全部或收合(rows = 每一列 <tr> 的 HTML，已依新到舊排好)
+  function moreTable(box, head, rows, n = 20) {
+    let all = false;
+    const draw = () => {
+      box.innerHTML = `<div class="tablewrap"><table class="stattable"><thead><tr>${head.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${
+        (all ? rows : rows.slice(0, n)).join('') || `<tr><td colspan="${head.length}" class="mute">目前沒有資料</td></tr>`}</tbody></table></div>${
+        rows.length > n ? `<div class="btnrow-l" style="margin-top:10px;"><button type="button">${all ? `收合，只顯示最新 ${n} 筆` : `顯示全部 ${rows.length.toLocaleString()} 筆`}</button></div>` : ''}`;
+      const b = box.querySelector('button');
+      if (b) b.onclick = () => { all = !all; draw(); };
+    };
+    draw();
   }
   function listPages() { return pages.slice(); }
 
@@ -603,5 +616,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, brief, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine, mdTables };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, brief, moreTable, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine, mdTables };
 })();

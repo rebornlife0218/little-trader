@@ -75,7 +75,7 @@
 
       // 精簡版(一句話結論、策略說明、累積報酬圖) → 報告(CLAUDE.md「研究報告」)：一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
       el.querySelector('#usBody').innerHTML = `
-        ${LT.brief({ hero: '<blockquote><p id="usHero"></p></blockquote>', stats: 'usBriefStats', chart: 'usBrief', items: [
+        ${LT.brief({ hero: '<blockquote><p id="usHero"></p></blockquote>', stats: 'usBriefStats', chart: 'usBrief', recent: 'usRecent', items: [
           ['邏輯', '每季從當時的 S&amp;P500 成分股挑股票：買上一季的贏家、輸家，或報酬穩定的股票，看哪一種想法能贏過買進持有 SPY。'],
           ['進出場', '每季最後一個交易日收盤選股，同時以收盤價換股。'],
           ['停利停損', '不設停利停損，到下一季換股才調整。'],
@@ -291,6 +291,10 @@
             card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
             card(x.sharpe.toFixed(2), '夏普值', `SPY ${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
             card(pct(x.mdd, 1), '最大回撤', `SPY ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)].join('');
+          // 近期明細：這個策略每一季的持股，最新一季在最前面
+          $('#usRecentNote').textContent = `${meta(b).name}每一季的持股，最新一季在最前面；上季報酬是選股時用的訊號。`;
+          LT.moreTable($('#usRecent'), ['換股季度', '代號', '權重', '上季報酬'], B.q.slice().reverse().filter(q => q.picks && q.picks[b]).flatMap(q =>
+            q.picks[b].map(([t, w, r]) => `<tr><td>${esc(q.q)}</td><td><a href="https://finance.yahoo.com/quote/${encodeURIComponent(t.replace('.', '-'))}" target="_blank" rel="noopener">${esc(t)}</a></td><td>${(w * 100).toFixed(1)}%</td><td class="${cls(r)}">${pct(r, 1)}</td></tr>`)));
           window.LTTW.navCharts({ d: B.d, i0: C.i0, navs: { [b]: C.navs[b], spy: C.navs.spy }, meta: { [b]: { name: meta(b).name, color: meta(b).color }, spy: { name: meta('spy').name, color: meta('spy').color } },
             main: b, log: true, chart: $('#usBrief'), legend: $('#usBriefLegend') });
         }

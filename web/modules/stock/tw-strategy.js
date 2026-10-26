@@ -134,7 +134,7 @@
 
     // 精簡版(一句話結論、策略說明、累積報酬圖) → 報告(CLAUDE.md「研究報告」)：一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
     el.querySelector('#twBody').innerHTML = `
-      ${LT.brief({ hero: '<blockquote><p id="twHero"></p></blockquote>', stats: 'twBriefStats', chart: 'twBrief', items: [
+      ${LT.brief({ hero: '<blockquote><p id="twHero"></p></blockquote>', stats: 'twBriefStats', chart: 'twBrief', recent: 'twRecent', items: [
         ['邏輯', '波動小的股票不一定賺得比較少：每月挑過去半年漲跌最平穩的股票，等權重持有，想用較小的起伏賺到報酬。'],
         ['進出場', '每月最後一個交易日收盤後選股，隔天開盤換股：先賣出落選的、再買進新入選的。'],
         ['停利停損', '不設停利停損，到下次換股才調整。'],
@@ -341,6 +341,10 @@
     {   // 精簡版的績效卡片(低波動 10%)與累積報酬圖：兩種低波動組合 vs 0050(對數刻度)
       const C0 = calc(), K = [...STRATS.map(s => s.key), 'b0050'];
       $('#twBriefStats').innerHTML = vs0050Cards(C0.st.lv10p, C0.st.b0050, C0.ts.lv10p) + tradeCards(C0.ts.lv10p);
+      const pk = B.picks, P = pk.lv10p;   // 近期明細：低波動 10% 最新一次選股的持股(波動由小到大)
+      $('#twRecentNote').textContent = `低波動 10% 的${pk.entered ? '本月持股' : '下個月持股'}：${pk.signal} 收盤選股，共 ${P.length} 檔，波動由小到大排列。`;
+      LT.moreTable($('#twRecent'), ['代號', '名稱', '產業', '年化波動', '每日成交金額(中位數)'],
+        P.map(([c, n, i, v, m]) => `<tr><td>${LT.stockLink(c)}</td><td>${esc(n)}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`));
       navCharts({ d: B.d, i0: 0, navs: Object.fromEntries(K.map(k => [k, C0.navs[k]])), meta: Object.fromEntries(K.map(k => [k, { name: meta(k).name, color: meta(k).color }])),
         main: 'lv10p', log: true, chart: $('#twBrief'), legend: $('#twBriefLegend') });
     }
@@ -435,7 +439,7 @@
     const stopTxt = P.tp != null && P.sl != null ? `${up}到 ${P.tp * 100}% 停利、${dn}到 ${P.sl * 100}% 停損` : P.sl != null ? `${dn}到 ${P.sl * 100}% 停損，不設停利` : P.tp != null ? `${up}到 ${P.tp * 100}% 停利，不設停損` : '不設停利停損';
     const holdTxt = P.exit === 'close' && P.hold === 1 ? '同一天進出' : `最多 ${P.hold} 個交易日`;
     el.innerHTML = `
-      ${LT.brief({ hero: '<blockquote><p id="evHero"></p></blockquote>', stats: 'evStats', chart: 'evChart', items: [
+      ${LT.brief({ hero: '<blockquote><p id="evHero"></p></blockquote>', stats: 'evStats', chart: 'evChart', recent: 'evRecent', items: [
         ['邏輯', cfg.idea], ['進出場', `每天收盤後選股，隔天開盤${T0.in}；${exitTxt}`], ['停利停損', stopTxt], ['持有期間', holdTxt]] })}
       <div class="panel">
         <div class="doc">
@@ -493,7 +497,6 @@
       return { i0, fee, navs, st: { s: stats(navs.s), b0050: stats(navs.b0050) }, T };
     };
     const tradeRow = t => `<tr><td>${LT.stockLink(t.c)}</td><td>${esc(t.n)}</td><td>${esc(t.e)}${t.edelay ? `<br><small class="mute">${T0.inLock}延後 ${t.edelay} 天</small>` : ''}</td><td>${t.x ? esc(t.x) : '—'}</td><td>${t.days}</td><td class="${cls(t.net)}">${pct(t.net, 1)}</td><td>${WHY[t.why]}${t.delay ? `<br><small class="mute">${T0.lock}延後 ${t.delay} 天</small>` : ''}</td></tr>`;
-    const tradeTable = list => `<div class="tablewrap"><table class="stattable"><thead><tr><th>代號</th><th>名稱</th><th>進場日</th><th>出場日</th><th>持有天數</th><th>報酬(扣成本)</th><th>出場原因</th></tr></thead><tbody>${list.map(tradeRow).join('')}</tbody></table></div>`;
 
     function draw() {
       const C = calc(), { i0, navs, st, T } = C, x = st.s, S = st.b0050;
@@ -511,6 +514,9 @@
         <li><b>每筆交易</b>：${ts.n.toLocaleString()} 筆，勝率 ${(ts.win * 100).toFixed(0)}%，每筆平均 ${pct(ts.mean, 2)}、中位數 ${pct(ts.median, 2)}(扣成本${long ? '' : '與借券費'})。</li>
         <li><b>資金使用</b>：${(held * 100).toFixed(0)}% 的交易日有部位，有部位時平均 ${avgPos.toFixed(1)} 檔。</li>`;
       $('#evStats').innerHTML = vs0050Cards(x, S, ts) + tradeCards(ts);
+      $('#evRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計，已扣進場成本${long ? '' : '與借券費'}。`;
+      LT.moreTable($('#evRecent'), ['代號', '名稱', '進場日', '出場日', '持有天數', '報酬(扣成本)', '出場原因'],
+        T.slice().sort((a, b) => b.e.localeCompare(a.e) || a.c.localeCompare(b.c)).map(tradeRow));
       $('#evView').innerHTML = `
         <div class="panel">
           <h3>回測績效</h3>
@@ -529,13 +535,6 @@
             ${rows.slice().reverse().map(r => `<tr><td>${r.label}</td><td>${r.n ? (r.w / r.n * 100).toFixed(0) + '%' : '—'}</td>${heat(r.r, r.r > r.b)}${heat(r.b, false)}<td class="${cls(r.r - r.b)}">${pct(r.r - r.b, 1)}</td><td>${r.n}</td></tr>`).join('')}
           </tbody></table></div>
           <p class="note">紅色越深代表漲越多、綠色越深代表跌越多；粗體底線表示當年贏過 0050。出場筆數與勝率以出場日所在年度計。</p>
-        </div>
-        <div class="panel">
-          <h3>交易明細</h3>
-          ${open.length ? `<h4>目前持有(報酬以 ${esc(B.asof)} 收盤計，已扣進場成本${long ? '' : '與借券費'})</h4>${tradeTable(open)}` : '<p class="mute">目前沒有部位。</p>'}
-          <h4>最近 20 筆已出場</h4>
-          ${tradeTable(done.slice(-20).reverse())}
-          ${done.length > 20 ? `<details style="margin-top:10px;"><summary>顯示全部 ${done.length} 筆</summary>${tradeTable(done.slice().reverse())}</details>` : ''}
         </div>`;
       navCharts({ d: B.d, i0, navs, meta, main: 's', log: $('#evScale').value === 'log', chart: $('#evChart'), legend: $('#evChartLegend') });
     }

@@ -437,25 +437,12 @@
     const S = { name: '處置股策略', series: 'disp' };
     const B = await load(el, ctx, 'disp');
     if (!B) return;
-    const T = B.strat, FIRST = 20;
-    let showAll = false;
+    const T = B.strat;
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
         ['邏輯', '處置前融資用得多(散戶追得兇)的熱門股，被處置後關注度仍高，處置期間的漲勢較能延續。'],
         ['進出場', `處置前一天融資使用率 ≥ ${B.util}% 的處置股，處置第一天收盤買進，處置結束後第一個交易日開盤賣出。`],
         ['停利停損', NO_STOP], ['持有期間', '處置期間(新制約 5 ～ 7 個交易日)。']] })}
-      <div class="panel">
-        <h3>${esc(S.name)} ${tag(S.series)}</h3>
-        <div class="doc">
-          <p><b>規則</b>：處置公告後，處置第一天的前一天融資使用率(融資餘額 ÷ 融資限額)≥ ${B.util}% 的處置股，處置第一天收盤買進(收盤漲停或沒有成交延到隔天收盤，仍買不到就放棄)；處置結束後第一個交易日開盤賣出(開盤跌停或沒有成交就延到下一個交易日開盤)。只回測處置新制(${B.newRule.replace(/-/g, '/')})上路後開始的處置；門檻與出場的依據見下方報告。</p>
-          <p><b>資金分配</b>：有新股票進場的那天收盤，把總資產平均分散到所有持股：每檔目標 = 前一天收盤總資產 ÷ 持有檔數(含新進場的，不另設上限)，先減碼、再進場、最後補足，都以整數股調整；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>交易明細</h3>
-        <div class="tablewrap"><table class="stattable" id="twrTrades"></table></div>
-        <div class="btnrow-l" style="margin-top:10px;"><button type="button" id="twrMore"></button></div>
-      </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
     briefChart(el, B.d, T.nav, B.b0050, '處置股策略', SERIES[S.series].color);
@@ -470,20 +457,13 @@
       const { stats, vs0050Cards, tradeCards } = W();
       $('#twrBriefStats').innerHTML = `${vs0050Cards(stats(T.nav), stats(B.b0050), t)}${tradeCards(t)}${cards}`;
     }
-    // 交易明細：最新的在前，先顯示 20 筆
-    function trades() {
-      const all = T.trades.slice().reverse(), rows = showAll ? all : all.slice(0, FIRST);
-      const more = $('#twrMore');
-      more.hidden = all.length <= FIRST;
-      more.textContent = showAll ? `收合，只顯示最新 ${FIRST} 筆` : `顯示全部 ${all.length.toLocaleString()} 筆`;
-      $('#twrTrades').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>處置期間</th><th>處置措施</th><th>融資使用率</th><th>買進(收盤)</th><th>賣出(開盤)</th><th>報酬</th></tr></thead><tbody>
-        ${rows.map(r => `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td><td>${r[4].toFixed(1)}%</td><td>${r[5]}</td>
-          <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`).join('')}</tbody>`;
-    }
+    // 近期明細：主策略的交易，最新的在前，先顯示 20 筆
+    $('#twrRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計。`;
+    LT.moreTable($('#twrRecent'), ['代號', '名稱', '處置期間', '處置措施', '融資使用率', '買進(收盤)', '賣出(開盤)', '報酬'], T.trades.slice().reverse().map(r =>
+      `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td><td>${r[4].toFixed(1)}%</td><td>${r[5]}</td>
+        <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`));
     drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: '處置股策略', nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
-    $('#twrMore').onclick = () => { showAll = !showAll; trades(); };
     draw();
-    trades();
   }
   window.LTTWR = { disp };
 })();
