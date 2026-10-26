@@ -35,7 +35,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：策略(目錄頁)；S&P500 季度換股策略回測(單一策略頁裡選總覽或單一策略；資料集 sp500)
     stock/query.js                  股票 · 台股：股票查詢(不列在側欄，從 LOGO 下方的搜尋框或代號連結進入；K 線圖、法人、融資券、借券、月營收與除權息等事件；api/prices，資料在 Cloudflare D1)
-    admin/admin.js                  後台(other/admin，只給管理員，不列在側欄)：最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能
+    admin/admin.js                  後台(other/admin，只給管理員，不列在側欄)：最受歡迎的主題、登入用戶分析、分享紀錄、誰在查資料、熱門股票、API 用量與效能
     option/lib.js                   選擇權共用：Black-Scholes、Greeks、策略定義 STRATEGIES、資料載入、結算日曆
     option/calculator.js            Black-Scholes 計算器元件(在市場概況的分頁裡顯示)
     option/market.js                選擇權市場概況(市場指標、T 字報價與未平倉、Black-Scholes 計算器三個分頁)
@@ -137,7 +137,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 |---|---|
 | 訪客 | 指數、統計學、其他 |
 | 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
-| 管理員(`users.role = 'admin'`) | 另外有後台 `other/admin`；後台統計不含管理員自己的紀錄(管理員帳號，以及登入前在同一個瀏覽器用訪客身分的紀錄：登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`) |
+| 管理員(`users.role = 'admin'`) | 另外有後台 `other/admin`；後台統計(含分享紀錄)不計入管理員與測試帳號(`functions/_lib/exclude.ts`：管理員，以及列在裡面的 email；repo 公開，只放 email 小寫的 SHA-256)，連同這些帳號登入前在同一個瀏覽器用訪客身分的紀錄(登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`)；這些帳號點開分享連結也不算點開次數 |
 
 **怎麼運作**
 
@@ -148,7 +148,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
   - **新增會員區塊的頁面**：程式放在 `web/modules/<區塊>/`，路徑加到 `memberScripts`(依側欄順序，同一小組要連續)，**不要**寫進 `index.html`。
   - **新增會員限定的資料集**：名稱加到 `memberDatasets`。
   - 要把整個區塊改成公開或會員限定：改 `memberSections`，並把該區塊的程式在 `index.html` 與 `memberScripts` 之間搬動。
-- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否被擋在需要登入的區塊)，存在 `page_views`；頁面裡切換分頁、研究、下拉選單時，頁面呼叫 `LT.view(第一層, 第二層, 第三層)` 再記一筆細項(`l1`～`l3`，例如 ETF研究 › 主動式ETF › A 系列 ETF 跟單)，0.6 秒內連續切換只記最後停下來的畫面。後台的「最受歡迎的主題」是可一層一層展開的樹狀表：區塊 › 頁面 › 細項，區塊與頁面算進入次數，細項算切換次數(上層是底下所有細項的加總)。同一頁重新整理會再記一筆。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
+- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否被擋在需要登入的區塊)，存在 `page_views`；頁面裡切換分頁、研究、下拉選單時，頁面呼叫 `LT.view(第一層, 第二層, 第三層)` 再記一筆細項(`l1`～`l3`，例如 ETF研究 › 主動式ETF › A 系列 ETF 跟單)，0.6 秒內連續切換只記最後停下來的畫面。後台的「最受歡迎的主題」是可一層一層展開的樹狀表：區塊 › 頁面 › 細項，區塊與頁面算進入次數，細項算切換次數(上層是底下所有細項的加總)。同一頁重新整理會再記一筆。後台的「登入用戶分析」列出登入用戶最常看的主題(依人數)與每位會員看了哪些主題(主題 = 頁面 › 看到的最深一層細項，只算登入後的瀏覽)；Google 登入只拿 email 與名稱(scope `openid email profile`)，沒有年齡、性別。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
 - 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me`、`/api/track` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM page_views WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
 - API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
   - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。

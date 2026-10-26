@@ -69,12 +69,42 @@
     </div>`;
   }
 
+  /* 登入用戶分析：每位會員期間內看了哪些主題(主題 = 頁面 › 最深一層的細項，例如「台股策略 › 月營收年增率…」)，
+     以及登入用戶最常看的主題(依人數排序) */
+  function memberPanel(S) {
+    const base = r => { const pg = LT.listPages().find(p => p.section === r.section && p.key === r.page);
+      return pg ? (pg.catalog && pg.catalog.title) || pg.name : r.title || r.page; };
+    const label = r => [base(r), r.l3 || r.l2 || r.l1].filter(Boolean).join(' › ');
+    const per = new Map(), all = new Map();
+    (S.mviews || []).forEach(r => {
+      const k = label(r), u = per.get(r.uid) || per.set(r.uid, { n: 0, t: new Map() }).get(r.uid);
+      u.n += r.n; u.t.set(k, (u.t.get(k) || 0) + r.n);
+      const a = all.get(k) || all.set(k, { n: 0, people: new Set() }).get(k);
+      a.n += r.n; a.people.add(r.uid);
+    });
+    const top = [...all].sort((a, b) => b[1].people.size - a[1].people.size || b[1].n - a[1].n).slice(0, 20);
+    const ms = (S.members || []).map(m => ({ ...m, v: per.get(m.uid) || { n: 0, t: new Map() } })).sort((a, b) => b.v.n - a.v.n);
+    const topics = v => { const t = [...v.t].sort((a, b) => b[1] - a[1]);
+      if (!t.length) return '<span class="mute">—</span>';
+      const li = ([k, n]) => `${esc(k)} <small class="mute">×${n0(n)}</small>`;
+      return t.slice(0, 3).map(li).join('<br>') + (t.length > 3 ? `<details><summary class="mute">全部 ${t.length} 個主題</summary>${t.slice(3).map(li).join('<br>')}</details>` : ''); };
+    const seen = ms.filter(m => m.v.n).length;
+    return `<div class="panel"><h3 style="margin-top:0;">登入用戶分析</h3>
+      <p class="mute">期間內有瀏覽紀錄的會員 ${n0(seen)} 人(登入過的會員共 ${n0(ms.length)} 人)</p>
+      <h4>登入用戶最常看的主題</h4>
+      ${table(['#', '主題', '人數', '瀏覽次數'], top.map(([k, a], i) => `<tr><td>${i + 1}</td><td style="text-align:left">${esc(k)}</td><td>${n0(a.people.size)}</td><td>${n0(a.n)}</td></tr>`))}
+      <h4>每位會員看了哪些主題</h4>
+      ${table(['會員', '第一次登入', '最後上線', '瀏覽次數', '最常看的主題'], ms.map(m => `<tr><td style="text-align:left">${esc(m.email || m.uid)}${m.name ? `<br><small class="mute">${esc(m.name)}</small>` : ''}</td>
+        <td>${esc(m.created || '')}</td><td>${esc(m.last_seen || '')}</td><td>${n0(m.v.n)}</td><td style="text-align:left;white-space:normal">${topics(m.v)}</td></tr>`))}
+      <p class="note">只算登入後的瀏覽(登入前用訪客身分看的不算)；主題 = 頁面 › 看到的最深一層(研究、策略、分頁)，只進入頁面沒有切換細項的記成頁面本身。Google 登入只提供 email 與名稱，沒有年齡、性別。</p></div>`;
+  }
+
   LT.register({
     section: 'other', key: 'admin', name: '後台', hidden: true,
     async mount(el, ctx) {
       let days = 7;
       el.innerHTML = `
-        <header class="top"><div><h1>後台</h1><p>最受歡迎的主題、誰在查資料、熱門股票、API 用量與效能(時間皆為台北時間；不含管理員自己的紀錄)</p></div></header>
+        <header class="top"><div><h1>後台</h1><p>最受歡迎的主題、登入用戶分析、分享紀錄、誰在查資料、熱門股票、API 用量與效能(時間皆為台北時間；不含管理員自己與測試帳號的紀錄)</p></div></header>
         <div class="btnrow-l adm-days">${[1, 7, 30, 90].map(d => `<button type="button" data-d="${d}" class="${d === days ? 'active' : ''}">${d === 1 ? '24 小時' : `近 ${d} 天`}</button>`).join('')}</div>
         <div id="admOut" style="margin-top:14px;"><div class="panel"><p class="mute">載入中…</p></div></div>`;
       const out = el.querySelector('#admOut');
@@ -93,6 +123,7 @@
           <div class="panel"><h3 style="margin-top:0;">最受歡迎的主題 <small class="mute">(點 ▸ 一層一層展開)</small></h3>${topicTree(S)}
             <p class="note">列出網站上所有的主題，還沒有人看過的顯示 0(灰色)；結構裡已經沒有的舊頁面或舊名稱標「舊版紀錄」。區塊、頁面的次數是進入那一頁的次數；頁面底下的細項(分頁、研究、下拉選單)是切換到那個畫面的次數，每一層是底下所有細項的加總，快速連續切換只算最後停下來的畫面。
               「訪客被擋」：沒登入的人點進需要登入的區塊的次數，可以看出大家想看但被擋住的主題。</p></div>
+          ${memberPanel(S)}
           <div class="panel"><h3 style="margin-top:0;">分享紀錄 <small class="mute">(全部期間)</small></h3>${(S.shares || []).length ? table(['分享的人', '報告', '分享時間', '點開次數', '登入後看的人', '新會員', '看的人是誰'],
               S.shares.map(r => `<tr><td>${esc(r.sharer || '')}</td><td><a href="${esc(r.path)}">${esc(r.title || r.path)}</a></td><td>${esc(r.created)}</td><td>${n0(r.clicks)}</td><td>${n0(r.viewers)}<small class="mute">(${n0(r.views)} 次)</small></td><td>${n0(r.new_members)}</td><td style="text-align:left;white-space:normal">${esc(r.who || '—')}</td></tr>`))
               : '<p class="mute">還沒有人分享報告。</p>'}
