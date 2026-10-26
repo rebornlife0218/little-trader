@@ -60,13 +60,15 @@
   function drawFigs(el, figs) {
     el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig]; if (f) f(div); else div.parentElement.remove(); });
   }
+  // 橫軸日期：跨年的只標年份，同一年內(例如處置股新制後)標月/日
+  const dateFmt = d => d[0].slice(0, 4) === d[d.length - 1].slice(0, 4) ? (v, tip) => tip ? v : v.slice(5).replace('-', '/') : (v, tip) => tip ? v : v.slice(0, 4);
   // 累積報酬(對數刻度)：lines = [{ name, nav, color, width }]，圖例接在圖的下方
   const LOG_TICKS = [0.02, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 20, 50];
   function navLines(div, d, lines) {
     const n = d.length, step = Math.max(1, Math.floor(n / 700)), idx = [];
     for (let i = 0; i < n; i += step) idx.push(i);
     if (idx[idx.length - 1] !== n - 1) idx.push(n - 1);
-    LTChart.line(div, { x: idx.map(i => d[i]), xType: 'date', label: '累積報酬', height: 300, xFmt: (v, tip) => tip ? v : v.slice(0, 4),
+    LTChart.line(div, { x: idx.map(i => d[i]), xType: 'date', label: '累積報酬', height: 300, xFmt: dateFmt(d),
       yFmt: v => W().pct(10 ** v - 1, 0), tipFmt: (s, v) => W().pct(10 ** v - 1, 1), yTicks: () => LOG_TICKS.map(Math.log10), refY: [{ y: 0 }],
       series: lines.map(l => ({ name: l.name, color: l.color, width: l.width || 1.6, y: idx.map(i => Math.log10(l.nav[i])) })) });
     div.insertAdjacentHTML('afterend', LTChart.legend(lines));
@@ -410,80 +412,65 @@
     draw();
   }
 
-  /* ---------- 處置股策略：融資使用率門檻 × 出場時點(股票 › 處置股 › 處置股策略) ---------- */
+  /* ---------- 處置股策略：融資使用率 ≥ 20%｜處置結束後一天開盤賣，只回測新制上路後(股票 › 處置股 › 處置股策略) ---------- */
   async function disp(el, ctx) {
     const S = { name: '處置股策略', series: 'disp' };
     const B = await load(el, ctx, 'disp');
     if (!B) return;
-    const main = B.strats.find(s => s.util === B.util && s.exit === 'open');
-    let k = main.key, showAll = false;
-    const FIRST = 20;
+    const T = B.strat, FIRST = 20;
+    let showAll = false;
     el.innerHTML = `
       <div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
-          <p><b>規則</b>：處置公告後，處置第一天的前一天融資使用率(融資餘額 ÷ 融資限額)≥ ${B.util}% 的處置股，處置第一天收盤買進(收盤漲停或沒有成交延到隔天收盤，仍買不到就放棄)。<b>出場</b>比較兩種：處置結束後第一個交易日開盤賣(主策略)、處置最後一天收盤賣；跌停或沒有成交就延到下一個交易日同一時點。另列不看融資、全部處置股都買的版本當對照。</p>
-          <p><b>資金分配</b>：先算出整段期間平均一天持有幾檔(只算有部位的日子)，每檔上限 = 前一天收盤總資產 ÷ 平均持有檔數；有新股票進場的那天收盤，所有部位調整到 min(上限, 1 ÷ 持有檔數)(先減碼、再進場、最後補足，都以整數股調整)；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
+          <p><b>規則</b>：處置公告後，處置第一天的前一天融資使用率(融資餘額 ÷ 融資限額)≥ ${B.util}% 的處置股，處置第一天收盤買進(收盤漲停或沒有成交延到隔天收盤，仍買不到就放棄)；處置結束後第一個交易日開盤賣出(開盤跌停或沒有成交就延到下一個交易日開盤)。只回測處置新制(${B.newRule.replace(/-/g, '/')})上路後開始的處置；門檻與出場的依據見下方報告。</p>
+          <p><b>資金分配</b>：有新股票進場的那天收盤，把總資產平均分散到所有持股：每檔目標 = 前一天收盤總資產 ÷ 持有檔數(含新進場的，不另設上限)，先減碼、再進場、最後補足，都以整數股調整；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
         </div>
-        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
-          <div class="paramitem"><label for="twrS">版本</label><select id="twrS">${B.strats.map(s => `<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
-          ${scaleSel('twrScale')}
-        </div>
+        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">${scaleSel('twrScale')}</div>
       </div>
       <div id="twrView"></div>
-      <div class="panel"><h3>四個版本比較</h3><div id="twrAll"></div></div>
       <div class="panel">
-        <h3>主策略的交易(融資使用率 ≥ ${B.util}%｜處置結束後一天開盤賣)</h3>
+        <h3>交易明細</h3>
         <div class="tablewrap"><table class="stattable" id="twrTrades"></table></div>
         <div class="btnrow-l" style="margin-top:10px;"><button type="button" id="twrMore"></button></div>
       </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
-    const cards = t => [
+    const t = T.ts;
+    const cards = [
       t.fail ? W().card(`${t.fail.toLocaleString()} 筆`, '收盤漲停買不到', '放棄的處置事件') : '',
-      t.nocash ? W().card(`${t.nocash.toLocaleString()} 筆`, '買不起一股而放棄', `每檔上限為總資產的 ${(t.cap * 100).toFixed(0)}%`) : '',
+      t.nocash ? W().card(`${t.nocash.toLocaleString()} 筆`, '買不起一股而放棄', '現金不夠') : '',
       t.delist ? W().card(`${t.delist} 筆`, '持有期間下市櫃', '以最後收盤價轉現金') : '',
     ].join('');
     function draw() {
       const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
-      const T = B.strats.find(s => s.key === k), x = stats(T.nav), Sx = stats(B.b0050);
+      const x = stats(T.nav), Sx = stats(B.b0050);
       $('#twrView').innerHTML = `
         <div class="panel">
           <h3>${esc(T.name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(T.ts)}${cards(T.ts)}</div>
+          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx)}${tradeCards(t)}${cards}</div>
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
-          <h4>累積報酬與回撤：${esc(T.name)} vs 0050</h4>
+          <h4>累積報酬與回撤：處置股策略 vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
           <h4>每日持有檔數</h4><div id="twrPos"></div>
-          <h4>每年報酬</h4>
-          ${yearTableHtml(B.d, [{ name: '本策略', nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
-      navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name: T.name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: C0050 } },
-        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
-      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: (d, tip) => tip ? d : d.slice(0, 4), yMin: 0,
+      navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name: '處置股策略', color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: C0050 } },
+        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend'), xFmt: dateFmt(B.d) });
+      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: dateFmt(B.d), yMin: 0,
         yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
-      $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: s.name, nav: s.nav, ts: s.ts, main: s.key === k })), Sx);
     }
     // 交易明細：最新的在前，先顯示 20 筆
     function trades() {
-      const all = main.trades.slice().reverse(), rows = showAll ? all : all.slice(0, FIRST);
+      const all = T.trades.slice().reverse(), rows = showAll ? all : all.slice(0, FIRST);
       const more = $('#twrMore');
       more.hidden = all.length <= FIRST;
       more.textContent = showAll ? `收合，只顯示最新 ${FIRST} 筆` : `顯示全部 ${all.length.toLocaleString()} 筆`;
       $('#twrTrades').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>處置期間</th><th>處置措施</th><th>融資使用率</th><th>買進(收盤)</th><th>賣出(開盤)</th><th>報酬</th></tr></thead><tbody>
-        ${rows.map(t => `<tr><td>${LT.stockLink(t[0])}</td><td>${esc(t[1])}</td><td>${esc(t[2].replace(/-/g, '/'))}</td><td>${esc(t[3])}</td><td>${t[4].toFixed(1)}%</td><td>${t[5]}</td>
-          <td>${t[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(t[7])}">${W().pct(t[7], 2)}</td></tr>`).join('')}</tbody>`;
+        ${rows.map(r => `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td><td>${r[4].toFixed(1)}%</td><td>${r[5]}</td>
+          <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`).join('')}</tbody>`;
     }
-    const sk = n => B.strats.find(s => s.util === n.u && s.exit === n.e);
-    const L = [{ name: `融資使用率 ≥ ${B.util}%｜結束後一天開盤賣`, nav: main.nav, color: CS[0], width: 2.2 },
-      { name: `融資使用率 ≥ ${B.util}%｜最後一天收盤賣`, nav: sk({ u: B.util, e: 'close' }).nav, color: CS[3] },
-      { name: '不限融資｜結束後一天開盤賣', nav: sk({ u: null, e: 'open' }).nav, color: CEW }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }];
-    drawFigs(el, {
-      'cum_return.png': div => navLines(div, B.d, L),
-      'yearly_return.png': div => yearBars(div, B.d, [L[0], L[2], { name: '0050', nav: B.b0050, color: C0050 }], B.b0050),
-    });
-    $('#twrS').value = k;
-    $('#twrS').onchange = () => { k = $('#twrS').value; draw(); ctx.view($('#twrS').selectedOptions[0].text); };
+    drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: '處置股策略', nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
+    $('#twrScale').value = 'lin';   // 回測只有幾個月，報酬範圍小，對數刻度幾乎沒有刻度
     $('#twrScale').onchange = draw;
     $('#twrMore').onclick = () => { showAll = !showAll; trades(); };
     draw();

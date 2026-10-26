@@ -10,7 +10,8 @@
   rev_growth 營收成長特徵：營收年增率 > 10% 公告後 T1 開盤買進，特徵 IC、分數組合與公告前後的事件研究
   rev_drop   營收衰退開低：營收年增率 < -10% 公告後 T1 開盤跳空 ≤ -5%，開盤買進，日內 / T+1 出場
   rev_turn   營收由負轉正：營收年增率上月 < 0、本月 > 0 公告後 T1 開盤買進，持有 5、10、20 日；門檻敏感度、四種營收變化的事件研究
-  disp       處置股策略：處置第一天收盤買進(處置前一天融資使用率 ≥ 20%)，處置結束後一天開盤賣或最後一天收盤賣；網頁在 股票 › 處置股 › 處置股策略
+  disp       處置股策略：處置第一天收盤買進(處置前一天融資使用率 ≥ 20%)，處置結束後一天開盤賣；只回測新制(2026/8/10)上路後，
+             門檻與出場的依據用 2016 年起的全部處置事件；資金：有新股票進場時總資產平均分散到所有持股(使用者指定)；網頁在 股票 › 處置股 › 處置股策略
 共用定義：
   - 月營收只用月底後 15 天內的公告；年增率用單月合併營收，缺值時用單月營收
   - T0 = 公告日(非交易日則為之前最後一個交易日)，T1 = T0 的下一個交易日
@@ -813,17 +814,11 @@ def disp_trades(X, evs, when):
 
 
 def disp_simulate(X, trades, i0):
-    """收盤進場的資金模擬(規則同 events.simulate，只是調整與進場都在收盤)：每檔上限 = 1 ÷ 平均一天持有檔數(只算有部位的日子)；
-    有新股票進場的那天收盤，先處理當天的出場，再把所有部位調整到 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)(含新進場的)：
+    """收盤進場的資金模擬(處置股策略的資金規則，使用者指定)：有新股票進場的那天收盤，先處理當天的出場，
+    再把總資產平均分散到所有持股：每檔目標 = 前一天收盤總資產 ÷ 持有檔數(含新進場的，不另設上限)；
     先減碼、再買進新股票(現金不夠就平分剩下的現金)、最後補足，都以一股的價格無條件捨去到整數股；收盤漲跌停或沒有成交的部位不調整。
-    回傳 (淨值, 每天收盤的持有檔數, 每筆報酬, 上限)"""
+    沒有新股票進場的日子不調整。回傳 (淨值, 每天收盤的持有檔數, 每筆報酬)"""
     C, Craw, O, RC, RO, LU, LD, TR, nd = X.C, X.Craw, X.O, X.RC, X.RO, X.LU, X.LD, X.TR, X.nd
-    held_n = np.zeros(nd)
-    for tr in trades:                                             # 持有的日子：進場隔天 ～ 出場日(開盤出場不含出場日)
-        e, x, when = tr[2], tr[3], tr[9]
-        end = nd - 1 if x is None else (x - 1 if when == 'open' else x)
-        held_n[e + 1:max(e + 1, end) + 1] += 1
-    cap = 1 / (held_n[held_n > 0].mean() if (held_n > 0).any() else 1.0)
     ins, outs = {}, {}
     for k, tr in enumerate(trades):
         ins.setdefault(tr[2], []).append(k)
@@ -868,7 +863,7 @@ def disp_simulate(X, trades, i0):
         new = sorted(ins.get(t, []), key=lambda k: trades[k][0])
         if new:
             keep = list(pos)
-            target = eq * min(cap, 1 / (len(keep) + len(new)))
+            target = eq / (len(keep) + len(new))
             for k in keep:                                        # 先減碼
                 j = trades[k][0]
                 if TR[t, j] and RC[t, j] > LD[t, j] + E.EPS:
@@ -890,74 +885,86 @@ def disp_simulate(X, trades, i0):
         nav[t] = (cash + sum(pos[k][0] * C[t, trades[k][0]] for k in pos)) / E.CAPITAL
     for k in pos:                                                 # 持有中：以最新收盤價計(已扣進場成本)
         res[k] = (pos[k][2] + pos[k][0] * C[-1, trades[k][0]]) / pos[k][1] - 1
-    return nav, npos, res, cap
+    return nav, npos, res
 
 
 def disp(X):
+    """主策略只回測新制(2026/8/10 起開始的處置)；門檻與出場的依據用 2016 年起的全部處置事件(新舊制，資金規則相同)"""
     evs = disp_events(X)
     sel = {u: [e for e in evs if u is None or (np.isfinite(e['util']) and (e['util'] > 0 if u == 0 else e['util'] >= u))] for u in UTILS}
-    T0, _ = disp_trades(X, evs, 'close')
-    i0 = min(t[2] for t in T0) - 1                                # 所有版本同一個期初：第一個可進場日的前一天收盤
-    d = [x.strftime('%Y-%m-%d') for x in X.D[i0:]]
-    b = E.bench_nav(X.W, i0)
-    S0 = stats(b)
     fmt = lambda t: X.D[t].strftime('%Y-%m-%d')  # noqa: E731
     short = lambda u: '不限' if u is None else '有融資餘額' if u == 0 else f'≥ {u}%'  # noqa: E731
     lab = lambda u: '不限融資' if u is None else '有融資餘額' if u == 0 else f'融資使用率 ≥ {u}%'  # noqa: E731
-    strats, F, sens = [], {}, []
+
+    def sim(E_, when, i0):
+        T, fails = disp_trades(X, E_, when)
+        nav, npos, res = disp_simulate(X, T, i0)
+        nav, npos = nav[i0:], npos[i0:]
+        done = [k for k in res if T[k][3] is not None]
+        r = np.array([res[k] for k in done])
+        hd = npos > 0
+        ts = {'n': len(r), 'win': rnd((r > 0).mean()) if len(r) else None, 'mean': rnd(r.mean()) if len(r) else None,
+              'median': rnd(np.median(r)) if len(r) else None, 'pos': rnd(npos[hd].mean()),
+              'days': rnd(np.mean([T[k][3] - T[k][2] for k in done])) if done else None, 'heldPct': rnd(hd[1:].mean()), 'nocash': len(T) - len(res),
+              'fail': fails, 'delist': sum(T[k][6] == 'delist' for k in done)}
+        return nav, npos, res, ts, T
+
+    def cells(F, nm, x, ts):
+        F[nm + '_ret'], F[nm + '_cagr'], F[nm + '_sharpe'], F[nm + '_sortino'] = pc(x['ret'], 1), pc(x['cagr']), num(x['sharpe']), num(x['sortino'])
+        F[nm + '_mdd'], F[nm + '_vol'], F[nm + '_n'], F[nm + '_win'], F[nm + '_mean'] = pc(x['mdd'], 1, False), pc(x['vol'], 1, False), intc(ts['n']), pc(ts['win'], 1, False), pc(ts['mean'], 2)
+        F[nm + '_row'] = perf_cells(x, ts['mean'], ts['win']).replace(pc(x['ret'], 0), pc(x['ret'], 1), 1)
+
+    F, sens = {}, []
+    # 1. 主策略：新制上路後(處置起日 ≥ 2026/8/10)，期初 = 第一筆可進場日的前一天收盤
+    new = [e for e in sel[UTIL] if e['start'] >= NEW_RULE]
+    i0 = min(t[2] for t in disp_trades(X, new, 'open')[0]) - 1
+    d = [x.strftime('%Y-%m-%d') for x in X.D[i0:]]
+    b = E.bench_nav(X.W, i0)
+    S0 = stats(b)
+    nav, npos, res, ts, T = sim(new, 'open', i0)
+    M = stats(nav)
+    cells(F, 'm', M, ts)
+    F['m_pos'], F['m_held'] = num(ts['pos'], 1), f"{ts['heldPct'] * 100:.0f}%"
+    F['m_days'] = num(ts['days'], 1) if ts['days'] is not None else '–'
+    # 交易明細：[代號, 名稱, 處置期間, 處置措施, 融資使用率, 進場日, 出場日, 報酬(持有中以最新收盤計)]
+    strat = {'name': f'{lab(UTIL)}｜{EXITS["open"]}', 'nav': navlist(nav), 'ts': ts, 'npos': npos.tolist(),
+             'trades': [[X.stocks[T[k][0]], X.names.get(X.stocks[T[k][0]], ('',))[0], f"{new[T[k][1]]['start']:%Y-%m-%d}～{new[T[k][1]]['end']:%Y-%m-%d}",
+                         new[T[k][1]]['kind'], round(new[T[k][1]]['util'], 2), fmt(T[k][2]), fmt(T[k][3]) if T[k][3] is not None else None, rnd(res[k])]
+                        for k in sorted(res, key=lambda k: (T[k][2], T[k][0]))]}
+    navc, _, _, tsc, _ = sim(new, 'close', i0)
+    cells(F, 'mc', stats(navc), tsc)
+    navn, _, _, tsn, _ = sim([e for e in evs if e['start'] >= NEW_RULE], 'open', i0)
+    cells(F, 'na', stats(navn), tsn)
+    F['b0050'], F['b_ret'], F['b_cagr'], F['b_sharpe'], F['b_mdd'] = perf_cells(S0).replace(pc(S0['ret'], 0), pc(S0['ret'], 1), 1), pc(S0['ret'], 1), pc(S0['cagr']), num(S0['sharpe']), pc(S0['mdd'], 1, False)
+    F['start'], F['end'], F['n_days'] = d[1], d[-1], len(d) - 1
+    # 2. 依據：2016 年起全部處置事件(新舊制)，門檻敏感度 × 出場
+    T0, _ = disp_trades(X, evs, 'close')
+    j0 = min(t[2] for t in T0) - 1
+    dl = [x.strftime('%Y-%m-%d') for x in X.D[j0:]]
+    L0 = stats(E.bench_nav(X.W, j0))
+    H = {}
     for u in UTILS:
         for when in ('open', 'close'):
-            T, fails = disp_trades(X, sel[u], when)
-            nav, npos, res, cap = disp_simulate(X, T, i0)
-            nav, npos = nav[i0:], npos[i0:]
-            done = [k for k in res if T[k][3] is not None]
-            r = np.array([res[k] for k in done])
-            hd = npos > 0
-            ts = {'n': len(r), 'win': rnd((r > 0).mean()), 'mean': rnd(r.mean()), 'median': rnd(np.median(r)), 'pos': rnd(npos[hd].mean()),
-                  'days': rnd(np.mean([T[k][3] - T[k][2] for k in done])), 'heldPct': rnd(hd[1:].mean()), 'nocash': len(T) - len(res),
-                  'fail': fails, 'delist': sum(T[k][6] == 'delist' for k in done), 'cap': rnd(cap)}
-            xs = stats(nav)
+            navl, _, resl, tsl, Tl = sim(sel[u], when, j0)
+            xs = stats(navl)
+            H[(u, when)] = xs
             if u is None and when == 'open':
-                G = disp_groups(T, res, evs)
-            if u == UTIL and when == 'open':                       # 主策略在新制上路後的交易
-                rn = np.array([res[k] for k in done if sel[u][T[k][1]]['start'] >= NEW_RULE])
-                F['new_m_n'], F['new_m_mean'], F['new_m_win'] = intc(len(rn)), pc(rn.mean(), 2), pc((rn > 0).mean(), 1, False)
-            key = f'{lab(u)}｜{EXITS[when]}'
+                G = disp_groups(Tl, resl, evs)
             sens.append(f"| {'**' + short(u) + '**' if u == UTIL else short(u)} | {EXITS[when]} | {pc(xs['cagr'])} | {num(xs['sharpe'])} | {num(xs['sortino'])} | "
-                        f"{pc(xs['mdd'], 1, False)} | {intc(ts['n'])} | {pc(ts['win'], 1, False)} | {pc(ts['mean'], 2)} |")
-            F[key] = xs | {'ts': ts}
-            if u in (None, UTIL):
-                main = u == UTIL
-                s = {'key': key, 'name': key, 'util': u, 'exit': when, 'nav': navlist(nav), 'ts': ts, 'npos': npos.tolist()}
-                if main:   # 交易明細：[代號, 名稱, 處置期間, 處置措施, 融資使用率, 進場日, 出場日, 報酬(持有中以最新收盤計)]
-                    s['trades'] = [[X.stocks[T[k][0]], X.names.get(X.stocks[T[k][0]], ('',))[0], f"{sel[u][T[k][1]]['start']:%Y-%m-%d}～{sel[u][T[k][1]]['end']:%Y-%m-%d}",
-                                    sel[u][T[k][1]]['kind'], round(sel[u][T[k][1]]['util'], 2), fmt(T[k][2]), fmt(T[k][3]) if T[k][3] is not None else None, rnd(res[k])]
-                                   for k in sorted(res, key=lambda k: (T[k][2], T[k][0]))]
-                strats.append(s)
-    # 報告用的數字
-    M = F[f'{lab(UTIL)}｜{EXITS["open"]}']
-    for nm, x in (('m', M), ('mc', F[f'{lab(UTIL)}｜{EXITS["close"]}']), ('bo', F[f'{lab(None)}｜{EXITS["open"]}']), ('bc', F[f'{lab(None)}｜{EXITS["close"]}'])):
-        F[nm + '_ret'], F[nm + '_cagr'], F[nm + '_sharpe'], F[nm + '_sortino'] = pc(x['ret'], 0), pc(x['cagr']), num(x['sharpe']), num(x['sortino'])
-        F[nm + '_mdd'], F[nm + '_vol'], F[nm + '_n'], F[nm + '_win'], F[nm + '_mean'] = pc(x['mdd'], 1, False), pc(x['vol'], 1, False), intc(x['ts']['n']), pc(x['ts']['win'], 1, False), pc(x['ts']['mean'], 2)
-        F[nm + '_row'] = perf_cells(x, x['ts']['mean'], x['ts']['win'])
-    F['m_pos'], F['m_days'], F['m_cap'], F['m_held'] = num(M['ts']['pos'], 1), num(M['ts']['days'], 1), f"{M['ts']['cap'] * 100:.0f}%", f"{M['ts']['heldPct'] * 100:.0f}%"
-    F['b0050'], F['b_ret'], F['b_cagr'], F['b_sharpe'], F['b_mdd'] = perf_cells(S0), pc(S0['ret'], 0), pc(S0['cagr']), num(S0['sharpe']), pc(S0['mdd'], 1, False)
-    sh = [F[f'{lab(u)}｜{EXITS["open"]}']['sharpe'] for u in (10, 15, 20, 25, 30, 40)]
+                        f"{pc(xs['mdd'], 1, False)} | {intc(tsl['n'])} | {pc(tsl['win'], 1, False)} | {pc(tsl['mean'], 2)} |")
+    F['l_start'], F['l_end'] = dl[1], dl[-1]
+    F['l_cagr'], F['l_sharpe'] = pc(H[(UTIL, 'open')]['cagr']), num(H[(UTIL, 'open')]['sharpe'])
+    F['l_bcagr'], F['l_bsharpe'] = pc(L0['cagr']), num(L0['sharpe'])
+    sh = [H[(u, 'open')]['sharpe'] for u in (10, 15, 20, 25, 30, 40)]
     F['sh_lo'], F['sh_hi'] = num(min(sh)), num(max(sh))
-    F['open_wins'] = sum(F[f'{lab(u)}｜{EXITS["open"]}']['sharpe'] > F[f'{lab(u)}｜{EXITS["close"]}']['sharpe'] for u in UTILS[1:])
+    F['open_wins'] = sum(H[(u, 'open')]['sharpe'] > H[(u, 'close')]['sharpe'] for u in UTILS[1:])
     F['n_utils'] = len(UTILS) - 1
     F['sens_rows'] = '\n'.join(sens)
-    F['n_events'], F['start'], F['end'] = intc(len(evs)), d[1], d[-1]
+    F['n_events'], F['n_new'] = intc(len(evs)), intc(sum(e['start'] >= NEW_RULE for e in evs))
     F['group_rows'] = '\n'.join(f"| {g['g']} | {g['k']} | {intc(g['n'])} | {pc(g['mean'], 2)} | {pc(g['median'], 2)} | {pc(g['win'], 1, False)} |" for g in G)
     gq = {g['k']: g for g in G if g['g'] == '融資使用率'}
     F['util_lo'], F['util_hi'] = pc(gq['< 10%']['mean'], 2), pc(gq['≥ 40%']['mean'], 2)
-    nr = next(g for g in G if g['k'] == '新制(2026/8/10 起)')
-    F['new_n'], F['new_mean'], F['new_win'] = intc(nr['n']), pc(nr['mean'], 2), pc(nr['win'], 1, False)
-    yb, ym = yearly(d, b), yearly(d, next(s for s in strats if s['util'] == UTIL and s['exit'] == 'open')['nav'])
-    F['beat_yr'], F['n_yr'] = sum(ym[y] > yb[y] for y in ym), len(ym)
-    F['years'] = '、'.join(f'{y} {pc(v)}' for y, v in ym.items())
-    strats.sort(key=lambda s: (s['util'] != UTIL, s['exit'] != 'open'))   # 主策略排第一
-    out = {'d': d, 'asof': d[-1], 'b0050': navlist(b), 'util': UTIL, 'strats': strats, 'groups': G, 'report': report('disp', F)}
+    out = {'d': d, 'asof': d[-1], 'b0050': navlist(b), 'util': UTIL, 'newRule': NEW_RULE.strftime('%Y-%m-%d'), 'strat': strat, 'groups': G, 'report': report('disp', F)}
     return out, F
 
 
