@@ -433,19 +433,25 @@
   }
 
   /* ---------- 處置股策略：融資使用率 ≥ 20%｜處置結束後一天開盤賣，只回測新制上路後(股票 › 處置股 › 處置股策略) ---------- */
-  async function disp(el, ctx) {
-    const S = { name: '處置股策略', series: 'disp' };
-    const B = await load(el, ctx, 'disp');
+  // 處置股策略(disp.json)：說明文字與交易明細的條件欄位
+  const DISP = {
+    disp: { name: '處置股策略', items: B => [
+      ['邏輯', '散戶融資追得兇、投信也在加碼的處置股，被處置後關注度仍高，處置期間的漲勢較能延續。'],
+      ['進出場', `處置前一天融資使用率 ≥ ${B.util}%、投信持股比率近 ${B.ihN || 20} 日增加的處置股，處置第一天收盤買進，處置結束後第一個交易日開盤賣出。`]],
+      fmt: [v => v.toFixed(1) + '%', v => (v > 0 ? '+' : '') + v.toFixed(2) + ' 個百分點'] },
+  };
+  async function disp(el, ctx, key = 'disp') {
+    const cfg = DISP[key], S = { name: cfg.name, series: 'disp' };
+    const B = await load(el, ctx, key);
     if (!B) return;
+    const feat = v => [].concat(v).map((x, i) => `<td>${x == null ? '—' : cfg.fmt[i](x)}</td>`).join('');
     const T = B.strat;
     el.innerHTML = `
       ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
-        ['邏輯', '處置前融資用得多(散戶追得兇)的熱門股，被處置後關注度仍高，處置期間的漲勢較能延續。'],
-        ['進出場', `處置前一天融資使用率 ≥ ${B.util}% 的處置股，處置第一天收盤買進，處置結束後第一個交易日開盤賣出。`],
-        ['停利停損', NO_STOP], ['持有期間', '處置期間(新制約 5 ～ 7 個交易日)。']] })}
+        ...cfg.items(B), ['停利停損', NO_STOP], ['持有期間', '處置期間(新制約 5 ～ 7 個交易日)。']] })}
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
-    briefChart(el, B.d, T.nav, B.b0050, '處置股策略', SERIES[S.series].color);
+    briefChart(el, B.d, T.nav, B.b0050, cfg.name, SERIES[S.series].color);
     const t = T.ts;
     const cards = [
       t.fail ? W().card(`${t.fail.toLocaleString()} 筆`, '收盤漲停買不到', '放棄的處置事件') : '',
@@ -461,15 +467,15 @@
     // 框起來排最前面：已公告、還沒開始的處置(處置第一天收盤買進)；持有中、處置已經結束的(下個交易日開盤賣出)
     const tag = t => `<span class="next-tag">${t}</span>`, md = d => d.slice(5).replace('-', '/');
     const up = B.upcoming || [], ended = r => !r[6] && r[2].split('～')[1] <= B.asof;
-    const row = (r, cls = '', note = '') => `<tr${cls}><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}${note}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td><td>${r[4].toFixed(1)}%</td><td>${r[5]}</td>
+    const row = (r, cls = '', note = '') => `<tr${cls}><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}${note}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td>${feat(r[4])}<td>${r[5]}</td>
         <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`;
     const all = T.trades.slice().reverse();
     $('#twrRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計。${up.length || all.some(ended) ? '框起來的是接下來要買進(處置第一天收盤)或下個交易日開盤要賣出的股票。' : ''}`;
-    LT.moreTable($('#twrRecent'), ['代號', '名稱', '處置期間', '處置措施', '融資使用率', '買進(收盤)', '賣出(開盤)', '報酬'], [
-      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${tag(md(u[2]) + ' 收盤買進')}</td><td>${esc((u[2] + '～' + u[3]).replace(/-/g, '/'))}</td><td>${esc(u[4])}</td><td>${u[5].toFixed(1)}%</td><td>—</td><td>—</td><td>—</td></tr>`),
+    LT.moreTable($('#twrRecent'), ['代號', '名稱', '處置期間', '處置措施', ...(B.cols || ['融資使用率']), '買進(收盤)', '賣出(開盤)', '報酬'], [
+      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${tag(md(u[2]) + ' 收盤買進')}</td><td>${esc((u[2] + '～' + u[3]).replace(/-/g, '/'))}</td><td>${esc(u[4])}</td>${feat(u[5])}<td>—</td><td>—</td><td>—</td></tr>`),
       ...all.filter(ended).map(r => row(r, ' class="next-act"', tag('下個交易日開盤賣出'))),
       ...all.filter(r => !ended(r)).map(r => row(r))]);
-    drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: '處置股策略', nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
+    drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: cfg.name, nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
     draw();
   }
   window.LTTWR = { disp };

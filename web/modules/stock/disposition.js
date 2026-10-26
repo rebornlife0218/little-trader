@@ -121,7 +121,7 @@
     desc: '成交異常被交易所列為處置的股票：新制說明、處置期間的股價表現與策略回測',
     groups: [{ name: '', items: [
       { key: 'intro', name: '處置股介紹', desc: '什麼是處置股、2026/8/10 新制改了什麼，以及新制上路後處置期間的股價表現', run: intro },
-      { key: 'strategy', name: '處置股策略', desc: '處置第一天收盤買進融資使用率 ≥ 20% 的處置股，處置結束後一天開盤賣出，和 0050 比較', run: (el, ctx) => window.LTTWR.disp(el, ctx) },
+      { key: 'strategy', name: '處置股策略', desc: '處置第一天收盤買進融資使用率高、投信加碼的處置股，處置結束後一天開盤賣出，和 0050 比較', run: (el, ctx) => window.LTTWR.disp(el, ctx) },
     ] }],
   });
 })();
