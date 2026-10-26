@@ -30,7 +30,9 @@ test('各頁面的 HTML：標題、說明、分享預覽換成這一頁的', () 
   assert.match(h, /<link rel="canonical" href="https:\/\/little-trader\.pages\.dev\/stats\/basic\/8">/);
   assert.match(h, /<base href="\/">/);
   for (const p of ['index/crash', 'stock/tw-strategy/lowvol', 'etf/research/lsi']) assert.ok(existsSync(join(site, p + '.html')), p);
-  assert.match(read(join(site, 'sitemap.xml')), /<loc>https:\/\/little-trader\.pages\.dev\/etf\/intro<\/loc>/);
+  const map = read(join(site, 'sitemap.xml'));
+  for (const p of ['etf/pack/intro', 'stock/disposition/strategy']) assert.ok(map.includes(`<loc>https://little-trader.pages.dev/${p}</loc>`), p);
+  assert.ok(!map.includes('<loc>https://little-trader.pages.dev/etf/intro</loc>'), '舊網址(轉址頁)不列在 sitemap');
 });
 
 test('公開版(GitHub Pages)：拿掉會員程式與資料、根目錄改成子目錄、有 404.html', () => {

@@ -23,11 +23,12 @@ web/                                網站(部署時整個資料夾就是網站�
                                     kchart(K 線圖)、myth(常見迷思)、cycle(週期性分析)、render(畫面與註冊)
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
     etf/lib.js                      ETF 共用(window.LTETF)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料(etf_compare)
-    etf/intro.js                    ETF：ETF介紹
-    etf/save.js                     ETF：怎麼存ETF(常存 ETF 比較、配息課稅試算、0050 vs 勞退基金)
-    etf/research.js                 ETF：ETF研究(目錄頁：投資方式、主動式 ETF 分組的研究卡片；A 系列 ETF 跟單用資料集 etf_research，績效統計共用 tw-strategy.js 的 LTTW)；舊網址 etf/pack 轉到新頁面
-    etf/etf.js                      ETF：即將發行ETF
-    stock/disposition.js            股票 · 台股：處置股(新制說明、處置期間表現；資料集 disposition)
+    etf/pack.js                     ETF：ETF大禮包(目錄頁：ETF介紹、怎麼存ETF、即將發行ETF 三個子主題，網址 etf/pack/<子主題>；舊網址 etf/intro、etf/save、etf/upcoming 轉過來，更早的 etf/pack/<研究> 轉到 ETF研究)
+    etf/intro.js                    ETF：ETF大禮包 › ETF介紹
+    etf/save.js                     ETF：ETF大禮包 › 怎麼存ETF(常存 ETF 比較、配息課稅試算、0050 vs 勞退基金)
+    etf/research.js                 ETF：ETF研究(目錄頁：投資方式、主動式 ETF 分組的研究卡片；A 系列 ETF 跟單用資料集 etf_research，績效統計共用 tw-strategy.js 的 LTTW)
+    etf/etf.js                      ETF：ETF大禮包 › 即將發行ETF
+    stock/disposition.js            股票 · 台股：處置股(目錄頁：處置股介紹 = 新制說明、處置期間表現，資料集 disposition；處置股策略 = 回測與報告，資料集 tw_research 的 disp.json，畫面在 tw-research.js 的 LTTWR.disp)
     stock/tw.js                     股票 · 台股：隔日沖(建置中)
     stock/tw-strategy.js            股票 · 台股：策略回測(目錄頁：做多、做空分組的策略卡片；做多：低波動選股、融資都沒退，算我輸嗎(需要密碼)；做空：大盤跌個股逆勢漲就是欠踹；一律和 0050 比較；資料集 tw_strategy)；績效統計與圖表函式以 window.LTTW 共用給 tw-research.js
     stock/tw-research.js            股票 · 台股：其他研究(目錄頁：營收、因子、事件、機器學習分組的研究卡片；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research)
@@ -196,12 +197,12 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 資料集 | 來源 | 排程(台北) | 主要檔案 |
 |---|---|---|---|
-| indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給 ETF大禮包的長期回測) |
+| indices | Yahoo Finance、臺灣證券交易所 | 週一~五 05:30、15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給怎麼存ETF、ETF研究的長期回測) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
 | etf_compare | 勞動基金運用局；台股 ETF 股價：本機 PostgreSQL `cm.tw_daily`(2016 年起)，之前用 Yahoo Finance(0050、0056、006208，從上市日起)；ARKK：Yahoo Finance；臺灣證券交易所(除權除息計算結果表) | 週一~五 23:45、週二~六 12:15(本機排程) | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬，用下面每日資料的月底值)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；排除沒有成交的日子；台股 ETF 的還原股價用證交所除息資料自己算，Yahoo 的還原股價缺 2013 年以前的配息、2014 年的除息也算錯) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
 | disposition | 本機 PostgreSQL `cm.tw_disposition`(處置名單)、`cm.tw_daily`(股價)；櫃買中心(櫃買指數) | 週一~五 23:45、週二~六 12:15(本機排程) | `events.json`(2026/7 起每個處置事件：期間、新制/舊制、處置第一天的開收(網頁算處置後第一天報酬 = 開盤 → 收盤)、處置前 5 日、處置期間、出關後 5 日與同期大盤報酬) |
-| tw_research | 本機 PostgreSQL `cm.tw_daily`、`cm.tw_monthly_revenue`、`cm.tw_company_info` | 不定期(研究更新時手動執行) | 每個研究一個 JSON：`rev_pre.json` 營收公告前布局(不限市值與市值四分位 Q1～Q4 的前 10、前 5 檔與全部合格股票淨值、交易統計、進場日敏感度、綜合分數十分位、因子 IC)、`rev_growth.json` 營收成長特徵(3 種持有期 × 3 種分數組合的淨值與持有檔數、特徵 IC t 值、公告前後累積超額報酬)、`rev_drop.json` 營收衰退開低(日內 / T+1 × 全部 / 均額 ≥ 1 千萬的淨值與持有檔數、分組報酬)、`rev_turn.json` 營收由負轉正(5 日 / 10 日 / 20 日 × 各種門檻與持續成長對照組的淨值與持有檔數、四種營收變化的累積超額報酬與每筆報酬)；都含 `d`(日期，第一天 = 期初)、`b0050`(0050 淨值)、`report`(報告 Markdown，不含建議)；淨值期初 = 1，本金 100 萬整數股、已扣成本，資金規則同 tw_strategy(有新股票進場時再平衡；寫明檔數的用 1/N 上限)。不發佈 csv、png 與原始股價 |
+| tw_research | 本機 PostgreSQL `cm.tw_daily`、`cm.tw_monthly_revenue`、`cm.tw_company_info` | 不定期(研究更新時手動執行) | 每個研究一個 JSON：`rev_pre.json` 營收公告前布局(不限市值與市值四分位 Q1～Q4 的前 10、前 5 檔與全部合格股票淨值、交易統計、進場日敏感度、綜合分數十分位、因子 IC)、`rev_growth.json` 營收成長特徵(3 種持有期 × 3 種分數組合的淨值與持有檔數、特徵 IC t 值、公告前後累積超額報酬)、`rev_drop.json` 營收衰退開低(日內 / T+1 × 全部 / 均額 ≥ 1 千萬的淨值與持有檔數、分組報酬)、`disp.json` 處置股策略(處置第一天收盤買進：融資使用率 ≥ 20% / 不限融資 × 結束後一天開盤賣 / 最後一天收盤賣的淨值、持有檔數與交易統計，主策略的交易明細，依融資使用率、處置措施、新舊制分組的每筆報酬；用 `cm.tw_disposition` 與 `cm.tw_daily` 的 `資使用率`，收盤進場的資金模擬寫在 update.py 的 disp_simulate)、`rev_turn.json` 營收由負轉正(5 日 / 10 日 / 20 日 × 各種門檻與持續成長對照組的淨值與持有檔數、四種營收變化的累積超額報酬與每筆報酬)；都含 `d`(日期，第一天 = 期初)、`b0050`(0050 淨值)、`report`(報告 Markdown，不含建議)；淨值期初 = 1，本金 100 萬整數股、已扣成本，資金規則同 tw_strategy(有新股票進場時再平衡；寫明檔數的用 1/N 上限)。不發佈 csv、png 與原始股價 |
 | etf_research | 本機研究資料夾(ETF持股明細、ETF折溢價、台股日資料) | 不定期(研究更新時手動執行) | `etf_follow.json` A 系列 ETF 跟單：`d`(日期，第一天 = 期初)、`b0050`(0050 淨值，報告的總報酬圖用)、`b0050s`(每組訊號自己的 0050，期初和該組策略相同)、`strats`(模式 × 範圍 × 出場的策略：從第一個訊號前一天 `i0` 開始的淨值(期初 = 1，本金 100 萬整數股、已扣成本)、交易統計 `ts`、每日持有檔數 `npos`)、`etfs`(10 檔 ETF 與持股資料起點)、報告用的統計表(`holding` 持有期、`by_etf` 各檔、`consensus` 多家同時、`entry` 進場時點、`flow` 申贖調整、`ex81` 拿掉 00981A、`cexit` 多家同時的出場規則：每筆平均超額報酬與日期聚類 t 值)、`report`(報告 Markdown)。網頁的夏普值用日報酬平均 ÷ 標準差 × √252(研究指定)。不發佈 csv、png 與原始股價 |
 | sp500 | fja05680/sp500 歷史成分股、Yahoo Finance、Tiingo | 週六 09:00 | `backtest.json`(四種策略、全部成分股等權重、SPY 的每日淨值(未扣成本)；每季的成分股數、可取得股價數、換手率、無風險利率、持股) |
 | options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
@@ -271,7 +272,7 @@ LT.register({
 - **後台的熱門主題細項**：頁面裡有分頁、下拉選單時，在切換的地方呼叫 `LT.view('分頁名稱', '類別', '研究名稱')`(最多三層，名稱用畫面上看到的文字)，後台就能一層一層看各細項的瀏覽次數。目錄頁會自動記錄；其他頁面目前用在選擇權市場概況(分頁)、大盤漲跌分析與 K棒型態分析(模式 › 指數)、初級統計學(章)，以及目錄頁裡的低波動選股、美股策略(分頁)。
 - **頁面裡的分頁**：用 `LT.tabs`，不要自己寫按鈕：`const tabs = LT.tabs({ items: [{ key, name, desc }], remember: 'lt.xxx', view: ctx.view, onChange: key => … })`，模板放 `${tabs.html}`，畫面放好後 `tabs.bind(el)`(套用上次的分頁並呼叫一次 onChange)，程式裡切換用 `tabs.set(key, { scroll: true })`。切換時自動記到後台熱門主題(目錄頁裡傳 `view: ctx.view`)。目前用在選擇權市場概況、低波動選股、美股策略。
 - **麵包屑**：每頁上方自動顯示「首頁 › 區塊 › (小組) › 頁面」，每一層都能點；頁面裡還有更深一層時呼叫 `LT.crumbs('名稱')` 補上(目錄頁的單一內容自動補；股票查詢補代號、統計學補章)。
-- **網址**：一般網址(不用 #)，例如 `stock/tw-strategy/lowvol`。站內連結一律寫相對網址(`href="stock/query/2330"`、首頁 `href="./"`，不要以 `/` 或 `#/` 開頭)，點了由 app.js 攔下來換頁、不重新載入；頁面讀網址用 `LT.path()`(例如 `['stock', 'query', '2330']`)，程式換頁用 `LT.go('etf/intro')`。舊的 `#/…` 網址(書籤、分享出去的連結)會自動轉成新網址。
+- **網址**：一般網址(不用 #)，例如 `stock/tw-strategy/lowvol`。站內連結一律寫相對網址(`href="stock/query/2330"`、首頁 `href="./"`，不要以 `/` 或 `#/` 開頭)，點了由 app.js 攔下來換頁、不重新載入；頁面讀網址用 `LT.path()`(例如 `['stock', 'query', '2330']`)，程式換頁用 `LT.go('etf/pack/intro')`。舊的 `#/…` 網址(書籤、分享出去的連結)會自動轉成新網址。
   - 部署時 `scripts/build-site.mjs` 依頁面清單產生每頁一份 HTML(例如 `stock/tw-strategy/lowvol.html`，內容同 index.html，只換標題、說明、canonical、og: 分享預覽)，搜尋引擎與 LINE、FB 的預覽才看得到各頁的標題；清單包含側欄頁面、目錄頁的項目，以及註冊時的 `routes`(例如統計學各章：`routes: [{ path: '1', name: '第 1 章 …' }]`)。沒有列出的網址(例如 `stock/query/2330`)由 Cloudflare Pages 回傳 index.html。
   - GitHub Pages 備援站放在 `/little-trader/` 子目錄：部署時把 `<base href="/">` 改成子目錄，並複製一份 `404.html`。
   - 頁面的 key 不要和網站資料夾撞名(`api`、`assets`、`content`、`data`、`modules`)，自動測試會檢查。

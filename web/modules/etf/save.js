@@ -1,4 +1,4 @@
-/* ETF · 怎麼存ETF(etf/save)：常存 ETF 績效比較、ETF 配息課稅試算、0050 vs 勞退基金(共用函式與資料載入在 lib.js) */
+/* ETF · ETF大禮包 › 怎麼存ETF(etf/pack/save，目錄頁在 pack.js)：常存 ETF 績效比較、ETF 配息課稅試算、0050 vs 勞退基金(共用函式與資料載入在 lib.js) */
 (() => {
   const { esc, pctf, cls, ym, statsOf, corr, growth, monthly, MIN_NOW, rollingStudy, pctl, TAX, taxCase, best, rateOf } = LTETF;
   async function save(el, ctx) {
@@ -7,8 +7,6 @@
     if (!ctx.alive()) return;
     const $ = s => el.querySelector(s);
     el.innerHTML = `
-      <header class="top"><div><h1>怎麼存ETF</h1><p>常存 ETF 比較、配息怎麼繳稅、0050 vs 勞退基金</p></div></header>
-
       <div class="pk-pane" data-pane="save">${C && E ? `
         <div class="panel">
           <h3>一、常存的 ETF 績效比較</h3>
@@ -171,5 +169,5 @@
     ['#txDeps', '#txSal1', '#txSal2', '#txDiv', '#txInt', '#txEq'].forEach(id => { $(id).oninput = drawTax; });
     drawTax();
   }
-  LT.register({ section: 'etf', key: 'save', name: '怎麼存ETF', mount: save });
+  LTETF.pages.save = { run: save };
 })();

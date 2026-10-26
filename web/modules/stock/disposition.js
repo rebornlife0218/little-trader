@@ -1,5 +1,6 @@
-/* 股票 · 台股 · 處置股：新制(2026/8/10)說明與處置股的股價表現(資料集 disposition，pipeline/disposition/update.py)
-   統計都由 events.json 即時計算，文字敘述依資料自動調整 */
+/* 股票 · 台股 · 處置股(目錄頁 LT.catalog，網址 stock/disposition/<子主題>)
+   · 處置股介紹(intro)：新制(2026/8/10)說明與處置股的股價表現(資料集 disposition，pipeline/disposition/update.py)；統計都由 events.json 即時計算，文字敘述依資料自動調整
+   · 處置股策略(strategy)：處置第一天收盤買進的回測與研究報告(資料集 tw_research 的 disp.json，畫面在 tw-research.js 的 LTTWR.disp) */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pct = (v, d = 1) => Number.isFinite(v) ? (v > 0 ? '+' : '') + (v * 100).toFixed(d) + '%' : '—';
@@ -20,105 +21,108 @@
     };
   }
 
-  LT.register({
+  async function intro(el, ctx) {
+    el.innerHTML = `
+      <div class="panel doc">
+        <h3>什麼是處置股？新制改了什麼</h3>
+        <p>股票短期內漲跌幅、成交量或週轉率異常，會先被列為<b>注意股</b>；一段期間內多次達到注意標準(例如連續 3 個營業日、或 30 個營業日內有 12 個營業日)，就會被列為<b>處置股</b>，在處置期間改用人工管制的分盤撮合，情節較重時還要預收款券(買賣前先把錢或股票交給券商)，目的是降低過熱的投機交易。</p>
+        <p>證交所與櫃買中心在 2026/8/3 公告修正處置制度，<b>2026/8/10 起實施</b>：</p>
+        <div class="tablewrap"><table class="stattable dp-rules">
+          <thead><tr><th>項目</th><th>新制(2026/8/10 起)</th></tr></thead>
+          <tbody>
+            <tr><td>處置期間(一般)</td><td><b>5 個營業日</b></td></tr>
+            <tr><td>處置期間(當沖過熱)</td><td><b>7 個營業日</b></td></tr>
+            <tr><td>分盤撮合</td><td><b>約每 2 分鐘</b>撮合一次</td></tr>
+            <tr><td>預收款券、暫停融資融券、禁止現股當沖</td><td>維持</td></tr>
+            <tr><td>高價股的注意標準</td><td>股價 1,000 元以上，6 日價差需達 300 元才列注意(2,000 元以上每千元再加 150 元)</td></tr>
+            <tr><td>制度檢討</td><td>每半年檢討一次</td></tr>
+          </tbody>
+        </table></div>
+        <p>新制讓處置股的流動性變好、關的時間變短，處置的「冷卻」效果可能也跟著變弱，這正是下面要觀察的。</p>
+      </div>
+      <div id="dpBody"><div class="panel"><p class="mute">載入處置股資料中…</p></div></div>`;
+    let J;
+    try { J = (await LT.loadJSON('disposition', 'events.json')).data; }
+    catch (e) { if (ctx.alive()) el.querySelector('#dpBody').innerHTML = `<div class="panel"><p class="mute">處置股資料尚未產生：${esc(e.message)}</p></div>`; return; }
+    if (!ctx.alive()) return;
+    const $ = s => el.querySelector(s);
+    const NEW = J.events.filter(e => e.rule === 'new');
+    const sn = summary(NEW);
+    const months = [...new Set(NEW.map(e => e.start.slice(0, 7)))].sort();
+    const byMonth = months.map(m => ({ m, ...summary(NEW.filter(e => e.start.startsWith(m))) }));
+
+    $('#dpBody').innerHTML = `
+      <div class="panel">
+        <h3>新制上路後的處置股(${md(J.new_rule)} ～ ${md(J.asof)})</h3>
+        <div class="statgrid" style="margin:12px 0;">
+          <div class="stat"><div class="v">${sn.n}</div><div class="l">處置事件(上市 ${NEW.filter(e => e.market === 'TWSE').length}、上櫃 ${NEW.filter(e => e.market === 'TPEx').length})，已出關 ${sn.nFin}</div></div>
+          <div class="stat"><div class="v ${cls(sn.d1)}">${pct(sn.d1, 2)}</div><div class="l">處置後第一天平均報酬(中位數 ${pct(sn.d1Med, 2)})</div></div>
+          <div class="stat"><div class="v ${cls(sn.ret)}">${pct(sn.ret)}</div><div class="l">處置期間平均報酬(中位數 ${pct(sn.retMed)})，上漲 ${share(sn.up, sn.nFin)}</div></div>
+          <div class="stat"><div class="v ${cls(sn.mkt)}">${pct(sn.mkt)}</div><div class="l">同期大盤平均報酬</div></div>
+        </div>
+        <ul class="insight" id="dpInsight"></ul>
+        <p class="note">處置後第一天報酬 = 處置第一天開盤 → 收盤；處置期間報酬 = 處置前一天收盤 → 處置最後一天收盤(只算已出關的事件)；同期大盤：上市用加權指數、上櫃用櫃買指數，期間與該處置事件相同。只統計 8/10 以後開始的處置。處置期間與大盤的報酬用還原股價，不計交易成本。</p>
+        <h4>各月份</h4>
+        <div class="tablewrap"><table class="stattable">
+          <thead><tr><th>處置開始月份</th><th>事件數</th><th>處置後第一天平均報酬</th><th>處置後第一天中位數</th><th>已出關</th><th>期間平均報酬</th><th>期間上漲比例</th><th>同期大盤平均</th></tr></thead>
+          <tbody>${byMonth.map(s => `<tr><td>${s.m.replace('-', '/')}</td><td>${s.n}</td><td class="${cls(s.d1)}">${pct(s.d1, 2)}</td><td class="${cls(s.d1Med)}">${pct(s.d1Med, 2)}</td><td>${s.nFin}</td><td class="${cls(s.ret)}">${pct(s.ret)}</td><td>${share(s.up, s.nFin)}</td><td class="${cls(s.mkt)}">${pct(s.mkt)}</td></tr>`).join('')}</tbody>
+        </table></div>
+      </div>
+      <div class="panel">
+        <h3>新制處置期間報酬的分布</h3>
+        <div id="dpHist"></div>
+        <h3 style="margin-top:18px;">最近的處置股</h3>
+        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
+          <div class="paramitem"><label for="dpMarket">市場</label><select id="dpMarket"><option value="">全部</option><option value="TWSE">上市</option><option value="TPEx">上櫃</option></select></div>
+        </div>
+        <div class="tablewrap"><table class="stattable" id="dpTable"></table></div>
+        <div class="btnrow-l" style="margin-top:10px;"><button id="dpMore"></button></div>
+        <p class="note">「進行中」表示還沒出關，期間報酬算到 ${md(J.asof)}。只列股票(不含權證、ETF)。</p>
+      </div>`;
+
+    // 重點(依資料產生)
+    $('#dpInsight').innerHTML = `
+      <li><b>處置後第一天</b>(開盤 → 收盤)：平均報酬 ${pct(sn.d1, 2)}，中位數 ${pct(sn.d1Med, 2)}。</li>
+      <li><b>處置期間仍偏漲</b>：已出關的 ${sn.nFin} 筆平均 ${pct(sn.ret)}(中位數 ${pct(sn.retMed)})、${share(sn.up, sn.nFin)} 上漲，同期大盤平均 ${pct(sn.mkt)}。處置的冷卻效果在新制下看起來不明顯。</li>
+      <li><b>樣本數較小</b>：新制只有約 ${Math.round((Date.parse(J.asof) - Date.parse(J.new_rule)) / 864e5 / 7)} 週、${sn.nFin} 筆已出關的事件，而且期間剛好遇到大盤反彈，結論可能隨更多資料而改變。</li>`;
+
+    // 期間報酬分布
+    const R = NEW.filter(e => e.done && e.ret != null).map(e => e.ret);
+    if (R.length) {
+      const step = 0.05, lo = Math.floor(Math.min(...R) / step) * step, hi = Math.ceil(Math.max(...R) / step) * step;
+      const bins = []; for (let x = lo; x < hi - 1e-9; x += step) bins.push({ x, n: 0 });
+      R.forEach(v => { bins[Math.min(bins.length - 1, Math.floor((v - lo) / step + 1e-9))].n++; });
+      LTChart.bars($('#dpHist'), { x: bins.map(b => b.x), label: '處置期間報酬分布', height: 200,
+        xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v), tipFmt: (s, v, i) => `${(bins[i].x * 100).toFixed(0)}%～${((bins[i].x + step) * 100).toFixed(0)}%：${v} 筆`,
+        series: [{ name: '事件數', y: bins.map(b => b.n), color: 'var(--amber)' }], refX: [{ x: 0, color: 'var(--dim)' }] });
+    }
+
+    // 最近的處置股：先顯示最新 20 筆，按「顯示全部」再展開
+    const FIRST = 20;
+    let showAll = false;
+    const table = () => {
+      const mk = $('#dpMarket').value;
+      const all = NEW.filter(e => !mk || e.market === mk).sort((a, b) => b.start.localeCompare(a.start) || a.code.localeCompare(b.code));
+      const rows = showAll ? all : all.slice(0, FIRST);
+      const more = $('#dpMore');
+      more.hidden = all.length <= FIRST;
+      more.textContent = showAll ? `收合，只顯示最新 ${FIRST} 筆` : `顯示全部 ${all.length} 筆`;
+      $('#dpTable').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>市場</th><th>處置期間</th><th>處置</th><th>處置後第一天漲跌</th><th>處置期間報酬</th><th>同期大盤</th><th>出關後 5 日</th></tr></thead><tbody>
+        ${rows.map(e => `<tr><td>${LT.stockLink(e.code)}</td><td>${esc(e.name)}</td><td>${e.market === 'TWSE' ? '上市' : '上櫃'}</td><td>${md(e.start)}～${md(e.end)}${e.done ? '' : ' <small class="mute">進行中</small>'}</td><td>${esc(e.kind)}</td>
+          <td class="${cls(d1ret(e))}">${pct(d1ret(e))}</td><td class="${cls(e.ret)}">${pct(e.ret)}</td><td class="${cls(e.mkt)}">${pct(e.mkt)}</td><td class="${cls(e.post5)}">${pct(e.post5)}</td></tr>`).join('')}</tbody>`;
+    };
+    $('#dpMarket').onchange = table;
+    $('#dpMore').onclick = () => { showAll = !showAll; table(); };
+    table();
+  }
+
+  LT.catalog({
     section: 'stock', group: '台股', key: 'disposition', name: '處置股',
-    async mount(el, ctx) {
-      el.innerHTML = `
-        <header class="top"><div>
-          <h1>處置股</h1>
-          <p>成交異常被交易所列為處置的股票：2026/8/10 處置新制上路後，處置期間的股價表現</p>
-        </div></header>
-        <div class="panel doc">
-          <h3>什麼是處置股？新制改了什麼</h3>
-          <p>股票短期內漲跌幅、成交量或週轉率異常，會先被列為<b>注意股</b>；一段期間內多次達到注意標準(例如連續 3 個營業日、或 30 個營業日內有 12 個營業日)，就會被列為<b>處置股</b>，在處置期間改用人工管制的分盤撮合，情節較重時還要預收款券(買賣前先把錢或股票交給券商)，目的是降低過熱的投機交易。</p>
-          <p>證交所與櫃買中心在 2026/8/3 公告修正處置制度，<b>2026/8/10 起實施</b>：</p>
-          <div class="tablewrap"><table class="stattable dp-rules">
-            <thead><tr><th>項目</th><th>新制(2026/8/10 起)</th></tr></thead>
-            <tbody>
-              <tr><td>處置期間(一般)</td><td><b>5 個營業日</b></td></tr>
-              <tr><td>處置期間(當沖過熱)</td><td><b>7 個營業日</b></td></tr>
-              <tr><td>分盤撮合</td><td><b>約每 2 分鐘</b>撮合一次</td></tr>
-              <tr><td>預收款券、暫停融資融券、禁止現股當沖</td><td>維持</td></tr>
-              <tr><td>高價股的注意標準</td><td>股價 1,000 元以上，6 日價差需達 300 元才列注意(2,000 元以上每千元再加 150 元)</td></tr>
-              <tr><td>制度檢討</td><td>每半年檢討一次</td></tr>
-            </tbody>
-          </table></div>
-          <p>新制讓處置股的流動性變好、關的時間變短，處置的「冷卻」效果可能也跟著變弱，這正是下面要觀察的。</p>
-        </div>
-        <div id="dpBody"><div class="panel"><p class="mute">載入處置股資料中…</p></div></div>`;
-      let J;
-      try { J = (await LT.loadJSON('disposition', 'events.json')).data; }
-      catch (e) { if (ctx.alive()) el.querySelector('#dpBody').innerHTML = `<div class="panel"><p class="mute">處置股資料尚未產生：${esc(e.message)}</p></div>`; return; }
-      if (!ctx.alive()) return;
-      const $ = s => el.querySelector(s);
-      const NEW = J.events.filter(e => e.rule === 'new');
-      const sn = summary(NEW);
-      const months = [...new Set(NEW.map(e => e.start.slice(0, 7)))].sort();
-      const byMonth = months.map(m => ({ m, ...summary(NEW.filter(e => e.start.startsWith(m))) }));
-
-      $('#dpBody').innerHTML = `
-        <div class="panel">
-          <h3>新制上路後的處置股(${md(J.new_rule)} ～ ${md(J.asof)})</h3>
-          <div class="statgrid" style="margin:12px 0;">
-            <div class="stat"><div class="v">${sn.n}</div><div class="l">處置事件(上市 ${NEW.filter(e => e.market === 'TWSE').length}、上櫃 ${NEW.filter(e => e.market === 'TPEx').length})，已出關 ${sn.nFin}</div></div>
-            <div class="stat"><div class="v ${cls(sn.d1)}">${pct(sn.d1, 2)}</div><div class="l">處置後第一天平均報酬(中位數 ${pct(sn.d1Med, 2)})</div></div>
-            <div class="stat"><div class="v ${cls(sn.ret)}">${pct(sn.ret)}</div><div class="l">處置期間平均報酬(中位數 ${pct(sn.retMed)})，上漲 ${share(sn.up, sn.nFin)}</div></div>
-            <div class="stat"><div class="v ${cls(sn.mkt)}">${pct(sn.mkt)}</div><div class="l">同期大盤平均報酬</div></div>
-          </div>
-          <ul class="insight" id="dpInsight"></ul>
-          <p class="note">處置後第一天報酬 = 處置第一天開盤 → 收盤；處置期間報酬 = 處置前一天收盤 → 處置最後一天收盤(只算已出關的事件)；同期大盤：上市用加權指數、上櫃用櫃買指數，期間與該處置事件相同。只統計 8/10 以後開始的處置。處置期間與大盤的報酬用還原股價，不計交易成本。</p>
-          <h4>各月份</h4>
-          <div class="tablewrap"><table class="stattable">
-            <thead><tr><th>處置開始月份</th><th>事件數</th><th>處置後第一天平均報酬</th><th>處置後第一天中位數</th><th>已出關</th><th>期間平均報酬</th><th>期間上漲比例</th><th>同期大盤平均</th></tr></thead>
-            <tbody>${byMonth.map(s => `<tr><td>${s.m.replace('-', '/')}</td><td>${s.n}</td><td class="${cls(s.d1)}">${pct(s.d1, 2)}</td><td class="${cls(s.d1Med)}">${pct(s.d1Med, 2)}</td><td>${s.nFin}</td><td class="${cls(s.ret)}">${pct(s.ret)}</td><td>${share(s.up, s.nFin)}</td><td class="${cls(s.mkt)}">${pct(s.mkt)}</td></tr>`).join('')}</tbody>
-          </table></div>
-        </div>
-        <div class="panel">
-          <h3>新制處置期間報酬的分布</h3>
-          <div id="dpHist"></div>
-          <h3 style="margin-top:18px;">最近的處置股</h3>
-          <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
-            <div class="paramitem"><label for="dpMarket">市場</label><select id="dpMarket"><option value="">全部</option><option value="TWSE">上市</option><option value="TPEx">上櫃</option></select></div>
-          </div>
-          <div class="tablewrap"><table class="stattable" id="dpTable"></table></div>
-          <div class="btnrow-l" style="margin-top:10px;"><button id="dpMore"></button></div>
-          <p class="note">「進行中」表示還沒出關，期間報酬算到 ${md(J.asof)}。只列股票(不含權證、ETF)。</p>
-        </div>`;
-
-      // 重點(依資料產生)
-      $('#dpInsight').innerHTML = `
-        <li><b>處置後第一天</b>(開盤 → 收盤)：平均報酬 ${pct(sn.d1, 2)}，中位數 ${pct(sn.d1Med, 2)}。</li>
-        <li><b>處置期間仍偏漲</b>：已出關的 ${sn.nFin} 筆平均 ${pct(sn.ret)}(中位數 ${pct(sn.retMed)})、${share(sn.up, sn.nFin)} 上漲，同期大盤平均 ${pct(sn.mkt)}。處置的冷卻效果在新制下看起來不明顯。</li>
-        <li><b>樣本數較小</b>：新制只有約 ${Math.round((Date.parse(J.asof) - Date.parse(J.new_rule)) / 864e5 / 7)} 週、${sn.nFin} 筆已出關的事件，而且期間剛好遇到大盤反彈，結論可能隨更多資料而改變。</li>`;
-
-      // 期間報酬分布
-      const R = NEW.filter(e => e.done && e.ret != null).map(e => e.ret);
-      if (R.length) {
-        const step = 0.05, lo = Math.floor(Math.min(...R) / step) * step, hi = Math.ceil(Math.max(...R) / step) * step;
-        const bins = []; for (let x = lo; x < hi - 1e-9; x += step) bins.push({ x, n: 0 });
-        R.forEach(v => { bins[Math.min(bins.length - 1, Math.floor((v - lo) / step + 1e-9))].n++; });
-        LTChart.bars($('#dpHist'), { x: bins.map(b => b.x), label: '處置期間報酬分布', height: 200,
-          xFmt: v => Math.round(v * 100) + '%', yFmt: v => Math.round(v), tipFmt: (s, v, i) => `${(bins[i].x * 100).toFixed(0)}%～${((bins[i].x + step) * 100).toFixed(0)}%：${v} 筆`,
-          series: [{ name: '事件數', y: bins.map(b => b.n), color: 'var(--amber)' }], refX: [{ x: 0, color: 'var(--dim)' }] });
-      }
-
-      // 最近的處置股：先顯示最新 20 筆，按「顯示全部」再展開
-      const FIRST = 20;
-      let showAll = false;
-      const table = () => {
-        const mk = $('#dpMarket').value;
-        const all = NEW.filter(e => !mk || e.market === mk).sort((a, b) => b.start.localeCompare(a.start) || a.code.localeCompare(b.code));
-        const rows = showAll ? all : all.slice(0, FIRST);
-        const more = $('#dpMore');
-        more.hidden = all.length <= FIRST;
-        more.textContent = showAll ? `收合，只顯示最新 ${FIRST} 筆` : `顯示全部 ${all.length} 筆`;
-        $('#dpTable').innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>市場</th><th>處置期間</th><th>處置</th><th>處置後第一天漲跌</th><th>處置期間報酬</th><th>同期大盤</th><th>出關後 5 日</th></tr></thead><tbody>
-          ${rows.map(e => `<tr><td>${LT.stockLink(e.code)}</td><td>${esc(e.name)}</td><td>${e.market === 'TWSE' ? '上市' : '上櫃'}</td><td>${md(e.start)}～${md(e.end)}${e.done ? '' : ' <small class="mute">進行中</small>'}</td><td>${esc(e.kind)}</td>
-            <td class="${cls(d1ret(e))}">${pct(d1ret(e))}</td><td class="${cls(e.ret)}">${pct(e.ret)}</td><td class="${cls(e.mkt)}">${pct(e.mkt)}</td><td class="${cls(e.post5)}">${pct(e.post5)}</td></tr>`).join('')}</tbody>`;
-      };
-      $('#dpMarket').onchange = table;
-      $('#dpMore').onclick = () => { showAll = !showAll; table(); };
-      table();
-    },
+    desc: '成交異常被交易所列為處置的股票：新制說明、處置期間的股價表現與策略回測',
+    groups: [{ name: '', items: [
+      { key: 'intro', name: '處置股介紹', desc: '什麼是處置股、2026/8/10 新制改了什麼，以及新制上路後處置期間的股價表現', run: intro },
+      { key: 'strategy', name: '處置股策略', desc: '處置第一天收盤買進融資使用率高的處置股，持有到處置結束後一天開盤賣出，和 0050 比較', run: (el, ctx) => window.LTTWR.disp(el, ctx),
+        topics: ['融資使用率 ≥ 20%', '不限融資'].flatMap(u => ['處置結束後一天開盤賣', '處置最後一天收盤賣'].map(x => `${u}｜${x}`)) },   // 後台熱門主題(同頁面裡「版本」選單的名稱)
+    ] }],
   });
 })();

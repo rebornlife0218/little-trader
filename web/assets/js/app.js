@@ -7,7 +7,7 @@ const LT = (() => {
   // 側欄區塊(順序即側欄順序)；新增區塊直接在這裡加一筆，desc 顯示在首頁
   const SECTIONS = [
     { key: 'index', name: '指數', desc: '全球 10 大指數的急跌反彈、均線、週期與 K 棒型態統計；台指期貨的價差、轉倉與法人未平倉' },
-    { key: 'etf', name: 'ETF', desc: 'ETF 介紹與折溢價、怎麼存 ETF(績效比較、配息課稅、0050 vs 勞退基金)、ETF 研究，以及即將發行的新 ETF' },
+    { key: 'etf', name: 'ETF', desc: 'ETF大禮包(ETF 介紹與折溢價、怎麼存 ETF、即將發行的新 ETF)與 ETF 研究' },
     { key: 'stock', name: '股票', desc: '台股處置股、策略回測與其他研究；美股財報行事曆與 S&P500 換股策略回測' },
     { key: 'option', name: '選擇權', desc: '臺指選擇權的隱含波動率、P/C ratio、T 字報價與結算日曆；24 種策略損益圖與 Black-Scholes 計算器' },
     { key: 'stats', name: '統計學', desc: '初級統計學 13 章：觀念、公式、R 範例、台股實例與互動模擬' },
@@ -212,6 +212,7 @@ const LT = (() => {
 
   /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
      LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, summary, tags, soon, run(el, ctx) }] }] })
+       redirect(選填)：redirect(項目代碼) 回傳網址時轉過去(舊網址)，回傳空字串就回到列表
        summary(選填)：研究的一句話結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
        - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
        - <區塊>/<頁面>/<項目>    單一內容：上方的麵包屑可以回到列表，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
@@ -226,6 +227,8 @@ const LT = (() => {
         const it = items.find(x => x.key === want && !x.soon);
         const base = `${def.section}/${def.key}`;
         if (!it) {
+          const to = want && def.redirect && def.redirect(want);   // redirect(選填)：舊網址的項目轉到別的頁面
+          if (to) { go(to, { replace: true }); return; }
           if (want) history.replaceState(null, '', base);   // 找不到的項目：回到列表
           el.innerHTML = `<header class="top"><div><h1>${esc(def.title || def.name)}</h1>${def.desc ? `<p>${esc(def.desc)}</p>` : ''}</div></header>
             ${def.groups.map(g => `<section class="cat-group">

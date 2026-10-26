@@ -48,7 +48,7 @@ const LTChart = (() => {
     // 長條圖每個類別都標刻度(xAll)時，類別太窄(手機)放不下就把刻度文字斜放 45°，底部多留空間
     const textW = s => [...s].reduce((w, c) => w + (c.charCodeAt(0) > 0x2e80 ? 10.5 : 6.2), 0);
     const labelW = kind === 'bars' && o.xAll ? Math.max(...o.x.map(v => textW(String(xFmt(v))))) : 0;
-    const tilt = labelW > (W - PAD.l - r) / xs.length - 6, extra = tilt ? Math.ceil(labelW * 0.71) : 0;
+    const tilt = labelW > 0 && labelW > (W - PAD.l - r) / xs.length - 6, extra = tilt ? Math.ceil(labelW * 0.71) : 0;
     const H = (o.height || 260) + lh + gap + extra, pb = PAD.b + extra;
     const ys = o.series.filter(s => s.axis !== 'right').flatMap(s => s.y).concat((o.refY || []).filter(q => q.axis !== 'right').map(q => q.y)).filter(Number.isFinite);
     if (kind === 'bars') ys.push(0);

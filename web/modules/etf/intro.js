@@ -1,16 +1,13 @@
-/* ETF · ETF介紹(etf/intro)：ETF 是什麼、種類、怎麼追蹤指數、成本、配息與總報酬、折溢價(靜態內容，共用函式在 lib.js) */
+/* ETF · ETF大禮包 › ETF介紹(etf/pack/intro，目錄頁在 pack.js)：ETF 是什麼、種類、怎麼追蹤指數、成本、配息與總報酬、折溢價(靜態內容，共用函式在 lib.js) */
 (() => {
   const { esc } = LTETF;
   const PREMIUM_REFS = [
     { name: '臺灣證券交易所 · ETF 盤中預估淨值與折溢價', desc: '各檔國內 ETF 的市價、預估淨值與折溢價率，盤中即時揭露',
       url: 'https://mis.twse.com.tw/stock/various-areas/etf-price/indicator-disclosure-etf?lang=zhHant' },
   ];
-  LT.register({
-    section: 'etf', key: 'intro', name: 'ETF介紹',
-    mount(el) {
+  LTETF.pages.intro = {
+    run(el) {
       el.innerHTML = `
-        <header class="top"><div><h1>ETF介紹</h1><p>是什麼、種類、成本、配息、折溢價</p></div></header>
-
         <div class="pk-pane" data-pane="intro">
           <div class="panel doc">
             <h3>什麼是 ETF</h3>
@@ -103,5 +100,5 @@
           </div>
         </div>`;
     },
-  });
+  };
 })();

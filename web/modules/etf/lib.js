@@ -1,5 +1,5 @@
-/* ETF 區塊共用(ETF介紹、怎麼存ETF、ETF研究三個頁面)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料
-   頁面：intro.js(etf/intro)、save.js(etf/save)、research.js(etf/research，目錄頁)；舊網址 etf/pack(ETF大禮包)轉到新頁面
+/* ETF 區塊共用(ETF大禮包的 ETF介紹、怎麼存ETF、即將發行ETF，以及 ETF研究)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料
+   頁面：pack.js(etf/pack，目錄頁；子主題 intro.js、save.js、etf.js)、research.js(etf/research，目錄頁)；舊網址 etf/intro、etf/save、etf/upcoming 轉到 etf/pack/<子主題>
    資料集：data/etf_compare/(compare.json、etfs.json；pipeline/etf_compare/update.py)、data/etf_research/(etf_follow.json) */
 window.LTETF = (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -97,5 +97,5 @@ window.LTETF = (() => {
     return { C, E, twList, MO, colorOf, failed };
   }
 
-  return { esc, pctf, cls, ym, statsOf, corr, growth, monthly, MIN_NOW, rollingStudy, pctl, TAX, taxCase, best, rateOf, load };
+  return { esc, pctf, cls, ym, statsOf, corr, growth, monthly, MIN_NOW, rollingStudy, pctl, TAX, taxCase, best, rateOf, load, pages: {} };   // pages：ETF大禮包的子主題(intro.js、save.js、etf.js 填入，pack.js 的目錄頁使用)
 })();

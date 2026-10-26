@@ -362,7 +362,4 @@
       key: x.key, name: x.name, desc: x.desc, summary: x.summary, tags: tagOf(x.series), run: (el, ctx) => study(el, ctx, x.key),
     })) })),
   });
-  // 舊網址 etf/pack、etf/pack/<研究>(ETF大禮包)：轉到新的頁面
-  LT.register({ section: 'etf', key: 'pack', name: 'ETF大禮包', hidden: true, redirect: true,
-    mount() { const k = LT.path()[2]; LT.go(k ? `etf/research/${k}` : 'etf/intro', { replace: true }); } });
 })();

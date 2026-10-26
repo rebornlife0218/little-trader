@@ -1,13 +1,11 @@
-/* ETF 區塊(ETF介紹、怎麼存ETF、ETF研究在 lib.js、intro.js、save.js、research.js)
-   · 即將發行ETF：資料集 data/etf_upcoming/(pipeline/etf_upcoming/update.py，排程見 .github/workflows/data-etf_upcoming.yml) */
+/* ETF · ETF大禮包 › 即將發行ETF(etf/pack/upcoming，目錄頁在 pack.js)：資料集 data/etf_upcoming/(pipeline/etf_upcoming/update.py，排程見 .github/workflows/data-etf_upcoming.yml) */
 (() => {
   const DATASET = 'etf_upcoming';
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const dash = s => s ? esc(s) : '<span class="na">—</span>';
 
-  LT.register({
-    section: 'etf', key: 'upcoming', name: '即將發行ETF',
-    async mount(el, ctx) {
+  LTETF.pages.upcoming = {
+    async run(el, ctx) {
       el.innerHTML = `<div class="panel"><div class="empty"><p>正在載入即將發行ETF…</p></div></div>`;
       let meta, data;
       try {
@@ -21,13 +19,7 @@
       const items = data.items || [];
       const recruiting = items.filter(x => x.period).length;
       el.innerHTML = `
-        <header class="top">
-          <div>
-            <h1>即將發行ETF</h1>
-            <p>${esc(data.title || '新基金一覽表')} · 僅列基金名稱含「ETF」者</p>
-            ${LT.sourceLine(meta)}
-          </div>
-        </header>
+        <div class="doc" style="margin-bottom:12px;"><p>${esc(data.title || '新基金一覽表')} · 僅列基金名稱含「ETF」者</p>${LT.sourceLine(meta)}</div>
         <div class="statgrid" style="margin-bottom:16px;">
           <div class="stat"><div class="v">${items.length}</div><div class="l">ETF 檔數</div></div>
           <div class="stat"><div class="v">${recruiting}</div><div class="l">已公布募集期間</div></div>
@@ -50,5 +42,5 @@
           <div class="note">日期為民國年。募集期間空白代表尚在送件申請或尚未公布；申請金額「E」為億元。</div>
         </div>`;
     },
-  });
+  };
 })();
