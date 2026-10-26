@@ -81,20 +81,21 @@
     }
     return rows;
   }
-  /* 累積報酬(上)與回撤(下)畫在同一張圖：navs = { key: 淨值 }，meta = { key: { name, color } }，main = 主角(線條較粗)；xFmt 可省略(預設只標年份) */
-  function navCharts({ d, i0, navs, meta, main, log, chart, legend, xFmt: xf }) {
+  /* 累積報酬(上)與回撤(下)畫在同一張圖：navs = { key: 淨值 }，meta = { key: { name, color } }，main = 主角(線條較粗)；xFmt 可省略(預設只標年份)
+     縱軸刻度由圖左上角的「對數｜一般」切換(LTChart，全站共用) */
+  function navCharts({ d, i0, navs, meta, main, chart, legend, xFmt: xf }) {
     const keys = Object.keys(meta), n = navs[keys[0]].length;
     const step = Math.max(1, Math.floor(n / 700)), idx = [];
     for (let i = 0; i < n; i += step) idx.push(i);
     if (idx[idx.length - 1] !== n - 1) idx.push(n - 1);
     const xs = idx.map(i => d[i0 + i]), xFmt = xf || ((v, tip) => tip ? v : v.slice(0, 4));
     const D = Object.fromEntries(keys.map(k => { let pk = -Infinity; return [k, navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; })]; }));
-    LTChart.line(chart, { x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
+    LTChart.line(chart, log => ({ x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
       yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),
       yTicks: log ? () => LOG_TICKS.map(Math.log10) : undefined, refY: [{ y: log ? 0 : 1 }],
       series: keys.map(k => ({ name: meta[k].name, color: meta[k].color, width: k === main ? 2.6 : 1.5, y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })),
       lower: { height: 130, label: '回撤', yMax: 0, fill: true, yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
-        series: keys.map(k => ({ name: meta[k].name + ' 回撤', color: meta[k].color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } });
+        series: keys.map(k => ({ name: meta[k].name + ' 回撤', color: meta[k].color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } }));
     legend.innerHTML = LTChart.legend(keys.map(k => meta[k]));
   }
 
@@ -167,9 +168,6 @@
       <h2 class="sec-h">四、實證結果與分析</h2>
       <div class="panel">
         ${tabs.html}
-        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
-          <div class="paramitem"><label for="twScale">走勢圖縱軸</label><select id="twScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
-        </div>
       </div>
       <div id="twView"></div>
       <div class="panel">
@@ -195,20 +193,20 @@
     const periodTxt = C => `${B.d[C.i0 + 1].replace(/-/g, '/')} 到 ${B.asof.replace(/-/g, '/')}`;
 
     function charts(C, keys, ddKeys, main) {
-      const log = $('#twScale').value === 'log', { i0, navs } = C;
+      const { i0, navs } = C;
       const step = Math.max(1, Math.floor((B.d.length - i0) / 700)), idx = [];
       for (let i = 0; i < B.d.length - i0; i += step) idx.push(i);
       if (idx[idx.length - 1] !== B.d.length - 1 - i0) idx.push(B.d.length - 1 - i0);
       const xs = idx.map(i => B.d[i0 + i]), xFmt = (d, tip) => tip ? d : d.slice(0, 4);
       const dd = k => { let pk = -Infinity; return navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; }); };
       const D = Object.fromEntries(ddKeys.map(k => [k, dd(k)]));
-      LTChart.line($('#twChart'), { x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
+      LTChart.line($('#twChart'), log => ({ x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
         yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),
         yTicks: log ? () => LOG_TICKS.map(Math.log10) : undefined, refY: [{ y: log ? 0 : 1 }],
         series: keys.map(k => ({ name: meta(k).name, color: meta(k).color, width: k === main ? 2.6 : 1.5, dash: k === 'ew' ? '5 4' : undefined,
           y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })),
         lower: { height: 130, label: '回撤', yMax: 0, fill: true, yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
-          series: ddKeys.map(k => ({ name: meta(k).name + ' 回撤', color: meta(k).color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } });
+          series: ddKeys.map(k => ({ name: meta(k).name + ' 回撤', color: meta(k).color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } }));
       $('#twLegend').innerHTML = LTChart.legend(keys.map(meta));
     }
     /* 每年報酬：每年最後一個交易日的淨值比 */
@@ -337,8 +335,7 @@
         xFmt: (v, tip) => tip ? v : v.endsWith('-01') ? v.slice(0, 4) : '', yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`,
         series: [{ name: '合格股票數', y: C.M.map(m => m.n), color: 'var(--blue)' }] });
     }
-    $('#twScale').onchange = draw;
-    {   // 精簡版的績效卡片(低波動 10%)與累積報酬圖：兩種低波動組合 vs 0050(對數刻度)
+    {   // 精簡版的績效卡片(低波動 10%)與累積報酬圖：兩種低波動組合 vs 0050
       const C0 = calc(), K = [...STRATS.map(s => s.key), 'b0050'];
       $('#twBriefStats').innerHTML = vs0050Cards(C0.st.lv10p, C0.st.b0050, C0.ts.lv10p) + tradeCards(C0.ts.lv10p);
       const pk = B.picks, P = pk.lv10p;   // 近期明細：低波動 10% 最新一次選股的持股(波動由小到大)；還沒進場時下個交易日開盤換股，全部框起來
@@ -346,7 +343,7 @@
       LT.moreTable($('#twRecent'), ['代號', '名稱', '產業', '年化波動', '每日成交金額(中位數)'],
         P.map(([c, n, i, v, m]) => `<tr${pk.entered ? '' : ' class="next-act"'}><td>${LT.stockLink(c)}</td><td>${esc(n)}${pk.entered ? '' : '<span class="next-tag">下個交易日換股</span>'}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`));
       navCharts({ d: B.d, i0: 0, navs: Object.fromEntries(K.map(k => [k, C0.navs[k]])), meta: Object.fromEntries(K.map(k => [k, { name: meta(k).name, color: meta(k).color }])),
-        main: 'lv10p', log: true, chart: $('#twBrief'), legend: $('#twBriefLegend') });
+        main: 'lv10p', chart: $('#twBrief'), legend: $('#twBriefLegend') });
     }
     tabs.bind(el);   // 套用上次看的分頁並畫出來
   }
@@ -469,12 +466,11 @@
         </div>
       </div>
       <h2 class="sec-h">四、實證結果與分析</h2>
-      <div class="panel">
+      ${long ? '' : `<div class="panel">
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
-          ${long ? '' : '<div class="paramitem"><label for="evFee">借券費(年利率，%)</label><input id="evFee" type="number" min="0" max="20" step="0.1" value="0.1"></div>'}
-          <div class="paramitem"><label for="evScale">走勢圖縱軸</label><select id="evScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
+          <div class="paramitem"><label for="evFee">借券費(年利率，%)</label><input id="evFee" type="number" min="0" max="20" step="0.1" value="0.1"></div>
         </div>
-      </div>
+      </div>`}
       <div id="evView"></div>
       <div class="panel">
         <div class="doc">
@@ -543,7 +539,7 @@
           </tbody></table></div>
           <p class="note">紅色越深代表漲越多、綠色越深代表跌越多；粗體底線表示當年贏過 0050。出場筆數與勝率以出場日所在年度計。</p>
         </div>`;
-      navCharts({ d: B.d, i0, navs, meta, main: 's', log: $('#evScale').value === 'log', chart: $('#evChart'), legend: $('#evChartLegend') });
+      navCharts({ d: B.d, i0, navs, meta, main: 's', chart: $('#evChart'), legend: $('#evChartLegend') });
     }
 
     // 每日選股：最新一個交易日＋最近幾個交易日
@@ -561,7 +557,7 @@
         </tbody></table></div>
         <p class="note">資料到 ${esc(B.asof)}。歷史回測不代表未來，這裡的選股只是策略規則的結果，不是投資建議。</p>
       </div>`;
-    if (!long) $('#evFee').oninput = draw; $('#evScale').onchange = draw;
+    if (!long) $('#evFee').oninput = draw;
     draw();
   }; }
 

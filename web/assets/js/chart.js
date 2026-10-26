@@ -8,6 +8,8 @@
    右側 y 軸：series 加 axis:'right'(長條圖中畫成折線＋圓點)，搭配 y2Min、y2Max、y2Fmt；refY 也可加 axis:'right'
    下方子圖(折線圖)：lower:{ height, series:[{ name, y, color, width }], yMin, yMax, yFmt, tipFmt, label, fill }
             畫在同一張圖的下方，共用 x 軸與十字線，例如權益曲線下方接回撤(fill:true 時從 0 往下塗色)
+   縱軸可切換對數/一般刻度：LTChart.line(el, log => ({ ...選項 }))(傳函式)，主圖左上角的小標旁會出現「對數｜一般」切換鈕；
+            設定全站共用(記在瀏覽器)，切換時同一頁所有可切換的圖一起重畫。
    顏色請用 CSS 變數(例如 'var(--amber)')，切換主題時不必重畫。
    ========================================================================== */
 const LTChart = (() => {
@@ -151,19 +153,37 @@ const LTChart = (() => {
     svg.addEventListener('mouseleave', leave);
   }
 
-  function render(el, o, kind, body) {
+  // 縱軸刻度設定(true = 對數)：全站共用，記在 localStorage
+  let logPref = true;
+  try { logPref = localStorage.getItem('lt-scale') !== 'lin'; } catch (e) {}
+  const scaleBtns = (o, f) => {
+    const left = PAD.l + 6 + (o.title ? [...o.title].length * 13 + 6 : 0);
+    return `<div class="lt-scale" role="group" aria-label="縱軸刻度" style="left:${left}px;top:${PAD.t + 1}px">${[[true, '對數'], [false, '一般']].map(([v, t]) =>
+      `<button type="button" data-log="${v ? 1 : 0}" aria-pressed="${logPref === v}">${t}</button>`).join('')}</div>`;
+  };
+  function setScale(log) {
+    logPref = log;
+    try { localStorage.setItem('lt-scale', log ? 'log' : 'lin'); } catch (e) {}
+    document.querySelectorAll('.lt-scaled').forEach(e => { if (e._ltScale) line(e, e._ltScale); });
+  }
+
+  function render(el, o, kind, body, scaled) {
     watch(el, () => {
       const f = frame(el, o, kind);
       el.classList.add('lt-chart');
       el.innerHTML = `<svg width="${f.W}" height="${f.H}" viewBox="0 0 ${f.W} ${f.H}" role="img" aria-label="${esc(o.label || '圖表')}">
         ${f.g}${body(f)}${refs(o, f, kind)}
         <line class="lt-cross" y1="${PAD.t}" y2="${f.H - f.pb}" stroke="var(--dim)" stroke-width="1" style="display:none"/>
-      </svg><div class="lt-tip"></div>`;
+      </svg><div class="lt-tip"></div>${scaled ? scaleBtns(o, f) : ''}`;
+      if (scaled) el.querySelectorAll('.lt-scale button').forEach(b => { b.onclick = () => setScale(b.dataset.log === '1'); });
       hover(el, o, f, kind);
     });
   }
 
   function line(el, o) {
+    const scaled = typeof o === 'function';
+    if (scaled) { el._ltScale = o; el.classList.add('lt-scaled'); o = o(logPref); }
+    else { delete el._ltScale; el.classList.remove('lt-scaled'); }
     render(el, o, 'line', f => o.series.map(s => {
       const segs = []; let cur = [];
       s.y.forEach((v, i) => { if (Number.isFinite(v)) cur.push([f.X(f.xs[i]), f.Y(v)]); else if (cur.length) { segs.push(cur); cur = []; } });
@@ -184,7 +204,7 @@ const LTChart = (() => {
       const line = pts.map(p => p.join(',')).join(' '), y0 = f.L.Y(0);
       return (o.lower.fill ? `<polygon points="${pts[0][0]},${y0} ${line} ${pts[pts.length - 1][0]},${y0}" fill="${s.color}" fill-opacity=".12"/>` : '')
         + `<polyline points="${line}" fill="none" stroke="${s.color}" stroke-width="${s.width || 1.4}" stroke-linejoin="round"/>`;
-    }).join('') : ''));
+    }).join('') : ''), scaled);
   }
 
   function bars(el, o) {

@@ -87,16 +87,14 @@
       <h3>研究報告 ${tag(S.series)}</h3>
       <div class="doc">${md(src)}</div>
     </div>`;
-  // 精簡版(LT.brief)的績效卡片(ts = 交易統計)與累積報酬圖：主要版本 vs 0050；短期間(同一年內)改用一般刻度與月/日
+  // 精簡版(LT.brief)的績效卡片(ts = 交易統計)與累積報酬圖：主要版本 vs 0050；短期間(同一年內)橫軸標月/日
   function briefChart(el, d, nav, b0050, name, color, ts) {
-    const short = d[0].slice(0, 4) === d[d.length - 1].slice(0, 4);
     const box = el.querySelector('#twrBriefStats');
     if (box && ts) { const { stats, vs0050Cards, tradeCards } = W(); box.innerHTML = vs0050Cards(stats(nav), stats(b0050), ts) + tradeCards(ts) + extraCards(ts); }
     W().navCharts({ d, i0: 0, navs: { s: nav, b0050 }, meta: { s: { name, color }, b0050: { name: '0050 買進持有', color: C0050 } },
-      main: 's', log: !short, chart: el.querySelector('#twrBrief'), legend: el.querySelector('#twrBriefLegend'), xFmt: dateFmt(d) });
+      main: 's', chart: el.querySelector('#twrBrief'), legend: el.querySelector('#twrBriefLegend'), xFmt: dateFmt(d) });
   }
   const NO_STOP = '不設停利停損。';
-  const scaleSel = id => `<div class="paramitem"><label for="${id}">走勢圖縱軸</label><select id="${id}"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>`;
   const MONEY = '本金 100 萬元，買賣金額除以成交價(含滑價與手續費)無條件捨去到整數股；沒有新股票進場的日子不調整，沒用到的資金持有現金(不計利息)。';
   // 回測規則依台股策略頁的同一套原則：漲跌停、沒有成交、下市櫃的處理
   // 每年報酬表：cols = [{ name, nav, cmp }](cmp = 和 0050 比較、粗體標示贏過)
@@ -151,7 +149,6 @@
         <div class="mode-tabs twr-ver" style="margin-top:12px;">${B.versions.map(v => `<button class="mode-tab" data-v="${v.key}"><b>${esc(v.name)}</b><small>${v.key === 'all' ? '全部合格股票' : capTxt(v)}</small></button>`).join('')}</div>
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
           <div class="paramitem"><label for="twrGrp">組合</label><select id="twrGrp"><option value="t10">前 10 檔</option><option value="t5">前 5 檔</option></select></div>
-          ${scaleSel('twrScale')}
         </div>
       </div>
       <div id="twrView"></div>
@@ -187,7 +184,7 @@
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: nav, ew: V.nav.ew, b0050: B.b0050 },
         meta: { s: { name: `${V.name}｜${G[grp]}`, color: SERIES[S.series].color }, ew: { name: '全部合格股票', color: '#94a3b8' }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
-        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
+        main: 's', chart: $('#twrChart'), legend: $('#twrLegend') });
       $('#twrAll').innerHTML = compareTable(B.versions.flatMap(v => ['t10', 't5'].map(g => ({ name: `${v.name}｜${G[g]}`, nav: v.nav[g], ts: v.ts[g], main: v.key === ver && g === grp }))), Sx);
     }
     const decile = div => LTChart.bars(div, { x: B.decile.map(r => 'D' + r.d), xAll: true, xFmt: v => v, label: '每筆平均報酬', height: 200, yFmt: v => (v * 100).toFixed(1) + '%',
@@ -203,7 +200,6 @@
     });
     el.querySelector('.twr-ver').onclick = e => { const b = e.target.closest('[data-v]'); if (b) { ver = b.dataset.v; draw(); } };
     $('#twrGrp').onchange = () => { grp = $('#twrGrp').value; draw(); };
-    $('#twrScale').onchange = draw;
     draw();
   }
 
@@ -225,7 +221,6 @@
         </div>
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
           <div class="paramitem"><label for="twrS">策略</label><select id="twrS">${B.strats.map(s => `<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
-          ${scaleSel('twrScale')}
         </div>
       </div>
       <div id="twrView"></div>
@@ -247,7 +242,7 @@
           ${yearTableHtml(B.d, [{ name: T.name, nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name: T.name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
-        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
+        main: 's', chart: $('#twrChart'), legend: $('#twrLegend') });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: s.name, nav: s.nav, ts: s.ts, main: s.key === k })), Sx);
     }
     const sk = n => B.strats.find(s => s.key === n);
@@ -258,7 +253,6 @@
         { name: '0050', nav: B.b0050, color: C0050 }], B.b0050),
     });
     $('#twrS').onchange = () => { k = $('#twrS').value; draw(); };
-    $('#twrScale').onchange = draw;
     draw();
   }
 
@@ -287,7 +281,6 @@
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
           <div class="paramitem"><label for="twrH">持有期</label><select id="twrH">${HS.map(x => `<option value="${esc(x)}">${esc(HN[x] || x)}</option>`).join('')}</select></div>
           <div class="paramitem"><label for="twrG">組合</label><select id="twrG">${GS.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('')}</select></div>
-          ${scaleSel('twrScale')}
         </div>
       </div>
       <div id="twrView"></div>
@@ -318,7 +311,7 @@
           ${yearTableHtml(B.d, [{ name: g, nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
-        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
+        main: 's', chart: $('#twrChart'), legend: $('#twrLegend') });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: `${HN[s.h] || s.h}｜${s.g}`, nav: s.nav, ts: s.ts, main: s === T })), Sx);
     }
     // 事件研究：衰退組用綠色系(越深衰退越多)，成長組用紅色系(越深成長越多)，台股慣例紅漲綠跌
@@ -345,7 +338,6 @@
     $('#twrH').value = h; $('#twrG').value = g;
     $('#twrH').onchange = () => { h = $('#twrH').value; draw(); };
     $('#twrG').onchange = () => { g = $('#twrG').value; draw(); };
-    $('#twrScale').onchange = draw;
     draw();
   }
 
@@ -370,7 +362,6 @@
         <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
           <div class="paramitem"><label for="twrH">持有期</label><select id="twrH">${HS.map(x => `<option value="${esc(x)}">${esc(HN[x] || x)}</option>`).join('')}</select></div>
           <div class="paramitem"><label for="twrG">條件</label><select id="twrG"></select></div>
-          ${scaleSel('twrScale')}
         </div>
       </div>
       <div id="twrView"></div>
@@ -406,7 +397,7 @@
           ${yearTableHtml(B.d, [{ name: g, nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: C0050 } },
-        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
+        main: 's', chart: $('#twrChart'), legend: $('#twrLegend') });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: `${HN[s.h] || s.h}｜${s.g}`, nav: s.nav, ts: s.ts, main: s === T })), Sx);
     }
     // 事件研究：由負轉正用系列色，其餘依方向配色(成長紅、衰退綠，台股慣例)
@@ -428,7 +419,6 @@
     $('#twrH').value = h; fillG();
     $('#twrH').onchange = () => { h = $('#twrH').value; fillG(); draw(); };
     $('#twrG').onchange = () => { g = $('#twrG').value; draw(); };
-    $('#twrScale').onchange = draw;
     draw();
   }
 

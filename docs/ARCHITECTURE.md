@@ -288,7 +288,7 @@ LT.register({
 - **分享研究**：目錄頁的單一內容(研究、策略)在頁首有「分享」按鈕(app.js 的 `share`；登入的會員才有，要密碼的策略沒有)，呼叫 `POST api/share`(`functions/api/share.ts`)產生專屬連結 `/s/<8 碼代碼>`(同一個人分享同一份報告是同一個連結，存在 D1 的 `share_links`)。手機用系統分享選單，電腦複製連結。
   打開連結(`functions/s/[code].ts`)：點開次數 +1(社群網站抓預覽不算)、存 `lt_ref` cookie(30 天)、轉到報告頁；報告在需要登入的區塊，沒登入的人先看到登入提示。登入後看報告時，`api/track` 依 `lt_ref` 記到 `share_views`(誰、看了幾次；分享的人自己不算)。後台「分享紀錄」列出誰分享了哪份報告、點開次數、登入後看的人與新會員(點了連結才第一次登入)。`_routes.json` 已包含 `/s/*`。
 - **IG 圖卡**：`node scripts/share/make-share.mjs [研究 key …]`，在本機開網站並截出圖卡；新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
-- **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。
+- **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。累積報酬圖的縱軸用 `LTChart.line(el, log => ({ … }))`(傳函式)：主圖左上角小標旁有「對數｜一般」切換鈕，設定全站共用(記在瀏覽器)，同一頁的累積報酬圖一起切換；策略與研究頁的報酬回撤圖(`LTTW.navCharts`)都用這個，頁面上不另放縱軸選單。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
 
 ## 自動測試

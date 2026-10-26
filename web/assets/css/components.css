@@ -333,6 +333,11 @@
   /* ---------- 共用 SVG 圖表(assets/js/chart.js) ---------- */
   .lt-chart{position:relative;width:100%;}
   .lt-chart svg{display:block;touch-action:pan-y;}
+  .lt-scale{position:absolute;display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:var(--panel);z-index:1;}
+  .lt-scale button{position:relative;font:inherit;font-size:11px;line-height:1;padding:3px 7px;border:0;background:none;color:var(--mute);cursor:pointer;}
+  .lt-scale button+button{border-left:1px solid var(--border);}
+  .lt-scale button[aria-pressed="true"]{background:var(--sec, var(--blue));color:var(--panel);font-weight:600;}
+  .lt-scale button:focus-visible{outline:2px solid var(--sec, var(--blue));outline-offset:1px;}
   .lt-tip{display:none;position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;padding:7px 10px;font-size:11.5px;line-height:1.6;box-shadow:0 4px 14px var(--shadow);white-space:nowrap;z-index:2;}
   .lt-tip b{display:block;font-family:var(--font-num);font-size:11px;color:var(--dim);font-weight:500;}
   .lt-tip i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:middle;}
@@ -592,6 +597,8 @@
     #content button, .chap-list a, .home-mkt-f a, .chap-nav, input[type="range"]{min-height:44px;}
     .chap-list a, .home-mkt-f a, .chap-nav{display:inline-flex;align-items:center;}
     #content summary{display:flex;align-items:center;min-height:44px;cursor:pointer;}
+    #content .lt-scale button{min-height:0;min-width:40px;}   /* 縱軸切換鈕外觀維持小的，點擊範圍用 ::before 延伸到 44px 高 */
+    .lt-scale button::before{content:"";position:absolute;inset:-14px -2px;}
   }
   @media (prefers-reduced-motion: reduce){ *, *::before, *::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;scroll-behavior:auto !important;} }
 

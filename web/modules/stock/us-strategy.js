@@ -111,7 +111,6 @@
           <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
             <div class="paramitem"><label for="usFrom">回測起點</label><select id="usFrom">${years.map(y => `<option value="${y}" ${y === 2000 ? 'selected' : ''}>${y} 年初</option>`).join('')}</select></div>
             <div class="paramitem"><label for="usCost">交易成本(單邊，%)</label><input id="usCost" type="number" min="0" max="2" step="0.05" value="0.1"></div>
-            <div class="paramitem"><label for="usScale">走勢圖縱軸</label><select id="usScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
           </div>
         </div>
         <div id="usView"></div>
@@ -140,20 +139,20 @@
 
       /* 累積報酬、回撤：keys 為要畫的組合，main 為加粗的那一條 */
       function charts(C, keys, ddKeys, main) {
-        const log = $('#usScale').value === 'log', { i0, navs } = C;
+        const { i0, navs } = C;
         const step = Math.max(1, Math.floor((B.d.length - i0) / 700)), idx = [];
         for (let i = 0; i < B.d.length - i0; i += step) idx.push(i);
         if (idx[idx.length - 1] !== B.d.length - 1 - i0) idx.push(B.d.length - 1 - i0);
         const xs = idx.map(i => B.d[i0 + i]), xFmt = (d, tip) => tip ? d : d.slice(0, 4);
         const dd = k => { let pk = -Infinity; return navs[k].map(v => { pk = Math.max(pk, v); return v / pk - 1; }); };
         const D = Object.fromEntries(ddKeys.map(k => [k, dd(k)]));
-        LTChart.line($('#usChart'), { x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
+        LTChart.line($('#usChart'), log => ({ x: xs, xType: 'date', label: '累積報酬與回撤', title: '報酬', height: 320, xFmt,
           yFmt: log ? v => mulFmt(10 ** v) : v => mulFmt(v), tipFmt: log ? (s, v) => pct(10 ** v - 1, 1) : (s, v) => pct(v - 1, 1),
           yTicks: log ? () => LOG_TICKS.map(Math.log10) : undefined, refY: [{ y: log ? 0 : 1 }],
           series: keys.map(k => ({ name: meta(k).name, color: meta(k).color, width: k === main ? 2.6 : 1.5, dash: k === 'ew' ? '5 4' : undefined,
             y: idx.map(i => log ? Math.log10(navs[k][i]) : navs[k][i]) })),
           lower: { height: 130, label: '回撤', yMax: 0, fill: true, yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => (v * 100).toFixed(1) + '%',
-            series: ddKeys.map(k => ({ name: meta(k).name + ' 回撤', color: meta(k).color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } });
+            series: ddKeys.map(k => ({ name: meta(k).name + ' 回撤', color: meta(k).color, width: k === main ? 1.6 : 1.2, y: idx.map(i => D[k][i]) })) } }));
         $('#usLegend').innerHTML = LTChart.legend(keys.map(meta));
       }
       /* 每年報酬(熱度表)：每年最後一個交易日的淨值比 */
@@ -296,14 +295,14 @@
           LT.moreTable($('#usRecent'), ['換股季度', '代號', '權重', '上季報酬'], B.q.slice().reverse().filter(q => q.picks && q.picks[b]).flatMap(q =>
             q.picks[b].map(([t, w, r]) => `<tr><td>${esc(q.q)}</td><td><a href="https://finance.yahoo.com/quote/${encodeURIComponent(t.replace('.', '-'))}" target="_blank" rel="noopener">${esc(t)}</a></td><td>${(w * 100).toFixed(1)}%</td><td class="${cls(r)}">${pct(r, 1)}</td></tr>`)));
           window.LTTW.navCharts({ d: B.d, i0: C.i0, navs: { [b]: C.navs[b], spy: C.navs.spy }, meta: { [b]: { name: meta(b).name, color: meta(b).color }, spy: { name: meta('spy').name, color: meta('spy').color } },
-            main: b, log: true, chart: $('#usBrief'), legend: $('#usBriefLegend') });
+            main: b, chart: $('#usBrief'), legend: $('#usBriefLegend') });
         }
         if (view === 'all') renderAll(C); else renderOne(C, view);
         LTChart.bars($('#usCov'), { x: C.Q.map(q => q.q), label: '可取得股價的成分股比例', height: 180, yMin: 0, yMax: 1,
           xFmt: (v, tip) => tip ? v : v.endsWith('Q1') && +v.slice(0, 4) % 5 === 0 ? v.slice(0, 4) : '', yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v, i) => `${(v * 100).toFixed(0)}%(${C.Q[i].usable} / ${C.Q[i].members} 檔)`,
           series: [{ name: '覆蓋率', y: C.Q.map(q => q.usable / q.members), color: 'var(--blue)' }] });
       }
-      $('#usFrom').onchange = draw; $('#usCost').oninput = draw; $('#usScale').onchange = draw;
+      $('#usFrom').onchange = draw; $('#usCost').oninput = draw;
       tabs.bind(el);   // 套用上次看的分頁並畫出來
   }
 })();

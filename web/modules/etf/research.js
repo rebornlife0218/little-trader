@@ -81,7 +81,6 @@
           <div class="paramitem"><label for="efMode">模式</label><select id="efMode">${MODES.map(m => `<option value="${m}">${m}</option>`).join('')}</select></div>
           <div class="paramitem"><label for="efGroup">範圍</label><select id="efGroup"></select></div>
           <div class="paramitem"><label for="efHold">出場</label><select id="efHold">${Object.keys(HN).map(h => `<option value="${h}">${esc(HN[h])}</option>`).join('')}</select></div>
-          <div class="paramitem"><label for="efScale">走勢圖縱軸</label><select id="efScale"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>
         </div>
       </div>
       <div id="efView"></div>
@@ -123,18 +122,17 @@
           ${yearHtml(T, b)}
         </div>`;
       W.navCharts({ d: B.d, i0: T.i0, navs: { s: T.nav, b0050: b }, meta: { s: { name, color: MC[mode] }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
-        main: 's', log: $('#efScale').value === 'log', chart: $('#efChart'), legend: $('#efLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
+        main: 's', chart: $('#efChart'), legend: $('#efLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
       $('#efAll').innerHTML = allTable(T);
     }
     $('#efMode').onchange = () => { mode = $('#efMode').value; fillGroup(); draw(); };
     $('#efGroup').onchange = () => { group = $('#efGroup').value; draw(); };
     $('#efHold').onchange = () => { hold = $('#efHold').value; fillGroup(); draw(); };
-    $('#efScale').onchange = draw;
     {   // 精簡版的累積報酬圖：加碼｜全部｜跟單出場 vs 0050
       const T0 = SK('加碼', '全部', '跟單出場') || B.strats[0];
       $('#efBriefStats').innerHTML = W.vs0050Cards(statsC(T0.nav), statsC(sub(T0)), T0.ts) + W.tradeCards(T0.ts) + extra(T0.ts);
       W.navCharts({ d: B.d, i0: T0.i0, navs: { s: T0.nav, b0050: sub(T0) }, meta: { s: { name: `${T0.mode}｜${T0.group}｜${hname(T0.hold)}`, color: MC[T0.mode] }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
-        main: 's', log: true, chart: $('#efBrief'), legend: $('#efBriefLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
+        main: 's', chart: $('#efBrief'), legend: $('#efBriefLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
     }
     $('#efAll').onclick = e => { const r = e.target.closest('tr[data-k]'); if (!r) return; [mode, group, hold] = r.dataset.k.split('｜'); fillGroup(); draw(); $('#efView').scrollIntoView({ behavior: 'smooth' }); };
     fillGroup(); draw();
