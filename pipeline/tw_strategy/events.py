@@ -32,6 +32,12 @@
     4. 借券賣出餘額張數創 3 日新高(高於前 2 日的最高值)
     排除：選股日開盤價等於漲停價；進場日開盤價等於漲停價(不放空)
     出場：不設停利停損，持有 1 個交易日，當天收盤回補
+  rev20 月營收年增率長期以來第一次破 20%(做多，XQ 回測改寫)：
+    1. 最新公布的單月營收年增率 > 20%，前 12 個月的年增率都 ≤ 20%；從公告日到公告當月月底(或下個月營收公布前)每天檢查
+    2. 近 2 日平均成交量 > 500 張　3. 買進分點家數(買分價家數) < 150　4. 收盤價 > 11 元　排除：近 2 日跌幅 > 10%
+    出場：停損 15%(盤中觸及)，最多持有 15 個交易日，第 15 天收盤賣出
+    XQ 的「分公司買進家數 < 100」和資料庫的買分價家數算法不同：XQ 的訊號日買分價家數中位數約 130，
+    用 < 150 時 2018/10～2025/10 的交易筆數(434)最接近 XQ(421)，其中 278 筆進場日相同
 
 用法：python pipeline/tw_strategy/events.py [策略 ...]   (預設全部；python pipeline/tw_strategy/update.py 也會一起產生)
 """
@@ -60,7 +66,7 @@ BENCH = '0050'
 EPS = 1e-6
 
 COLS = {'open': '開盤價', 'close': '收盤價', 'vol': '成交量', 'o': '還原開盤價', 'h': '還原最高價', 'l': '還原最低價', 'c': '還原收盤價',
-        'sbl': '借券賣出餘額', 'val': '成交金額(千)'}
+        'sbl': '借券賣出餘額', 'val': '成交金額(千)', 'brk': '買分價家數'}
 if private:
     COLS.update(private.COLS)
 SQL = f'''COPY (
@@ -141,8 +147,46 @@ def against_signal(W):
     return sig, cols
 
 
+REV_TH, REV_N, BRK_TH = 20, 12, 150      # 營收年增率門檻(%)、近幾個月、買進分點家數上限
+
+
+def rev20_signal(W):
+    """月營收年增率長期以來第一次破 20%(XQ 回測改寫)：最新公布的月營收年增率 > 20%，而且前 12 個月都沒有超過 20%；
+    從公告日(收盤後公告)起到該月月底，每天收盤後檢查日資料條件，符合就隔天開盤買進"""
+    c, close, vol = W['c'], W['close'], W['vol']
+    D, cols = c.index, list(c.columns)
+    jx = {s: j for j, s in enumerate(cols)}
+    with pg_connect() as conn:
+        rv = pd.DataFrame(conn.execute('SELECT "股票代號", "年月", "單月合併營收年成長(%)", "單月營收年成長(%)", "公告日" '
+                                       'FROM cm.tw_monthly_revenue WHERE "公告日" IS NOT NULL').fetchall(), columns=['s', 'ym', 'yc', 'y', 'ann'])
+    rv['yoy'] = rv['yc'].fillna(rv['y']).astype(float)       # 合併營收缺值時用單月營收
+    rv['ym'] = pd.to_datetime(rv['ym'] + '01')
+    rv['ann'] = pd.to_datetime(rv['ann'])
+    act, yoy, prev12 = (np.full(c.shape, np.nan) for _ in range(3))
+    for s, g in rv[rv['s'].isin(jx)].sort_values('ym').groupby('s'):
+        g = g.drop_duplicates('ym').set_index('ym')
+        a = g['yoy'].reindex(pd.date_range(g.index.min(), g.index.max(), freq='MS'))
+        pm = a.shift(1).rolling(REV_N, min_periods=REV_N).max().reindex(g.index).to_numpy()
+        y = g['yoy'].to_numpy()
+        t0 = np.searchsorted(D.values, g['ann'].values.astype('datetime64[ns]'), side='right') - 1   # 公告日(非交易日 = 之前最後一個交易日)
+        me = np.searchsorted(D.values, (g['ann'] + pd.offsets.MonthEnd(0)).values.astype('datetime64[ns]'), side='right')
+        for i in range(len(g)):
+            if y[i] > REV_TH and pm[i] <= REV_TH and t0[i] >= 0:
+                end = min(me[i], t0[i + 1] if i + 1 < len(g) else len(D))   # 到公告當月月底，或下個月營收公布前
+                j = jx[s]
+                act[t0[i]:end, j], yoy[t0[i]:end, j], prev12[t0[i]:end, j] = 1, y[i], pm[i]
+    act = pd.DataFrame(act, index=D, columns=cols).notna()
+    v2 = vol.rolling(2).mean()
+    r2 = c / c.shift(2) - 1
+    sig = act & (v2 > 500) & (W['brk'] < BRK_TH) & (close > 11) & ~(r2 < -0.10)
+    cols_ = [('營收年增率', 'num', pd.DataFrame(yoy, index=D, columns=cols)), ('前 12 個月最高年增率', 'num', pd.DataFrame(prev12, index=D, columns=cols)),
+             ('近 2 日均量(張)', 'int', v2), ('買進分點家數', 'int', W['brk']), ('近 2 日漲跌', 'chg', r2)]
+    return sig, cols_
+
+
 STRATEGIES = [
     {'key': 'against', 'side': 'short', 'signal': against_signal, 'tp': None, 'sl': None, 'hold': 1, 'exit': 'close'},
+    {'key': 'rev20', 'side': 'long', 'signal': rev20_signal, 'tp': None, 'sl': 0.15, 'hold': 15, 'exit': 'close'},
 ] + (private.STRATEGIES if private else [])
 
 
@@ -244,10 +288,10 @@ def backtest(W, sig, st):
             E = O[e, j]
             x, px, why, when = None, None, None, None
             if tp is not None or sl is not None:
-                win = E * (1 + tp) if long else E * (1 - tp)      # 停利價
-                lose = E * (1 - sl) if long else E * (1 + sl)     # 停損價
-                hit_w = (lambda p: p >= win) if long else (lambda p: p <= win)
-                hit_l = (lambda p: p <= lose) if long else (lambda p: p >= lose)
+                win = None if tp is None else E * (1 + tp) if long else E * (1 - tp)      # 停利價(可省略)
+                lose = None if sl is None else E * (1 - sl) if long else E * (1 + sl)    # 停損價(可省略)
+                hit_w = (lambda p: False) if win is None else (lambda p: p >= win) if long else (lambda p: p <= win)
+                hit_l = (lambda p: False) if lose is None else (lambda p: p <= lose) if long else (lambda p: p >= lose)
                 for t in range(e, min(e + hold, nd)):
                     if not TR[t, j]:
                         continue                                  # 沒有成交：價格不動

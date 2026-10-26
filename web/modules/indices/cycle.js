@@ -79,7 +79,7 @@ function computeElection(rows, key){
     if (base<1 || base>=n-1) return; // 資料範圍外，或選後還沒有交易日
     events.push({...e, base, react:base+1,
       pre20:ret(base-20,base), pre5:ret(base-5,base), day1:ret(base,base+1),
-      post5:ret(base,base+5), post20:ret(base,base+20), post60:ret(base,base+60)});
+      post5:ret(base,base+5), post20:ret(base,base+20)});
   });
   return { E, events };
 }
@@ -218,7 +218,7 @@ function renderElection(el, key){
   const rows = state.data[key], E = el.E;
   const pct = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v)}</td>`;
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
-  const F = ['pre20','pre5','day1','post5','post20','post60'];
+  const F = ['pre20','pre5','day1','post5','post20'];
   const sums = F.map(f=>cycleSummary(el.events.map(e=>e[f])));
   const skipped = E.list.filter(e=>!el.events.find(x=>x.d===e.d));
   return `
@@ -226,8 +226,8 @@ function renderElection(el, key){
       <h3><span class="tag elec">選</span> ${E.region}${E.title}前後的漲跌</h3>
       <div class="tablewrap"><table class="stattable cycle">
         <thead>
-          <tr><th rowspan="2">投票日</th><th rowspan="2">基準日<br>(選前收盤)</th><th colspan="2">選前</th><th rowspan="2">選後<br>第1個交易日</th><th colspan="3">選後(以基準日收盤計)</th></tr>
-          <tr><th>20日</th><th>5日</th><th>+5日</th><th>+20日</th><th>+60日</th></tr>
+          <tr><th rowspan="2">投票日</th><th rowspan="2">基準日<br>(選前收盤)</th><th colspan="2">選前</th><th rowspan="2">選後<br>第1個交易日</th><th colspan="2">選後(以基準日收盤計)</th></tr>
+          <tr><th>20日</th><th>5日</th><th>+5日</th><th>+20日</th></tr>
         </thead>
         <tbody>
           ${el.events.map(e=>`<tr class="click" onclick="focusDate('${key}',${e.base})"><td>${e.d}</td><td>${rows[e.base].date}</td>${F.map(f=>pct(e[f])).join('')}</tr>`).join('')}

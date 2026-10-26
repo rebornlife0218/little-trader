@@ -121,3 +121,14 @@ test('站內連結用一般網址，不再用 #/ 舊網址', () => {
     assert.doesNotMatch(s, /href=["'`]#\/|\]\(#\/|location\.hash\s*=/, `${rel(f)} 還有 #/ 舊網址`);
   }
 });
+
+test('新策略、研究上線：events.py 的每個台股事件型策略都列在策略頁(後台熱門主題依目錄頁自動列出)；IG 圖卡的網址都對得到頁面', async () => {
+  const items = sec => new Map(site.pages.filter(p => p.catalog && p.section === sec).flatMap(p => p.catalog.groups.flatMap(g => g.items.map(it => [`${p.section}/${p.key}/${it.key}`, it]))));
+  const all = new Map([...items('stock'), ...items('etf'), ...items('index'), ...items('stats'), ...items('option'), ...items('other')]);
+  const py = readFileSync(new URL('../pipeline/tw_strategy/events.py', import.meta.url), 'utf8');
+  const keys = [...py.slice(py.indexOf('STRATEGIES = [')).matchAll(/\{'key': '(\w+)', 'side'/g)].map(m => m[1]);
+  assert.ok(keys.length >= 2, 'events.py 找不到策略');
+  for (const k of keys) assert.ok(all.has(`stock/tw-strategy/${k}`), `策略 ${k} 沒有列在台股策略頁(web/modules/stock/tw-strategy.js 的 SIDES)`);
+  const { TOPICS } = await import('../scripts/share/ig-topics.mjs');
+  for (const t of TOPICS) assert.ok(all.has(t.path), `IG 圖卡 ${t.key} 的網址 ${t.path} 沒有對應的頁面`);
+});
