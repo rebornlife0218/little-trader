@@ -452,7 +452,7 @@
             ${cfg.caveat ? `<li><b>資料時點</b>：${cfg.caveat}</li>` : ''}
           </ul>
           <h3 class="md-h2">三、研究方法</h3>
-          <p><b>選股規則</b>：每天收盤後，以下 ${cfg.conds.length} 個條件<b>同時</b>成立(張數單位皆為張)${cfg.exclude ? `，並排除${cfg.exclude.join('、')}` : ''}：</p>
+          <p><b>選股規則</b>：每天收盤後，以下 ${cfg.conds.length} 個條件<b>同時</b>成立${cfg.exclude ? `，並排除${cfg.exclude.join('、')}` : ''}：</p>
           <ol>${cfg.conds.map(c => `<li>${c}</li>`).join('')}</ol>
           <p><b>進出場</b>：隔一個交易日<b>開盤</b>${T0.in}；${P.tp != null && P.sl != null ? `盤中${long ? '漲' : '跌'}到 ${P.tp * 100}% 停利、${long ? '跌' : '漲'}到 ${P.sl * 100}% 停損(跳空越過則以開盤價出場，同一天兩者都碰到以停損計)；否則持有 ${P.hold} 個交易日，`
             : P.sl != null ? `盤中${long ? '跌' : '漲'}到 ${P.sl * 100}% 停損(跳空越過則以開盤價出場)；否則持有 ${P.hold} 個交易日，` : ''}${exitTxt}。同一檔股票同時只持有一筆。</p>
