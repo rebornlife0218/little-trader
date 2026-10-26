@@ -34,7 +34,8 @@
     出場：不設停利停損，持有 1 個交易日，當天收盤回補
   rev20 月營收年增率長期以來第一次破 20%(做多)：
     1. 最新公布的單月營收年增率 > 20%，前 12 個月的年增率都 ≤ 20%；從公告日到公告當月月底(或下個月營收公布前)每天檢查
-    2. 近 2 日平均成交量 > 500 張　3. 買進分點家數(買分價家數) < 150　4. 收盤價 > 11 元　排除：近 2 日跌幅 > 10%
+    2. 近 2 日平均成交量 > 500 張　3. 買進分點家數(買分價家數) < 150　4. 前五大分點買超比例 > 15%　5. 收盤價 > 11 元　排除：近 2 日跌幅 > 10%
+    前五大分點買超比例 = (分價買張1～5 合計 − 分價賣張1～5 合計) ÷ 成交量；門檻 0%～15% 都比只看分點家數好，15% 是使用者選定
     出場：停損 15%(盤中觸及)，最多持有 15 個交易日，第 15 天收盤賣出
     買進分點家數門檻 150：原始條件(分點買進家數 < 100)的算法和資料庫的買分價家數不同，依符合條件的訊號日換算
 
@@ -146,7 +147,23 @@ def against_signal(W):
     return sig, cols
 
 
-REV_TH, REV_N, BRK_TH = 20, 12, 150      # 營收年增率門檻(%)、近幾個月、買進分點家數上限
+REV_TH, REV_N, BRK_TH, TOP5_TH = 20, 12, 150, 15   # 營收年增率門檻(%)、近幾個月、買進分點家數上限、前五大分點買超比例門檻(%)
+
+
+def top5_ratio(W):
+    """前五大分點買超比例(%) = (買進最多的 5 個分點合計買進張數 − 賣出最多的 5 個分點合計賣出張數) ÷ 當天成交量 × 100"""
+    B = [f'分價買張{i}' for i in range(1, 6)] + [f'分價賣張{i}' for i in range(1, 6)]
+    with pg_connect() as conn:
+        buf = io.BytesIO()
+        with conn.cursor().copy('COPY (SELECT "日期", "股票代號", ' + ', '.join(f'"{x}"' for x in B) +
+                                " FROM cm.tw_daily WHERE \"股票代號\" ~ '^[1-9][0-9]{3}$') TO STDOUT WITH CSV") as cp:
+            for chunk in cp:
+                buf.write(chunk)
+    buf.seek(0)
+    df = pd.read_csv(buf, header=None, names=['d', 's', *B], dtype={'s': str}, parse_dates=['d'])
+    df['net'] = df[B[:5]].fillna(0).sum(axis=1) - df[B[5:]].fillna(0).sum(axis=1)
+    net = df.pivot(index='d', columns='s', values='net').reindex_like(W['c'])
+    return net / W['vol'].where(W['vol'] > 0) * 100
 
 
 def rev20_signal(W):
@@ -177,9 +194,10 @@ def rev20_signal(W):
     act = pd.DataFrame(act, index=D, columns=cols).notna()
     v2 = vol.rolling(2).mean()
     r2 = c / c.shift(2) - 1
-    sig = act & (v2 > 500) & (W['brk'] < BRK_TH) & (close > 11) & ~(r2 < -0.10)
+    top5 = top5_ratio(W)
+    sig = act & (v2 > 500) & (W['brk'] < BRK_TH) & (top5 > TOP5_TH) & (close > 11) & ~(r2 < -0.10)
     cols_ = [('營收年增率', 'num', pd.DataFrame(yoy, index=D, columns=cols)), ('前 12 個月最高年增率', 'num', pd.DataFrame(prev12, index=D, columns=cols)),
-             ('近 2 日均量(張)', 'int', v2), ('買進分點家數', 'int', W['brk']), ('近 2 日漲跌', 'chg', r2)]
+             ('近 2 日均量(張)', 'int', v2), ('買進分點家數', 'int', W['brk']), ('前五大分點買超比例', 'num', top5), ('近 2 日漲跌', 'chg', r2)]
     return sig, cols_
 
 
