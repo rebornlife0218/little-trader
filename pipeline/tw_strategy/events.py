@@ -38,6 +38,12 @@
     前五大分點買超比例 = (分價買張1～5 合計 − 分價賣張1～5 合計) ÷ 成交量；門檻 0%～15% 都比只看分點家數好，15% 是使用者選定
     出場：停損 15%(盤中觸及)，最多持有 15 個交易日，第 15 天收盤賣出
     買進分點家數門檻 200：原始條件(分點買進家數 < 100)的算法和資料庫的買分價家數不同；測過 150、200、250，200 的夏普值和 150 一樣、交易較多，250 明顯變差
+  boss 老闆回頭發動了(做多)：外資連賣兩天後轉買，賣出的分點家數多於買進的分點家數(籌碼集中)，融資、融券同時加碼
+    1. 外資連續 2 日賣超後，當天轉為買超　2. 近 2 日每天的(賣分價家數 − 買分價家數)都 ≥ 50
+    3. 融資買進張數 > 成交量的 8%　4. 融券增減 > 20 張　5. 近 5 日平均成交量 > 1000 張
+    排除：開盤量創 3 日新低(比前 2 天都低，cm.tw_open_close_vol，2020/3/2 起才有資料)；融券買進 > 20 張
+    出場：停利 30%、停損 15%(盤中觸及)，最多持有 10 個交易日，第 10 天收盤賣出
+    家數差門檻：原始條件是 20(XQ，連續 2 天都要符合；和 XQ 的交易約 77% 對得上)；測過 10～150，30～70 都比 20 好、100 以上變差，使用者選定 50
 
 用法：python pipeline/tw_strategy/events.py [策略 ...]   (預設全部；python pipeline/tw_strategy/update.py 也會一起產生)
 """
@@ -66,7 +72,8 @@ BENCH = '0050'
 EPS = 1e-6
 
 COLS = {'open': '開盤價', 'close': '收盤價', 'vol': '成交量', 'o': '還原開盤價', 'h': '還原最高價', 'l': '還原最低價', 'c': '還原收盤價',
-        'sbl': '借券賣出餘額', 'val': '成交金額(千)', 'brk': '買分價家數'}
+        'sbl': '借券賣出餘額', 'val': '成交金額(千)', 'brk': '買分價家數',
+        'fnet': '外資買賣超', 'sbrk': '賣分價家數', 'mgb': '資買', 'shd': '券增減', 'shb': '券買'}
 if private:
     COLS.update(private.COLS)
 SQL = f'''COPY (
@@ -201,9 +208,37 @@ def rev20_signal(W):
     return sig, cols_
 
 
+BOSS_TH = 50   # 老闆回頭發動了：每天的(賣分價家數 − 買分價家數)門檻
+
+
+def open_vol(W):
+    """開盤量(張)：cm.tw_open_close_vol，2020/3/2 起"""
+    with pg_connect() as conn:
+        df = pd.DataFrame(conn.execute('SELECT "日期", "股票代號", "開盤量" FROM cm.tw_open_close_vol').fetchall(), columns=['d', 's', 'ov'])
+    df['d'] = pd.to_datetime(df['d'])
+    return df.pivot(index='d', columns='s', values='ov').reindex_like(W['c']).astype(float)
+
+
+def boss_signal(W):
+    """老闆回頭發動了：外資連賣 2 天後轉買、賣出家數比買進家數多(連 2 天)、融資買進占成交量 > 8%、融券增加 > 20 張、5 日均量 > 1000 張；
+    排除開盤量創 3 日新低、融券買進 > 20 張。開盤量 2020/3/2 起才有資料，之前沒有訊號"""
+    vol, fb = W['vol'], W['fnet']
+    d1 = W['sbrk'] - W['brk']
+    ov = open_vol(W)
+    v5 = vol.rolling(5).mean()
+    low3 = ov < ov.shift(1).rolling(2).min()
+    sig = ((fb.shift(2) < 0) & (fb.shift(1) < 0) & (fb > 0) & (d1 >= BOSS_TH) & (d1.shift(1) >= BOSS_TH)
+           & (W['mgb'] > vol * 0.08) & (W['shd'] > 20) & (v5 > 1000)
+           & ov.notna() & ov.shift(2).notna() & ~low3 & ~(W['shb'] > 20))
+    cols_ = [('外資買賣超(張)', 'int', fb), ('賣減買分點家數', 'int', d1), ('前一天賣減買分點家數', 'int', d1.shift(1)),
+             ('融資買進占成交量', 'num', W['mgb'] / vol.where(vol > 0) * 100), ('融券增減(張)', 'int', W['shd']), ('近 5 日均量(張)', 'int', v5)]
+    return sig, cols_
+
+
 STRATEGIES = [
     {'key': 'against', 'side': 'short', 'signal': against_signal, 'tp': None, 'sl': None, 'hold': 1, 'exit': 'close'},
     {'key': 'rev20', 'side': 'long', 'signal': rev20_signal, 'tp': None, 'sl': 0.15, 'hold': 15, 'exit': 'close'},
+    {'key': 'boss', 'side': 'long', 'signal': boss_signal, 'tp': 0.30, 'sl': 0.15, 'hold': 10, 'exit': 'close'},
 ] + (private.STRATEGIES if private else [])
 
 
