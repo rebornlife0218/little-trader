@@ -213,7 +213,7 @@ const LT = (() => {
   /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
      LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, summary, tags, soon, run(el, ctx) }] }] })
        redirect(選填)：redirect(項目代碼) 回傳網址時轉過去(舊網址)，回傳空字串就回到列表
-       summary(選填)：研究的一句話結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
+       summary(選填)：研究的先講結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
        - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
        - <區塊>/<頁面>/<項目>    單一內容：上方的麵包屑可以回到列表，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
                                   ctx.view(...) 可再記一層細項(例如策略裡的分頁)
@@ -274,7 +274,7 @@ const LT = (() => {
     try { await navigator.clipboard.writeText(url); say('已複製分享連結，對方登入 Google 後就能看'); }
     catch (e) { window.prompt('複製這個分享連結：', url); }
   }
-  // 研究報告的「一句話結論」(報告開頭的 > 引言)：搬到頁面最上方(有精簡版時放進精簡版的結論位置)，一打開就看得到
+  // 研究報告的「先講結論」(報告開頭的 > 引言)：搬到頁面最上方(有精簡版時放進精簡版的結論位置)，一打開就看得到
   function hoistConclusion(body) {
     const slot = body.querySelector('.lt-brief .brief-hero');
     const q = body.querySelector('.panel .doc > blockquote:first-child');
@@ -285,9 +285,9 @@ const LT = (() => {
     box.appendChild(q);
     body.prepend(box);
   }
-  /* ---------- 研究與策略的精簡版(頁面上半)：一句話結論 → 策略說明 → 累積報酬與回撤圖；下半是完整的研究報告 ----------
+  /* ---------- 研究與策略的精簡版(頁面上半)：先講結論 → 策略說明 → 累積報酬與回撤圖；下半是完整的研究報告 ----------
      LT.brief({ hero, items: [['邏輯', '…'], ['進出場', '…'], ['停利停損', '…'], ['持有期間', '…']], chart: 'id' }) 回傳 HTML，放在內容最上方
-       hero(選填)：一句話結論的 HTML(網頁依回測數字產生時)；省略時由報告開頭的 > 一句話結論自動放進來(hoistConclusion)
+       hero(選填)：先講結論的 HTML(網頁依回測數字產生時)；省略時由報告開頭的 > 先講結論自動放進來(hoistConclusion)
        items：每項一句話，給第一次看的人；值是空的項目不顯示。第一項(邏輯)佔兩格寬，第三項之後(停利停損、持有期間)合併在同一張小卡。
        stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。recent(選填)：圖下方「近期明細」的容器 id(用 LT.moreTable 填入，說明文字放在 recent + 'Note')。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
      精簡版和下方報告之間用分隔線區隔(只有樣式，不加文字) */

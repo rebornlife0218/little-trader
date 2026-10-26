@@ -18,10 +18,11 @@
       做空：進場日開盤跌停(或沒有成交) → 空不到，放棄；進場日開盤是漲停價 → 不放空(空在漲停價不合理)，這筆取消；
             要回補時剛好是漲停價或沒有成交 → 買不回來，延到下一個交易日同一時點(可能連續延後)
       持有期間下市櫃：以最後收盤價轉為現金(不計成本)
-  - 資金(simulate)：本金 100 萬；每檔上限 = 1 ÷ 平均一天持有檔數(只算有部位的日子)，策略指定持有檔數 N 時 = 1/N。
-    有新股票進場的那天，所有部位調整到 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)(含新進場的)：先減碼、再進場、最後補足，
-    都以一股的價格無條件捨去到整數股；開盤漲跌停或沒有成交的部位不調整，當天預定出場的部位不算。現金不夠時新股票平分剩下的現金，
-    不放棄訊號(連一股都買不起才放棄，nocash)。沒有新股票進場的日子不調整。
+  - 資金(simulate)：本金 100 萬；每檔上限 = 1 ÷ 平均一天持有檔數，只用進場日之前的持股紀錄(只算有部位的日子；不到 20 個交易日時 20%)，
+    策略指定持有檔數 N 時 = 1/N。有新股票進場的那天，新股票的目標金額 = 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)(含新進場的)：
+    先用現金買，現金不夠時差額由舊部位平均分攤(每檔開盤減碼相等的金額)，舊部位不另外補足；都以一股的價格無條件捨去到整數股；
+    開盤漲跌停或沒有成交的部位不減碼，當天預定出場的部位不算。還是不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄，nocash)。
+    沒有新股票進場的日子不調整。
   - 成本：手續費 0.1425% × 0.3(買賣都收)、證交稅 0.3%(賣出時收，同一天進出 0.15%)、滑價買賣各一個升降單位(不超過漲跌停價)；
     借券費(年利率)在網頁依每天收盤的放空比例(expo)與日曆天數扣除，使用者可調整。
 
@@ -385,22 +386,43 @@ def backtest(W, sig, st):
     return trades, skipped
 
 
-def avg_holding(trades, nd):
-    """平均一天持有檔數(只算有部位的日子)：開盤出場的那天不算持有"""
+CAP0, CAP_DAYS = 0.20, 20   # 資料還少(進場日之前有部位的日子不到 20 個交易日)時，每檔上限用 20%
+
+
+def holding_counts(trades, nd):
+    """每天的持有檔數(依交易紀錄，和資金無關)：開盤出場的那天不算持有"""
     n = np.zeros(nd)
     for j, s, e, x, E, px, why, delay, edelay, when in trades:
         end = nd - 1 if x is None else (x - 1 if when == 'open' else x)
         n[e:max(e, end) + 1] += 1
+    return n
+
+
+def avg_holding(trades, nd):
+    """平均一天持有檔數(只算有部位的日子，整段期間；網頁顯示用，不用在資金分配)"""
+    n = holding_counts(trades, nd)
     return float(n[n > 0].mean()) if (n > 0).any() else 1.0
 
 
+def caps_by_day(trades, nd):
+    """每天的每檔上限 = 1 ÷ 平均一天持有檔數，只用那天之前已經發生的持有紀錄(只算有部位的日子)；
+    之前有部位的日子不到 CAP_DAYS 天時用 CAP0。沒有前視偏誤：第 t 天只看得到第 t−1 天以前的持股"""
+    n = holding_counts(trades, nd)
+    held = n > 0
+    days = np.concatenate([[0], np.cumsum(held)[:-1]])          # 第 t 天之前有部位的日子
+    tot = np.concatenate([[0], np.cumsum(n)[:-1]])
+    avg = np.divide(tot, days, out=np.ones(nd), where=days > 0)
+    return np.where(days >= CAP_DAYS, 1 / np.maximum(avg, 1), CAP0)
+
+
 def simulate(W, trades, long, i0, cap=None, whole=True):
-    """本金 100 萬的逐日資金模擬。cap = 每檔上限(占總資產)，省略時 = 1 ÷ 平均一天持有檔數；策略指定持有檔數 N 時傳 1/N。
+    """本金 100 萬的逐日資金模擬。cap = 每檔上限(占總資產)，省略時 = 1 ÷ 平均一天持有檔數，只用進場日之前的持有紀錄
+    (caps_by_day，資料還少時 20%)；策略指定持有檔數 N 時傳 1/N。
     whole=False 不取整數股(只用在研究的參考組，例如每月等權買進全部合格股票)。
-    有新股票進場的那天，所有部位調整到 目標金額 = 前一天收盤總資產 × min(cap, 1 ÷ 持有檔數)(持有檔數含新進場的股票)：
-    開盤先把超過目標的舊部位減碼，再買進新股票(現金不夠就平分剩下的現金)，最後把低於目標的舊部位補足；
-    減碼、補足都以一股的價格無條件捨去到整數股，開盤漲跌停或沒有成交的部位不調整，當天預定出場的部位不算、也不調整。
-    沒有新股票進場的日子不調整。同一天先處理開盤出場、再調整與進場、最後處理盤中與收盤出場。
+    有新股票進場的那天，新股票的目標金額 = 前一天收盤總資產 × min(cap, 1 ÷ 持有檔數)(持有檔數含新進場的股票)：
+    先用現金買；現金不夠時，差額由舊部位平均分攤：每檔舊部位開盤減碼相等的金額(以一股的價格無條件捨去到整數股)，
+    再買進新股票(現金還是不夠就平分剩下的現金)。舊部位不補足、不另外調整；開盤漲跌停或沒有成交的部位不減碼，
+    當天預定出場的部位不算、也不減碼。沒有新股票進場的日子不調整。同一天先處理開盤出場、再調整與進場、最後處理盤中與收盤出場。
     做空視為拿出同樣金額當保證金，損益 = −(還原股價漲跌幅) × 放空金額。不含借券費(網頁依使用者設定扣除)。
     每筆報酬 = 這檔從進場到全部出場收回的錢 ÷ 投入的錢 − 1(含所有加減碼與成本)。"""
     O, C = W['o'].to_numpy(), W['c'].ffill().to_numpy()
@@ -408,7 +430,7 @@ def simulate(W, trades, long, i0, cap=None, whole=True):
     LU, LD = limits(W)
     TR = traded(W)
     nd = C.shape[0]
-    cap = cap or 1 / avg_holding(trades, nd)
+    caps = np.full(nd, cap) if cap else caps_by_day(trades, nd)
     sign = 1 if long else -1
     ins, outs = {}, {}
     for k, tr in enumerate(trades):
@@ -483,24 +505,20 @@ def simulate(W, trades, long, i0, cap=None, whole=True):
         new = sorted(ins.get(t, []), key=lambda k: trades[k][0])
         if new:
             keep = [k for k in pos if not due(k, t)]
-            target = eq * min(cap, 1 / (len(keep) + len(new)))
-            for k in keep:                                        # 先減碼：超過目標的部分
+            target = eq * min(caps[t], 1 / (len(keep) + len(new)))
+            short = target * len(new) * (1 + FEE) - cash          # 現金不夠的差額：舊部位平均分攤
+            adj = [k for k in keep if can(k, t, False)] if short > 0 else []
+            for k in adj:
                 j = trades[k][0]
-                if can(k, t, False):
-                    sh = (value(k, O[t, j]) - target) / RO[t, j]
-                    sh = int(sh) if whole else sh
-                    if sh > 0:
-                        trade(k, t, sh, False)
+                amt = min(short / len(adj) / (1 - FEE - (TAX if long else 0)), value(k, O[t, j]))   # 賣出金額(扣成本後收回 = 分攤額)
+                sh = amt / RO[t, j]
+                sh = int(sh) if whole else sh
+                if sh > 0:
+                    trade(k, t, sh, False)
             for i, k in enumerate(new):                           # 再進場：現金不夠就平分剩下的現金
                 sh = shares_for(k, t, min(target, cash / (len(new) - i)), long)
                 if sh > 0:
                     trade(k, t, sh, True)
-            for k in keep:                                        # 最後補足：低於目標的部分
-                j = trades[k][0]
-                if can(k, t, True):
-                    sh = shares_for(k, t, min(target - value(k, O[t, j]), cash), long)
-                    if sh > 0:
-                        trade(k, t, sh, True)
         npos[t] = len(pos)                                        # 當天持有檔數(含當天收盤出場的部位，不含開盤出場的)
         for k in [k for k in outs.get(t, []) if k in pos]:
             close_out(k, t)
@@ -509,7 +527,7 @@ def simulate(W, trades, long, i0, cap=None, whole=True):
         expo[t] = 0 if long else sum(mv) / max(nav[t] * CAPITAL, EPS)
     for k in pos:                                                 # 持有中：以最新收盤價計(已扣進場成本)
         res[k] = (pos[k][3] + value(k, C[-1, trades[k][0]])) / pos[k][2] - 1
-    return nav, npos, expo, res, cap
+    return nav, npos, expo, res, float(caps[-1])
 
 
 def build(W, names, st):

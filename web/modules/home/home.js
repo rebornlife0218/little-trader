@@ -1,4 +1,4 @@
-/* 首頁：網站介紹＋加權指數近 60 日迷你 K 線、各區塊入口(依區塊主題色與圖樣)、研究重點(各研究與策略的一句話結論)
+/* 首頁：網站介紹＋加權指數近 60 日迷你 K 線、各區塊入口(依區塊主題色與圖樣)、研究重點(各研究與策略的先講結論)
    K 線資料是公開的 indices 資料集；最新研究取自已載入的目錄頁(LT.catalog)項目的 summary，訪客看不到研究就顯示登入提示 */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -45,7 +45,7 @@
     }
   }
 
-  // 最新研究：目錄頁裡有一句話結論(summary)的項目
+  // 最新研究：目錄頁裡有先講結論(summary)的項目
   function latest() {
     const items = [];
     LT.listPages().filter(p => p.catalog).forEach(p => p.catalog.groups.forEach(g => g.items.forEach(it => {
@@ -89,7 +89,7 @@
         </div>
 
         <section class="home-latest">
-          <h2 class="home-h2">研究重點 <small>每份研究與策略的一句話結論</small></h2>
+          <h2 class="home-h2">研究重點 <small>每份研究與策略的先講結論</small></h2>
           ${studies.length
             ? `<div class="cat-grid is-list">${studies.map(s => `<a class="cat-row" href="${s.href}" data-sec="${s.sec}"><b>${esc(s.name)}</b><span>${esc(s.summary)}</span><em>${esc(s.page)}</em></a>`).join('')}</div>`
             : `<div class="home-lock"><span>ETF、股票的研究與策略，登入 Google 就能看每份研究的結論。</span>${LT.loginButton('用 Google 登入')}</div>`}

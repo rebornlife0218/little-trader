@@ -11,7 +11,7 @@
   rev_drop   營收衰退開低：營收年增率 < -10% 公告後 T1 開盤跳空 ≤ -5%，開盤買進，日內 / T+1 出場
   rev_turn   營收由負轉正：營收年增率上月 < 0、本月 > 0 公告後 T1 開盤買進，持有 5、10、20 日；門檻敏感度、四種營收變化的事件研究
   disp       處置股策略：處置第一天收盤買進(處置前一天融資使用率 ≥ 20%，且投信持股比率近 20 日增加)，處置結束後一天開盤賣；只回測新制(2026/8/10)上路後，
-             門檻與出場的依據用 2016 年起的全部處置事件；資金：有新股票進場時總資產平均分散到所有持股(使用者指定)；網頁在 股票 › 處置股 › 處置股策略
+             門檻與出場的依據用 2016 年起的全部處置事件；資金：新股票的目標金額 = 總資產 ÷ 持有檔數(不設上限，使用者指定)，現金不夠時由舊持股平均分攤；網頁在 股票 › 處置股 › 處置股策略
 共用定義：
   - 月營收只用月底後 15 天內的公告；年增率用單月合併營收，缺值時用單月營收
   - T0 = 公告日(非交易日則為之前最後一個交易日)，T1 = T0 的下一個交易日
@@ -833,8 +833,8 @@ def disp_trades(X, evs, when):
 
 def disp_simulate(X, trades, i0):
     """收盤進場的資金模擬(處置股策略的資金規則，使用者指定)：有新股票進場的那天收盤，先處理當天的出場，
-    再把總資產平均分散到所有持股：每檔目標 = 前一天收盤總資產 ÷ 持有檔數(含新進場的，不另設上限)；
-    先減碼、再買進新股票(現金不夠就平分剩下的現金)、最後補足，都以一股的價格無條件捨去到整數股；收盤漲跌停或沒有成交的部位不調整。
+    新股票的目標金額 = 前一天收盤總資產 ÷ 持有檔數(含新進場的，不另設上限)；先用現金買，現金不夠時差額由舊持股平均分攤
+    (每檔收盤減碼相等的金額，以一股的價格無條件捨去到整數股)，舊持股不補足；收盤漲跌停或沒有成交的部位不減碼。
     沒有新股票進場的日子不調整。回傳 (淨值, 每天收盤的持有檔數, 每筆報酬)"""
     C, Craw, O, RC, RO, LU, LD, TR, nd = X.C, X.Craw, X.O, X.RC, X.RO, X.LU, X.LD, X.TR, X.nd
     ins, outs = {}, {}
@@ -882,23 +882,18 @@ def disp_simulate(X, trades, i0):
         if new:
             keep = list(pos)
             target = eq / (len(keep) + len(new))
-            for k in keep:                                        # 先減碼
+            short = target * len(new) * (1 + E.FEE) - cash        # 現金不夠的差額：舊持股平均分攤
+            adj = [k for k in keep if TR[t, trades[k][0]] and RC[t, trades[k][0]] > LD[t, trades[k][0]] + E.EPS] if short > 0 else []
+            for k in adj:
                 j = trades[k][0]
-                if TR[t, j] and RC[t, j] > LD[t, j] + E.EPS:
-                    sh = int((pos[k][0] * Craw[t, j] - target) / RC[t, j])
-                    if sh > 0:
-                        trade(k, t, sh, False)
+                sh = int(min(short / len(adj) / (1 - E.FEE - E.TAX), pos[k][0] * Craw[t, j]) / RC[t, j])
+                if sh > 0:
+                    trade(k, t, sh, False)
             for i, k in enumerate(new):                           # 再進場：現金不夠就平分剩下的現金
                 j = trades[k][0]
                 sh = int(max(0.0, min(target, cash / (len(new) - i))) / (E.fill(RC[t, j], True, LU[t, j], LD[t, j]) * (1 + E.FEE)))
                 if sh > 0:
                     trade(k, t, sh, True)
-            for k in keep:                                        # 最後補足
-                j = trades[k][0]
-                if TR[t, j] and RC[t, j] < LU[t, j] - E.EPS:
-                    sh = int(max(0.0, min(target - pos[k][0] * Craw[t, j], cash)) / (E.fill(RC[t, j], True, LU[t, j], LD[t, j]) * (1 + E.FEE)))
-                    if sh > 0:
-                        trade(k, t, sh, True)
         npos[t] = len(pos)
         nav[t] = (cash + sum(pos[k][0] * C[t, trades[k][0]] for k in pos)) / E.CAPITAL
     for k in pos:                                                 # 持有中：以最新收盤價計(已扣進場成本)

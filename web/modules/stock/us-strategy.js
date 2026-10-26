@@ -73,7 +73,7 @@
       const tabs = LT.tabs({ cls: 'us-tabs', remember: VIEW_KEY, view: ctx.view, onChange: k => { view = k; draw(); },
         items: [{ key: 'all', name: '總覽比較', desc: '四種策略與 SPY 並列' }, ...STRATS.map(s => ({ key: s.key, name: s.name, desc: s.idea }))] });
 
-      // 精簡版(一句話結論、策略說明、累積報酬圖) → 報告(CLAUDE.md「研究報告」)：一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
+      // 精簡版(先講結論、策略說明、累積報酬圖) → 報告(CLAUDE.md「研究報告」)：一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
       el.querySelector('#usBody').innerHTML = `
         ${LT.brief({ hero: '<blockquote><p id="usHero"></p></blockquote>', stats: 'usBriefStats', chart: 'usBrief', recent: 'usRecent', items: [
           ['邏輯', '每季從當時的 S&amp;P500 成分股挑股票：買上一季的贏家、輸家，或報酬穩定的股票，看哪一種想法能贏過買進持有 SPY。'],
@@ -267,11 +267,11 @@
         charts(C, [k, 'spy', 'ew'], [k, 'spy'], k);
       }
 
-      // 一句話結論與結論：依目前選的回測起點與成本，由回測數字產生
+      // 先講結論與結論：依目前選的回測起點與成本，由回測數字產生
       function conclude(C) {
         const { st } = C, S = st.spy, best = STRATS.slice().sort((a, b) => st[b.key].sharpe - st[a.key].sharpe)[0], x = st[best.key];
         const beatN = STRATS.filter(s => st[s.key].mult > S.mult).length, tot = v => pct(v - 1, 0);
-        $('#usHero').innerHTML = `<b>一句話結論</b>：${C.y0} 年起，四種策略中風險調整後最好的是「${esc(best.name)}」(夏普值 ${x.sharpe.toFixed(2)}，SPY ${S.sharpe.toFixed(2)})；`
+        $('#usHero').innerHTML = `<b>先講結論</b>：${C.y0} 年起，四種策略中風險調整後最好的是「${esc(best.name)}」(夏普值 ${x.sharpe.toFixed(2)}，SPY ${S.sharpe.toFixed(2)})；`
           + `四種策略有 ${beatN} 種總報酬贏過 SPY 的 ${tot(S.mult)}。`;
         $('#usConcl').innerHTML = STRATS.map(s => { const y = st[s.key];
           return `<li><b>${esc(s.name)}</b>：總報酬 ${tot(y.mult)}、年化 ${pct(y.ret, 1)}、夏普值 ${y.sharpe.toFixed(2)}、最大回撤 ${pct(y.mdd, 0)}，${y.mult > S.mult ? '贏過' : '輸給'} SPY。</li>`; }).join('')
