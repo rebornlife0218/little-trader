@@ -458,10 +458,17 @@
       $('#twrBriefStats').innerHTML = `${vs0050Cards(stats(T.nav), stats(B.b0050), t)}${tradeCards(t)}${cards}`;
     }
     // 近期明細：主策略的交易，最新的在前，先顯示 20 筆
-    $('#twrRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計。`;
-    LT.moreTable($('#twrRecent'), ['代號', '名稱', '處置期間', '處置措施', '融資使用率', '買進(收盤)', '賣出(開盤)', '報酬'], T.trades.slice().reverse().map(r =>
-      `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td><td>${r[4].toFixed(1)}%</td><td>${r[5]}</td>
-        <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`));
+    // 框起來排最前面：已公告、還沒開始的處置(處置第一天收盤買進)；持有中、處置已經結束的(下個交易日開盤賣出)
+    const tag = t => `<span class="next-tag">${t}</span>`, md = d => d.slice(5).replace('-', '/');
+    const up = B.upcoming || [], ended = r => !r[6] && r[2].split('～')[1] <= B.asof;
+    const row = (r, cls = '', note = '') => `<tr${cls}><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}${note}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td><td>${r[4].toFixed(1)}%</td><td>${r[5]}</td>
+        <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`;
+    const all = T.trades.slice().reverse();
+    $('#twrRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計。${up.length || all.some(ended) ? '框起來的是接下來要買進(處置第一天收盤)或下個交易日開盤要賣出的股票。' : ''}`;
+    LT.moreTable($('#twrRecent'), ['代號', '名稱', '處置期間', '處置措施', '融資使用率', '買進(收盤)', '賣出(開盤)', '報酬'], [
+      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${tag(md(u[2]) + ' 收盤買進')}</td><td>${esc((u[2] + '～' + u[3]).replace(/-/g, '/'))}</td><td>${esc(u[4])}</td><td>${u[5].toFixed(1)}%</td><td>—</td><td>—</td><td>—</td></tr>`),
+      ...all.filter(ended).map(r => row(r, ' class="next-act"', tag('下個交易日開盤賣出'))),
+      ...all.filter(r => !ended(r)).map(r => row(r))]);
     drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: '處置股策略', nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
     draw();
   }

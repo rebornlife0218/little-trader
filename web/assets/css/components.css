@@ -658,6 +658,10 @@
   .brief-recent{margin-top:16px;padding:12px 14px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--border);}
   .brief-recent h4{margin:2px 0 4px;}
   .brief-recent .note{margin:0 0 8px;}
+  /* 近期明細：下個交易日要進出場的列(框起來＋小標籤) */
+  .stattable tr.next-act{outline:2px solid var(--sec);outline-offset:-2px;}
+  .stattable tr.next-act td{background:color-mix(in srgb, var(--sec) 10%, transparent);}
+  .next-tag{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:999px;font-size:11.5px;font-weight:700;color:var(--bg);background:var(--sec);white-space:nowrap;vertical-align:1px;}
   .lt-sep{border:0;height:2px;margin:40px 0 30px;position:relative;overflow:visible;
     background:linear-gradient(90deg, transparent, color-mix(in srgb, var(--sec) 22%, var(--border)) 20%, color-mix(in srgb, var(--sec) 70%, transparent) 50%, color-mix(in srgb, var(--sec) 22%, var(--border)) 80%, transparent);}
   .lt-sep::after{content:'';position:absolute;left:50%;top:-4px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--sec);

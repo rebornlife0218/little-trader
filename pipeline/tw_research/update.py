@@ -785,6 +785,22 @@ def disp_events(X):
     return sorted(ev.values(), key=lambda e: (e['start'], e['code']))
 
 
+def disp_upcoming(X):
+    """已公告、還沒開始的處置(處置起日在最新交易日之後)，處置前一天融資使用率 ≥ UTIL 的：策略會在處置第一天收盤買進。
+    融資使用率用最新交易日的數字(處置公告當晚，最新交易日就是處置前一天)。回傳 [代號, 名稱, 處置起日, 處置迄日, 處置措施, 融資使用率]"""
+    with pg_connect() as c:
+        rows = c.execute(SQL_DISP + ' AND "處置時間起" > %s', (X.D[-1].date(),)).fetchall()
+        util = dict(c.execute('SELECT "股票代號", "資使用率" FROM cm.tw_daily WHERE "日期" = %s AND "資使用率" IS NOT NULL', (X.D[-1].date(),)).fetchall())
+    out = {}
+    for code, st, en, kind, body in rows:
+        u = util.get(code)
+        if code not in X.jx or u is None or float(u) < UTIL:
+            continue
+        kind = kind or ('再次處置' if '曾發布處置' in (body or '') else '第一次處置')
+        out[(code, st)] = [code, X.names.get(code, ('',))[0], st.isoformat(), en.isoformat(), kind, round(float(u), 2)]
+    return sorted(out.values(), key=lambda r: (r[2], r[0]))
+
+
 def disp_trades(X, evs, when):
     """處置第一天收盤買進(收盤漲停或沒有成交延到隔天收盤，仍買不到就放棄；第二天已經出關也放棄)；
     when='close'：處置最後一天收盤賣、'open'：處置結束後第一個交易日開盤賣(跌停或沒有成交往後延，下市櫃以最後收盤價轉現金)。
@@ -964,7 +980,8 @@ def disp(X):
     F['group_rows'] = '\n'.join(f"| {g['g']} | {g['k']} | {intc(g['n'])} | {pc(g['win'], 1, False)} | {pc(g['mean'], 2)} | {pc(g['median'], 2)} |" for g in G)
     gq = {g['k']: g for g in G if g['g'] == '融資使用率'}
     F['util_lo'], F['util_hi'] = pc(gq['< 10%']['mean'], 2), pc(gq['≥ 40%']['mean'], 2)
-    out = {'d': d, 'asof': d[-1], 'b0050': navlist(b), 'util': UTIL, 'newRule': NEW_RULE.strftime('%Y-%m-%d'), 'strat': strat, 'groups': G, 'report': report('disp', F)}
+    out = {'d': d, 'asof': d[-1], 'b0050': navlist(b), 'util': UTIL, 'newRule': NEW_RULE.strftime('%Y-%m-%d'), 'strat': strat, 'groups': G,
+           'upcoming': disp_upcoming(X), 'report': report('disp', F)}
     return out, F
 
 

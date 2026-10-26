@@ -237,10 +237,10 @@
             <p><b>選股規則</b>：每季最後一個交易日，${esc(s.short)}，持有一季後重新挑選。<b>想法</b>：${esc(s.idea)}</p>
             <div class="statgrid" style="margin:12px 0;">
               ${card(`${(win / d.length * 100).toFixed(0)}%`, '勝率(贏 SPY 的季數)', `${win} / ${d.length} 季，年度 ${yWin} / ${rows.length}`)}
-              ${card(pct(x.ret), '年化報酬', `SPY ${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`)}
-              ${card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false))}
-              ${card(x.sharpe.toFixed(2), '夏普值', `SPY ${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe))}
-              ${card(pct(x.mdd, 1), '最大回撤', `SPY ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)}
+              ${card(pct(x.ret), '年化報酬', `SPY：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`)}
+              ${card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false))}
+              ${card(x.sharpe.toFixed(2), '夏普值', `SPY：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe))}
+              ${card(pct(x.mdd, 1), '最大回撤', `SPY：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)}
               ${card(`${(turnAvg(k) / 2 * 100).toFixed(0)}%`, '每季換手率(單邊)', `每年成本約 ${(turnAvg(k) * cost * 4 * 100).toFixed(1)}%`)}
             </div>
             <ul class="insight">
@@ -286,11 +286,11 @@
           const x = C.st[b], S = C.st.spy, d = C.qret(b).map((v, j) => v - C.spyQ[j]), win = d.filter(v => v > 0).length, { card } = window.LTTW;
           $('#usBriefStats').innerHTML = [
             card(`${(win / d.length * 100).toFixed(0)}%`, `勝率(${esc(short(b))}贏 SPY 的季數)`, `${win} / ${d.length} 季`),
-            card(pct(x.mult - 1, 0), '總報酬', `SPY ${pct(S.mult - 1, 0)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
-            card(pct(x.ret), '年化報酬', `SPY ${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
-            card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
-            card(x.sharpe.toFixed(2), '夏普值', `SPY ${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
-            card(pct(x.mdd, 1), '最大回撤', `SPY ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)].join('');
+            card(pct(x.mult - 1, 0), '總報酬', `SPY：${pct(S.mult - 1, 0)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
+            card(pct(x.ret), '年化報酬', `SPY：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
+            card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
+            card(x.sharpe.toFixed(2), '夏普值', `SPY：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
+            card(pct(x.mdd, 1), '最大回撤', `SPY：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)].join('');
           // 近期明細：這個策略每一季的持股，最新一季在最前面
           $('#usRecentNote').textContent = `${meta(b).name}每一季的持股，最新一季在最前面；上季報酬是選股時用的訊號。`;
           LT.moreTable($('#usRecent'), ['換股季度', '代號', '權重', '上季報酬'], B.q.slice().reverse().filter(q => q.picks && q.picks[b]).flatMap(q =>

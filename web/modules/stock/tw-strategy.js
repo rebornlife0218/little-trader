@@ -50,13 +50,13 @@
   const winCard = t => card(`${(t.win * 100).toFixed(1)}%`, '勝率', '', t.win >= 0.5 ? 'up' : '');
   const vs0050Cards = (x, S, t) => [
     t ? winCard(t) : '',
-    card(totalRet(x), '總報酬', `0050 ${totalRet(S)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
-    card(pct(x.ret), '年化報酬', `0050 ${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
-    card((x.vol * 100).toFixed(1) + '%', '年化波動', `0050 ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
-    card(x.sharpe.toFixed(2), '夏普值', `0050 ${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
-    card(x.sortino.toFixed(2), '索提諾比率', `0050 ${S.sortino.toFixed(2)}`, beat(x.sortino, S.sortino)),
-    card(pct(x.mdd, 1), '最大回撤', `0050 ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`),
-    card(`${x.ddDays} 天`, '最長連續回撤', `0050 ${S.ddDays} 天(交易日)`, beat(x.ddDays, S.ddDays, false)),
+    card(totalRet(x), '總報酬', `0050：${totalRet(S)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
+    card(pct(x.ret), '年化報酬', `0050：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
+    card((x.vol * 100).toFixed(1) + '%', '年化波動', `0050：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
+    card(x.sharpe.toFixed(2), '夏普值', `0050：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
+    card(x.sortino.toFixed(2), '索提諾比率', `0050：${S.sortino.toFixed(2)}`, beat(x.sortino, S.sortino)),
+    card(pct(x.mdd, 1), '最大回撤', `0050：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`),
+    card(`${x.ddDays} 天`, '最長連續回撤', `0050：${S.ddDays} 天`, beat(x.ddDays, S.ddDays, false)),
   ].join('');
   // 交易筆數、每筆平均報酬、每筆中位數報酬、平均一天持有檔數、平均一檔持倉天期(t = tradeStats() 的結果；勝率在 vs0050Cards 的第一張)
   const tradeCards = t => [
@@ -341,10 +341,10 @@
     {   // 精簡版的績效卡片(低波動 10%)與累積報酬圖：兩種低波動組合 vs 0050(對數刻度)
       const C0 = calc(), K = [...STRATS.map(s => s.key), 'b0050'];
       $('#twBriefStats').innerHTML = vs0050Cards(C0.st.lv10p, C0.st.b0050, C0.ts.lv10p) + tradeCards(C0.ts.lv10p);
-      const pk = B.picks, P = pk.lv10p;   // 近期明細：低波動 10% 最新一次選股的持股(波動由小到大)
-      $('#twRecentNote').textContent = `低波動 10% 的${pk.entered ? '本月持股' : '下個月持股'}：${pk.signal} 收盤選股，共 ${P.length} 檔，波動由小到大排列。`;
+      const pk = B.picks, P = pk.lv10p;   // 近期明細：低波動 10% 最新一次選股的持股(波動由小到大)；還沒進場時下個交易日開盤換股，全部框起來
+      $('#twRecentNote').textContent = `低波動 10% 的${pk.entered ? '本月持股' : '下個月持股'}：${pk.signal} 收盤選股，共 ${P.length} 檔，波動由小到大排列。${pk.entered ? '' : '框起來的是下個交易日開盤要換進的持股。'}`;
       LT.moreTable($('#twRecent'), ['代號', '名稱', '產業', '年化波動', '每日成交金額(中位數)'],
-        P.map(([c, n, i, v, m]) => `<tr><td>${LT.stockLink(c)}</td><td>${esc(n)}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`));
+        P.map(([c, n, i, v, m]) => `<tr${pk.entered ? '' : ' class="next-act"'}><td>${LT.stockLink(c)}</td><td>${esc(n)}${pk.entered ? '' : '<span class="next-tag">下個交易日換股</span>'}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`));
       navCharts({ d: B.d, i0: 0, navs: Object.fromEntries(K.map(k => [k, C0.navs[k]])), meta: Object.fromEntries(K.map(k => [k, { name: meta(k).name, color: meta(k).color }])),
         main: 'lv10p', log: true, chart: $('#twBrief'), legend: $('#twBriefLegend') });
     }
@@ -515,8 +515,15 @@
         <li><b>資金使用</b>：${(held * 100).toFixed(0)}% 的交易日有部位，有部位時平均 ${avgPos.toFixed(1)} 檔。</li>`;
       $('#evStats').innerHTML = vs0050Cards(x, S, ts) + tradeCards(ts);
       $('#evRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計，已扣進場成本${long ? '' : '與借券費'}。`;
-      LT.moreTable($('#evRecent'), ['代號', '名稱', '進場日', '出場日', '持有天數', '報酬(扣成本)', '出場原因'],
-        T.slice().sort((a, b) => b.e.localeCompare(a.e) || a.c.localeCompare(b.c)).map(tradeRow));
+      // 下個交易日要進出場的框起來、排在最前面：進場 = 最新一個交易日收盤的選股；出場 = 持有中、下個交易日持有期滿(含漲跌停延後中的)
+      const due = P.exit === 'open' ? P.hold : P.hold - 1, tag = t => `<span class="next-tag">${t}</span>`;
+      const last = B.recent[0], entries = last && last.d === B.asof ? last.p : [];
+      const exiting = open.filter(t => t.days >= due);
+      $('#evRecentNote').textContent += entries.length || exiting.length ? `框起來的是下個交易日要${T0.in}(開盤)或${T0.out}(${P.exit === 'open' ? '開盤' : '收盤'})的股票(停損另計)。` : '';
+      LT.moreTable($('#evRecent'), ['代號', '名稱', '進場日', '出場日', '持有天數', '報酬(扣成本)', '出場原因'], [
+        ...entries.map(p => `<tr class="next-act"><td>${LT.stockLink(p[0])}</td><td>${esc(p[1])}${tag('下個交易日' + T0.in)}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`),
+        ...exiting.map(t => tradeRow(t).replace('<tr>', '<tr class="next-act">').replace(`<td>${esc(t.n)}</td>`, `<td>${esc(t.n)}${tag('下個交易日' + T0.out)}</td>`)),
+        ...T.filter(t => !exiting.includes(t)).sort((a, b) => b.e.localeCompare(a.e) || a.c.localeCompare(b.c)).map(tradeRow)]);
       $('#evView').innerHTML = `
         <div class="panel">
           <h3>回測績效</h3>
