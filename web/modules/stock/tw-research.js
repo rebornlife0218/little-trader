@@ -87,6 +87,15 @@
       <h3>研究報告 ${tag(S.series)}</h3>
       <div class="doc">${md(src)}</div>
     </div>`;
+  // 精簡版(LT.brief)的績效卡片(ts = 交易統計)與累積報酬圖：主要版本 vs 0050；短期間(同一年內)改用一般刻度與月/日
+  function briefChart(el, d, nav, b0050, name, color, ts) {
+    const short = d[0].slice(0, 4) === d[d.length - 1].slice(0, 4);
+    const box = el.querySelector('#twrBriefStats');
+    if (box && ts) { const { stats, vs0050Cards, tradeCards } = W(); box.innerHTML = vs0050Cards(stats(nav), stats(b0050), ts) + tradeCards(ts) + extraCards(ts); }
+    W().navCharts({ d, i0: 0, navs: { s: nav, b0050 }, meta: { s: { name, color }, b0050: { name: '0050 買進持有', color: C0050 } },
+      main: 's', log: !short, chart: el.querySelector('#twrBrief'), legend: el.querySelector('#twrBriefLegend'), xFmt: dateFmt(d) });
+  }
+  const NO_STOP = '不設停利停損。';
   const scaleSel = id => `<div class="paramitem"><label for="${id}">走勢圖縱軸</label><select id="${id}"><option value="log">對數刻度(看報酬率)</option><option value="lin">一般刻度(看金額)</option></select></div>`;
   const MONEY = '本金 100 萬元，買賣金額除以成交價(含滑價與手續費)無條件捨去到整數股；沒有新股票進場的日子不調整，沒用到的資金持有現金(不計利息)。';
   // 回測規則依台股策略頁的同一套原則：漲跌停、沒有成交、下市櫃的處理
@@ -128,6 +137,10 @@
     let ver = 'all', grp = 't10';
     const G = { t10: '前 10 檔', t5: '前 5 檔' };
     el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '營收大多在每月 10 日前公布，公布前先用已經公布的營收趨勢，預測誰下個月的營收會好，提前買進。'],
+        ['進出場', '每月 21 日後第一個交易日開盤，買進綜合分數最高的 10 檔；各檔營收公告後的下一個交易日開盤賣出。'],
+        ['停利停損', NO_STOP], ['持有期間', '約 2 ～ 4 週(到營收公告)。']] })}
       <div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
@@ -147,6 +160,7 @@
 </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
+    briefChart(el, B.d, B.versions[0].nav.t10, B.b0050, '不限市值｜前 10 檔', SERIES[S.series].color, B.versions[0].ts.t10);
     // 市值範圍(每月的最小、最大值)：第一個月 → 最後一個月；Q1 只列上限、Q4 只列下限
     function capTxt(v) {
       const n = v.cap.lo.length, r = i => v.key === 'q1' ? `${Math.round(v.cap.hi[i])} 億以下` : v.key === 'q4' ? `${Math.round(v.cap.lo[i])} 億以上` : `${Math.round(v.cap.lo[i])}～${Math.round(v.cap.hi[i])} 億`;
@@ -199,6 +213,10 @@
     if (!B) return;
     let k = B.strats[0].key;
     el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '營收衰退的公司公告後，隔天開盤常常大跌；跌太多時，開盤買進賭當天的反彈。'],
+        ['進出場', '營收年增率 < -10% 公告後，隔天開盤跳空跌 5% 以上就開盤買進，當天收盤賣出(另比較隔天開盤賣)。'],
+        ['停利停損', NO_STOP], ['持有期間', '1 天(當天或隔天賣出)。']] })}
       <div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
@@ -214,6 +232,7 @@
       <div class="panel"><h3>四種策略比較</h3><div id="twrAll"></div></div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
+    briefChart(el, B.d, B.strats[0].nav, B.b0050, B.strats[0].name, SERIES[S.series].color, B.strats[0].ts);
     function draw() {
       const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.key === k), x = stats(T.nav), Sx = stats(B.b0050);
@@ -224,14 +243,11 @@
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(T.name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
-          <h4>每日持有檔數</h4><div id="twrPos"></div>
           <h4>每年報酬</h4>
           ${yearTableHtml(B.d, [{ name: T.name, nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name: T.name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
         main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
-      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: (d, tip) => tip ? d : d.slice(0, 4), yMin: 0,
-        yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: s.name, nav: s.nav, ts: s.ts, main: s.key === k })), Sx);
     }
     const sk = n => B.strats.find(s => s.key === n);
@@ -257,6 +273,10 @@
       投信5日買超比: '投信 5 日買超比', '近5日主力買賣超(%)': '近 5 日主力買賣超' };
     const HN = { 日內: '日內(T1 收盤賣)', 'T+1': 'T+1(T2 開盤賣)', '5日': '5 日(T5 收盤賣)' };
     el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '營收年增率超過 10% 的公司公告後，找出哪些特徵(成長幅度、股價位置、法人買賣…)最能分出後續會漲還是會跌。'],
+        ['進出場', '營收公告後的下一個交易日開盤買進，持有期滿收盤賣出；只買特徵分數高的事件。'],
+        ['停利停損', NO_STOP], ['持有期間', '當天、隔天或 5 個交易日(三種版本比較)。']] })}
       <div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
@@ -282,6 +302,7 @@
       </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
+    { const T0 = B.strats.find(x => x.h === '5日' && x.g === '分數 = 3') || B.strats[0]; briefChart(el, B.d, T0.nav, B.b0050, `${T0.h}｜${T0.g}`, SERIES[S.series].color, T0.ts); }
     function draw() {
       const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.h === h && s.g === g), x = stats(T.nav), Sx = stats(B.b0050);
@@ -293,14 +314,11 @@
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
-          <h4>每日持有檔數</h4><div id="twrPos"></div>
           <h4>每年報酬</h4>
           ${yearTableHtml(B.d, [{ name: g, nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
         main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
-      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: (d, tip) => tip ? d : d.slice(0, 4), yMin: 0,
-        yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: `${HN[s.h] || s.h}｜${s.g}`, nav: s.nav, ts: s.ts, main: s === T })), Sx);
     }
     // 事件研究：衰退組用綠色系(越深衰退越多)，成長組用紅色系(越深成長越多)，台股慣例紅漲綠跌
@@ -339,6 +357,10 @@
     const HN = { '5日': '5 日(T5 收盤賣)', '10日': '10 日(T10 收盤賣)', '20日': '20 日(T20 收盤賣)' };
     const gs = hh => B.strats.filter(s => s.h === hh).map(s => s.g);
     el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '營收年增率由衰退轉為成長，可能代表景氣或營運開始好轉，公告後跟著買進。'],
+        ['進出場', '營收年增率上個月 < 0、這個月 > 0 公告後，下一個交易日開盤買進，持有期滿收盤賣出。'],
+        ['停利停損', NO_STOP], ['持有期間', '5、10 或 20 個交易日(主要看 20 日)。']] })}
       <div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
@@ -363,6 +385,7 @@
       </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
+    { const T0 = B.strats.find(x => x.h === '20日' && x.g === '由負轉正') || B.strats[0]; briefChart(el, B.d, T0.nav, B.b0050, '20 日｜由負轉正', SERIES[S.series].color, T0.ts); }
     const fillG = () => {
       $('#twrG').innerHTML = gs(h).map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
       if (!gs(h).includes(g)) g = gs(h)[0];
@@ -379,14 +402,11 @@
           <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="twrChart"></div><div id="twrLegend"></div>
-          <h4>每日持有檔數</h4><div id="twrPos"></div>
           <h4>每年報酬</h4>
           ${yearTableHtml(B.d, [{ name: g, nav: T.nav, cmp: true }], B.b0050)}
         </div>`;
       navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name, color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: C0050 } },
         main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend') });
-      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: (d, tip) => tip ? d : d.slice(0, 4), yMin: 0,
-        yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
       $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: `${HN[s.h] || s.h}｜${s.g}`, nav: s.nav, ts: s.ts, main: s === T })), Sx);
     }
     // 事件研究：由負轉正用系列色，其餘依方向配色(成長紅、衰退綠，台股慣例)
@@ -420,15 +440,17 @@
     const T = B.strat, FIRST = 20;
     let showAll = false;
     el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '處置前融資用得多(散戶追得兇)的熱門股，被處置後關注度仍高，處置期間的漲勢較能延續。'],
+        ['進出場', `處置前一天融資使用率 ≥ ${B.util}% 的處置股，處置第一天收盤買進，處置結束後第一個交易日開盤賣出。`],
+        ['停利停損', NO_STOP], ['持有期間', '處置期間(新制約 5 ～ 7 個交易日)。']] })}
       <div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
           <p><b>規則</b>：處置公告後，處置第一天的前一天融資使用率(融資餘額 ÷ 融資限額)≥ ${B.util}% 的處置股，處置第一天收盤買進(收盤漲停或沒有成交延到隔天收盤，仍買不到就放棄)；處置結束後第一個交易日開盤賣出(開盤跌停或沒有成交就延到下一個交易日開盤)。只回測處置新制(${B.newRule.replace(/-/g, '/')})上路後開始的處置；門檻與出場的依據見下方報告。</p>
           <p><b>資金分配</b>：有新股票進場的那天收盤，把總資產平均分散到所有持股：每檔目標 = 前一天收盤總資產 ÷ 持有檔數(含新進場的，不另設上限)，先減碼、再進場、最後補足，都以整數股調整；現金不夠時新股票平分剩下的現金，不放棄訊號(連一股都買不起才放棄)。${MONEY}</p>
         </div>
-        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">${scaleSel('twrScale')}</div>
       </div>
-      <div id="twrView"></div>
       <div class="panel">
         <h3>交易明細</h3>
         <div class="tablewrap"><table class="stattable" id="twrTrades"></table></div>
@@ -436,28 +458,17 @@
       </div>
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
+    briefChart(el, B.d, T.nav, B.b0050, '處置股策略', SERIES[S.series].color);
     const t = T.ts;
     const cards = [
       t.fail ? W().card(`${t.fail.toLocaleString()} 筆`, '收盤漲停買不到', '放棄的處置事件') : '',
       t.nocash ? W().card(`${t.nocash.toLocaleString()} 筆`, '買不起一股而放棄', '現金不夠') : '',
       t.delist ? W().card(`${t.delist} 筆`, '持有期間下市櫃', '以最後收盤價轉現金') : '',
     ].join('');
+    // 績效卡片(勝率在最前面)：放在精簡版的累積報酬圖上方
     function draw() {
-      const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
-      const x = stats(T.nav), Sx = stats(B.b0050);
-      $('#twrView').innerHTML = `
-        <div class="panel">
-          <h3>${esc(T.name)}</h3>
-          <div class="statgrid" style="margin:12px 0;">${vs0050Cards(x, Sx, t)}${tradeCards(t)}${cards}</div>
-          <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
-          <h4>累積報酬與回撤：處置股策略 vs 0050</h4>
-          <div id="twrChart"></div><div id="twrLegend"></div>
-          <h4>每日持有檔數</h4><div id="twrPos"></div>
-        </div>`;
-      navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name: '處置股策略', color: SERIES[S.series].color }, b0050: { name: '0050 買進持有', color: C0050 } },
-        main: 's', log: $('#twrScale').value === 'log', chart: $('#twrChart'), legend: $('#twrLegend'), xFmt: dateFmt(B.d) });
-      LTChart.line($('#twrPos'), { x: B.d, xType: 'date', label: '持有檔數', height: 150, xFmt: dateFmt(B.d), yMin: 0,
-        yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: SERIES[S.series].color, width: 1.2, y: T.npos }] });
+      const { stats, vs0050Cards, tradeCards } = W();
+      $('#twrBriefStats').innerHTML = `${vs0050Cards(stats(T.nav), stats(B.b0050), t)}${tradeCards(t)}${cards}`;
     }
     // 交易明細：最新的在前，先顯示 20 筆
     function trades() {
@@ -470,8 +481,6 @@
           <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`).join('')}</tbody>`;
     }
     drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: '處置股策略', nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
-    $('#twrScale').value = 'lin';   // 回測只有幾個月，報酬範圍小，對數刻度幾乎沒有刻度
-    $('#twrScale').onchange = draw;
     $('#twrMore').onclick = () => { showAll = !showAll; trades(); };
     draw();
     trades();

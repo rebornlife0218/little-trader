@@ -64,6 +64,11 @@
     const sub = T => B.b0050s[`${T.mode}｜${T.group}`];   // 和策略同一個期初的 0050(期初現金，隔天開盤買進)
     let mode = '加碼', group = '全部', hold = '跟單出場';
     el.innerHTML = `
+      ${LT.brief({ chart: 'efBrief', stats: 'efBriefStats', items: [
+        ['邏輯', '主動式 ETF 每天公布持股；經理人加碼某檔股票時跟著買，看能不能賺到經理人選股的報酬。'],
+        ['進出場', 'ETF 公布加碼後的隔天開盤買進；等這檔 ETF 之後減碼或剔除時，隔天開盤賣出(跟單出場)。'],
+        ['停利停損', '不設停利停損，跟著經理人的動作出場。'],
+        ['持有期間', '到經理人減碼為止(平均約 3 ～ 4 週)；另比較固定持有 5 日、20 日。']] })}
       <div class="panel">
         <h3>A 系列 ETF 跟單 ${tagOf('active')}</h3>
         <div class="doc">
@@ -114,20 +119,23 @@
           <ul class="insight"><li>${W.vs0050Txt(B.d[T.i0 + 1], B.asof, x, Sx)}。</li></ul>
           <h4>累積報酬與回撤：${esc(name)} vs 0050</h4>
           <div id="efChart"></div><div id="efLegend"></div>
-          <h4>每日持有檔數</h4><div id="efPos"></div>
           <h4>每年報酬</h4>
           ${yearHtml(T, b)}
         </div>`;
       W.navCharts({ d: B.d, i0: T.i0, navs: { s: T.nav, b0050: b }, meta: { s: { name, color: MC[mode] }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
         main: 's', log: $('#efScale').value === 'log', chart: $('#efChart'), legend: $('#efLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
-      LTChart.line($('#efPos'), { x: B.d.slice(T.i0), xType: 'date', label: '持有檔數', height: 150, xFmt: (d, tip) => tip ? d : d.slice(0, 7).replace('-', '/'), yMin: 0,
-        yFmt: v => v.toFixed(0), tipFmt: (s, v) => `${v} 檔`, series: [{ name: '持有檔數', color: MC[mode], width: 1.2, y: T.npos }] });
       $('#efAll').innerHTML = allTable(T);
     }
     $('#efMode').onchange = () => { mode = $('#efMode').value; fillGroup(); draw(); };
     $('#efGroup').onchange = () => { group = $('#efGroup').value; draw(); };
     $('#efHold').onchange = () => { hold = $('#efHold').value; fillGroup(); draw(); };
     $('#efScale').onchange = draw;
+    {   // 精簡版的累積報酬圖：加碼｜全部｜跟單出場 vs 0050
+      const T0 = SK('加碼', '全部', '跟單出場') || B.strats[0];
+      $('#efBriefStats').innerHTML = W.vs0050Cards(statsC(T0.nav), statsC(sub(T0)), T0.ts) + W.tradeCards(T0.ts) + extra(T0.ts);
+      W.navCharts({ d: B.d, i0: T0.i0, navs: { s: T0.nav, b0050: sub(T0) }, meta: { s: { name: `${T0.mode}｜${T0.group}｜${hname(T0.hold)}`, color: MC[T0.mode] }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
+        main: 's', log: true, chart: $('#efBrief'), legend: $('#efBriefLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
+    }
     $('#efAll').onclick = e => { const r = e.target.closest('tr[data-k]'); if (!r) return; [mode, group, hold] = r.dataset.k.split('｜'); fillGroup(); draw(); $('#efView').scrollIntoView({ behavior: 'smooth' }); };
     fillGroup(); draw();
 
@@ -191,6 +199,11 @@
     function arkkView(body) {
       if (!C || !E) { body.innerHTML = failed; return; }
       body.innerHTML = `
+        ${LT.brief({ chart: 'pkArkkChart', items: [
+          ['邏輯', '熱門主題型 ETF 大漲後，資金大量湧入；比較基金帳面上的報酬，和投資人實際賺到的報酬差多少。'],
+          ['怎麼比較', '基金報酬 = 一開始買進後一直抱著；投資人報酬 = 依照資金實際流入流出的時間計算。'],
+          ['資料', '晨星(Morningstar)的研究數字，加上 ARKK 的月底還原股價。'],
+          ['期間', '截至 2021 年 11 月的 5 年，以及截至 2023 年的 10 年。']] })}
         <div class="panel">
           <h3>ARKK 研究：基金賺錢，投資人卻賠錢 ${tagOf('how')}</h3>
           <div class="doc">
@@ -209,7 +222,6 @@
             </ul>
             <h3 class="md-h2">四、實證結果與分析</h3>
           </div>
-          <div id="pkArkkChart"></div>
           <div class="doc">
             <div class="tablewrap"><table class="stattable">
               <thead><tr><th>研究</th><th>期間</th><th>基金報酬</th><th>投資人報酬</th></tr></thead>
@@ -242,6 +254,11 @@
     function lsiView(body) {
       if (!C || !E) { body.innerHTML = failed; return; }
       body.innerHTML = `
+        ${LT.brief({ stats: 'rsStats', chart: 'rsLine', items: [
+          ['邏輯', '手上已經有一筆錢：一次投入、分好幾個月慢慢投入，還是等市場下跌再買，哪一種長期比較好？'],
+          ['怎麼比較', '每個月都當成一個起點，三種做法各自持有到期間結束，比較年化報酬。'],
+          ['資料', '國外 6 個國家的研究，加上台股加權報酬指數(含股息)自己驗證。'],
+          ['期間', '持有 5、10、20 年或到現在，可以在下方調整。']] })}
         <div class="panel">
           <h3>單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD) ${tagOf('how')}</h3>
           <div class="doc">
@@ -288,13 +305,9 @@
             <div class="paramitem"><label for="rsN">定期定額分幾個月</label><select id="rsN"><option value="6">6 個月</option><option value="12" selected>12 個月</option><option value="24">24 個月</option></select></div>
             <div class="paramitem"><label for="rsCash">現金年利率(%)</label><input id="rsCash" type="number" min="0" max="10" step="0.1" value="1.5"></div>
           </div>
-          <div class="statgrid" id="rsStats" style="margin:14px 0;"></div>
           <div class="tablewrap"><table class="stattable" id="rsTable"></table></div>
           <h4>每個起點的年化報酬差(單筆 − 定期定額)</h4>
           <div id="rsHist"></div>
-          <h4>依起點月份的年化報酬</h4>
-          <div id="rsLine"></div>
-          ${LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }])}
           <ul class="insight" id="rsInsight"></ul>
           <div class="doc">
             <h3 class="md-h2">五、結論</h3>
@@ -337,6 +350,7 @@
         d.forEach(v => { const i = Math.min(bins.length - 1, Math.floor((v - lo) / step)); bins[i].n++; });
         LTChart.bars($('#rsHist'), { x: bins.map(b => b.x + step / 2), label: '年化報酬差分布', height: 200, xFmt: v => (v * 100).toFixed(1) + '%', yFmt: v => Math.round(v), tipFmt: (s, v, i) => `${v} 個起點`,
           series: [{ name: '起點數', y: bins.map(b => b.n), color: 'var(--amber)' }], refX: [{ x: 0, label: '0：兩者相同', color: 'var(--dim)' }] });
+        $('#rsLineLegend').innerHTML = LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }]);
         LTChart.line($('#rsLine'), { x: R.map(x => M[x.t]), xType: 'date', label: '依起點的年化報酬', height: 260, xFmt: (m, tip) => tip ? `${ym(m)} 起` : m.slice(2).replace('-', '/'),
           yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => pctf(v, 2), refY: [{ y: 0 }],
           series: [{ name: '單筆投入', y: R.map(x => x.lsi), color: 'var(--amber)' }, { name: '定期定額', y: R.map(x => x.dca), color: 'var(--blue)' }, { name: '逢低買入(10%)', y: R.map(x => x.btd[0]), color: 'var(--up)', width: 1.3 }, { name: '逢低買入(20%)', y: R.map(x => x.btd[1]), color: 'var(--down)', width: 1.3 }] });

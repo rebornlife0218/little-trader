@@ -73,9 +73,13 @@
       const tabs = LT.tabs({ cls: 'us-tabs', remember: VIEW_KEY, view: ctx.view, onChange: k => { view = k; draw(); },
         items: [{ key: 'all', name: '總覽比較', desc: '四種策略與 SPY 並列' }, ...STRATS.map(s => ({ key: s.key, name: s.name, desc: s.idea }))] });
 
-      // 報告結構(CLAUDE.md「研究報告」)：一句話結論 → 一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
+      // 精簡版(一句話結論、策略說明、累積報酬圖) → 報告(CLAUDE.md「研究報告」)：一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
       el.querySelector('#usBody').innerHTML = `
-        <div class="doc lt-hero"><blockquote><p id="usHero"></p></blockquote></div>
+        ${LT.brief({ hero: '<blockquote><p id="usHero"></p></blockquote>', stats: 'usBriefStats', chart: 'usBrief', items: [
+          ['邏輯', '每季從當時的 S&amp;P500 成分股挑股票：買上一季的贏家、輸家，或報酬穩定的股票，看哪一種想法能贏過買進持有 SPY。'],
+          ['進出場', '每季最後一個交易日收盤選股，同時以收盤價換股。'],
+          ['停利停損', '不設停利停損，到下一季換股才調整。'],
+          ['持有期間', '一季(每季換股一次)。']] })}
         <div class="panel">
           <div class="doc">
             <h3 class="md-h2">一、研究目的</h3>
@@ -277,6 +281,19 @@
       function draw() {
         const C = calc();
         conclude(C);
+        {   // 精簡版的績效卡片與累積報酬圖：風險調整後最好的策略 vs SPY
+          const b = STRATS.slice().sort((p, q) => C.st[q.key].sharpe - C.st[p.key].sharpe)[0].key;
+          const x = C.st[b], S = C.st.spy, d = C.qret(b).map((v, j) => v - C.spyQ[j]), win = d.filter(v => v > 0).length, { card } = window.LTTW;
+          $('#usBriefStats').innerHTML = [
+            card(`${(win / d.length * 100).toFixed(0)}%`, `勝率(${esc(short(b))}贏 SPY 的季數)`, `${win} / ${d.length} 季`),
+            card(pct(x.mult - 1, 0), '總報酬', `SPY ${pct(S.mult - 1, 0)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
+            card(pct(x.ret), '年化報酬', `SPY ${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
+            card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY ${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
+            card(x.sharpe.toFixed(2), '夏普值', `SPY ${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
+            card(pct(x.mdd, 1), '最大回撤', `SPY ${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)].join('');
+          window.LTTW.navCharts({ d: B.d, i0: C.i0, navs: { [b]: C.navs[b], spy: C.navs.spy }, meta: { [b]: { name: meta(b).name, color: meta(b).color }, spy: { name: meta('spy').name, color: meta('spy').color } },
+            main: b, log: true, chart: $('#usBrief'), legend: $('#usBriefLegend') });
+        }
         if (view === 'all') renderAll(C); else renderOne(C, view);
         LTChart.bars($('#usCov'), { x: C.Q.map(q => q.q), label: '可取得股價的成分股比例', height: 180, yMin: 0, yMax: 1,
           xFmt: (v, tip) => tip ? v : v.endsWith('Q1') && +v.slice(0, 4) % 5 === 0 ? v.slice(0, 4) : '', yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v, i) => `${(v * 100).toFixed(0)}%(${C.Q[i].usable} / ${C.Q[i].members} 檔)`,

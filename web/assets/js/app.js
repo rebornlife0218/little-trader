@@ -274,14 +274,38 @@ const LT = (() => {
     try { await navigator.clipboard.writeText(url); say('已複製分享連結，對方登入 Google 後就能看'); }
     catch (e) { window.prompt('複製這個分享連結：', url); }
   }
-  // 研究報告的「一句話結論」(報告開頭的 > 引言)：報告放在頁面下方時，搬到內容最上方，一打開就看得到
+  // 研究報告的「一句話結論」(報告開頭的 > 引言)：搬到頁面最上方(有精簡版時放進精簡版的結論位置)，一打開就看得到
   function hoistConclusion(body) {
+    const slot = body.querySelector('.lt-brief .brief-hero');
     const q = body.querySelector('.panel .doc > blockquote:first-child');
+    if (slot) { if (q && !slot.children.length) slot.appendChild(q); return; }
     if (!q || q.closest('.panel') === body.firstElementChild) return;
     const box = document.createElement('div');
     box.className = 'doc lt-hero';
     box.appendChild(q);
     body.prepend(box);
+  }
+  /* ---------- 研究與策略的精簡版(頁面上半)：一句話結論 → 策略說明 → 累積報酬與回撤圖；下半是完整的研究報告 ----------
+     LT.brief({ hero, items: [['邏輯', '…'], ['進出場', '…'], ['停利停損', '…'], ['持有期間', '…']], chart: 'id' }) 回傳 HTML，放在內容最上方
+       hero(選填)：一句話結論的 HTML(網頁依回測數字產生時)；省略時由報告開頭的 > 一句話結論自動放進來(hoistConclusion)
+       items：每項一句話，給第一次看的人；值是空的項目不顯示。第一項(邏輯)佔兩格寬，第三項之後(停利停損、持有期間)合併在同一張小卡。
+       stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
+     精簡版和下方報告之間用分隔線區隔(只有樣式，不加文字) */
+  // 小卡：第一項(邏輯)佔兩格寬；第二項(進出場)一張；其餘(停利停損、持有期間)合併成一張
+  function briefCards(items) {
+    const row = ([k, v]) => `<b>${esc(k)}</b><span>${v}</span>`;
+    const [first, second, ...rest] = items;
+    return [first && `<div class="brief-item wide">${row(first)}</div>`, second && `<div class="brief-item">${row(second)}</div>`,
+      rest.length && `<div class="brief-item">${rest.map(row).join('')}</div>`].filter(Boolean).join('');
+  }
+  function brief(o) {
+    return `<section class="lt-brief">
+        <div class="brief-hero doc lt-hero">${o.hero || ''}</div>
+        <div class="brief-items">${briefCards(o.items.filter(x => x && x[1]))}</div>
+        ${o.stats ? `<div class="statgrid brief-stats" id="${o.stats}"></div>` : ''}
+        ${o.chart ? `<div class="brief-chart"><div id="${o.chart}"></div><div id="${o.chart}Legend"></div></div>` : ''}
+      </section>
+      <hr class="lt-sep" aria-hidden="true">`;
   }
   function listPages() { return pages.slice(); }
 
@@ -579,5 +603,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine, mdTables };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, brief, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine, mdTables };
 })();
