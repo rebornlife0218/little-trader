@@ -302,13 +302,21 @@ const LT = (() => {
     return `<section class="lt-brief">
         <div class="brief-hero doc lt-hero">${o.hero || ''}</div>
         <div class="brief-items">${briefCards(o.items.filter(x => x && x[1]))}</div>
-        ${o.stats ? `<div class="statgrid brief-stats" id="${o.stats}"></div>` : ''}
+        ${o.stats ? `<div class="statgrid brief-stats" id="${o.stats}"></div><div class="btnrow-l brief-more"><button type="button" aria-expanded="false">顯示更多績效</button></div>` : ''}
         ${o.chart ? `<div class="brief-chart"><div id="${o.chart}"></div><div id="${o.chart}Legend"></div></div>` : ''}
         ${o.recent ? `<div class="brief-recent"><h4>近期明細</h4><p class="note" id="${o.recent}Note"></p><div id="${o.recent}"></div></div>` : ''}
       </section>
       <hr class="lt-sep" aria-hidden="true">`;
   }
   // 近期明細等長表格：先顯示最新 n 列，按鈕展開全部或收合(rows = 每一列 <tr> 的 HTML，已依新到舊排好)
+  // 精簡版的績效卡片：手機只顯示前 4 張(勝率、總報酬、年化報酬、年化波動)，按「顯示更多績效」展開其餘(CSS 的 .brief-stats.open)
+  document.addEventListener('click', e => {
+    const b = e.target.closest('.brief-more button'), g = b && b.parentElement.previousElementSibling;
+    if (!g) return;
+    const open = g.classList.toggle('open');
+    b.setAttribute('aria-expanded', open);
+    b.textContent = open ? '收合績效' : '顯示更多績效';
+  });
   function moreTable(box, head, rows, n = 20) {
     let all = false;
     const draw = () => {

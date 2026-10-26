@@ -153,9 +153,9 @@ const LTChart = (() => {
     svg.addEventListener('mouseleave', leave);
   }
 
-  // 縱軸刻度設定(true = 對數)：全站共用，記在 localStorage
-  let logPref = true;
-  try { logPref = localStorage.getItem('lt-scale') !== 'lin'; } catch (e) {}
+  // 縱軸刻度設定(true = 對數)：預設一般刻度，全站共用，記在 localStorage
+  let logPref = false;
+  try { logPref = localStorage.getItem('lt-scale') === 'log'; } catch (e) {}
   const scaleBtns = (o, f) => {
     const left = PAD.l + 6 + (o.title ? [...o.title].length * 13 + 6 : 0);
     return `<div class="lt-scale" role="group" aria-label="縱軸刻度" style="left:${left}px;top:${PAD.t + 1}px">${[[true, '對數'], [false, '一般']].map(([v, t]) =>
