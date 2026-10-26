@@ -82,7 +82,7 @@ const LT = (() => {
       <div class="panel lock-panel">
         <div class="lock-ico">🔒</div>
         <h2>登入 Google 看更多</h2>
-        <p class="mute">用 Google 帳號登入後，就能看 ETF、股票、選擇權的所有內容；設有密碼的策略仍需要另外輸入密碼。</p>
+        <p class="mute">用 Google 帳號登入後，就能看 ETF、股票的所有內容；設有密碼的策略仍需要另外輸入密碼。</p>
         ${loginButton()}
         ${LTAuth.error ? `<p class="lock-err">${esc(LTAuth.error)}</p>` : ''}
       </div>`;
@@ -194,7 +194,7 @@ const LT = (() => {
     box.innerHTML = `<div class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
         <img src="assets/img/logo.svg" alt="" class="welcome-logo">
         <h2 id="welcomeTitle">歡迎來到 Little Trader</h2>
-        <p class="mute">訪客可以看指數、統計學與其他；登入 Google 看更多：ETF、股票、選擇權。</p>
+        <p class="mute">訪客可以看指數、選擇權、統計學與其他；登入 Google 看更多：ETF、股票。</p>
         ${loginButton()}
         <button type="button" class="welcome-guest">以訪客身分繼續瀏覽</button>
       </div>`;

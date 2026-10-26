@@ -13,7 +13,7 @@
 ## 網站
 
 - 所有計算不是在 pipeline 先算好，就是在瀏覽器端算；後端(`functions/`)只負責登入、權限、查詢日誌與股票查詢。API 一律經過 `functions/_lib/security.ts` 的來源檢查、次數限制與安全標頭，不回 `Access-Control-Allow-Origin: *`。
-- 訪客只能看指數、統計學、其他；ETF、股票、選擇權要 Google 登入，設有密碼的策略仍要密碼。權限清單只寫在 `functions/_lib/access.json`：會員區塊的新頁面加到 `memberScripts`(不寫進 `index.html`)，會員限定的新資料集加到 `memberDatasets`。
+- 訪客只能看指數、選擇權、統計學、其他；ETF、股票要 Google 登入，設有密碼的策略仍要密碼。權限清單只寫在 `functions/_lib/access.json`：會員區塊的新頁面加到 `memberScripts`(不寫進 `index.html`)，會員限定的新資料集加到 `memberDatasets`。
 - CSP 只允許同源：第三方套件放 `web/assets/vendor/`，不用 CDN；新的 `<script>` 一律加 `defer`。唯一例外是登入時連 `identitytoolkit.googleapis.com`(只有 connect-src，不載入外部腳本)。
 - 新頁面用 `LT.register`，研究、策略這類一份一份的內容用目錄頁 `LT.catalog`(區塊 › 頁面 › 單一內容，最多三層，每份內容有自己的網址)，頁面裡的分頁用 `LT.tabs`，資料用 `LT.loadJSON`，圖表用 `LTChart`；網址是一般網址(不用 #)，站內連結一律寫相對網址(例如 `href="stock/query/2330"`)；顏色用 CSS 變數，暗色、淺色主題都要正常顯示，手機寬度也要能看。
 - 新的研究或策略上線時，前端頁面(目錄頁卡片與頁面說明)、後台(最受歡迎的主題看得到它)與 IG 圖卡(只有研究、策略需要，內容在 `scripts/share/ig-topics.mjs`)一起更新；使用者說圖卡先不做時才可以之後補。目錄頁的項目會自動列進後台；`tests/site.test.mjs` 檢查 events.py 的策略都列在策略頁、IG 圖卡的網址都對得到頁面。

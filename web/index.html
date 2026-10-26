@@ -70,7 +70,7 @@
 <script defer src="assets/vendor/marked/marked.js"></script>
 <script defer src="assets/vendor/katex/katex.min.js"></script>
 <!-- 研究模組(訪客也能看的區塊)：新增研究內容時在此加入。
-     會員區塊(ETF、股票、選擇權)的程式不寫在這裡：清單在 functions/_lib/access.json，登入後由 app.js 載入 -->
+     會員區塊(ETF、股票)的程式不寫在這裡：清單在 functions/_lib/access.json，登入後由 app.js 載入 -->
 <script defer src="modules/indices/core.js"></script>   <!-- 大盤漲跌分析、K棒型態分析：7 個檔共用全域變數，順序不能換 -->
 <script defer src="modules/indices/patterns.js"></script>
 <script defer src="modules/indices/events.js"></script>
@@ -80,6 +80,9 @@
 <script defer src="modules/indices/render.js"></script>
 <script defer src="modules/option/lib.js"></script>   <!-- 選擇權共用函式：台指期貨(指數區塊)與選擇權頁面都用到 -->
 <script defer src="modules/indices/futures.js"></script>
+<script defer src="modules/option/calculator.js"></script>
+<script defer src="modules/option/market.js"></script>
+<script defer src="modules/option/strategy.js"></script>
 <script defer src="modules/stats/demos.js"></script>
 <script defer src="modules/stats/basic.js"></script>
 <script defer src="modules/stats/stats.js"></script>

@@ -135,7 +135,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 身分 | 看得到 |
 |---|---|
-| 訪客 | 指數、統計學、其他 |
+| 訪客 | 指數、選擇權、統計學、其他 |
 | 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
 | 管理員(`users.role = 'admin'`) | 另外有後台 `other/admin`；後台統計(含分享紀錄)不計入管理員與測試帳號(`functions/_lib/exclude.ts`：管理員，以及列在裡面的 email；repo 公開，只放 email 小寫的 SHA-256)，連同這些帳號登入前在同一個瀏覽器用訪客身分的紀錄(登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`)；這些帳號點開分享連結也不算點開次數 |
 
@@ -229,7 +229,7 @@ sp500 的特殊處理：
 
 ## 新增頁面
 
-在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)。會員區塊(ETF、股票、選擇權)的頁面改加到 `functions/_lib/access.json` 的 `memberScripts`，不寫進 `index.html`(見「會員與權限」)：
+在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)。會員區塊(ETF、股票)的頁面改加到 `functions/_lib/access.json` 的 `memberScripts`，不寫進 `index.html`(見「會員與權限」)：
 
 ```js
 LT.register({ section: 'etf', key: 'x', name: '外部網站', href: 'https://...' });       // 側欄直接開新分頁

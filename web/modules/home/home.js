@@ -92,7 +92,7 @@
           <h2 class="home-h2">研究重點 <small>每份研究與策略的一句話結論</small></h2>
           ${studies.length
             ? `<div class="cat-grid is-list">${studies.map(s => `<a class="cat-row" href="${s.href}" data-sec="${s.sec}"><b>${esc(s.name)}</b><span>${esc(s.summary)}</span><em>${esc(s.page)}</em></a>`).join('')}</div>`
-            : `<div class="home-lock"><span>ETF、股票、選擇權的研究與策略，登入 Google 就能看每份研究的結論。</span>${LT.loginButton('用 Google 登入')}</div>`}
+            : `<div class="home-lock"><span>ETF、股票的研究與策略，登入 Google 就能看每份研究的結論。</span>${LT.loginButton('用 Google 登入')}</div>`}
         </section>`;
       market(el.querySelector('#homeMkt'), ctx);
     },
