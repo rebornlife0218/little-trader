@@ -18,6 +18,7 @@
   - 均額 = 含當天的事前 N 日平均成交金額；市值 = 原始收盤價 × 當年度交易所公告股本 ÷ 面額 10 元
 
 用法：python pipeline/tw_research/update.py [研究 ...]   (預設全部；python pipeline/run_local.py tw_research 會執行並發佈)
+排程：disp(處置股策略)每天由本機 run_local.py 重跑(tw_research:disp)，其他研究不定期手動執行
 """
 import io
 import warnings
@@ -1065,7 +1066,7 @@ def main(keys=None, data=None, write=True):
             write_json(out / f'{key}.json', res[key][0])
             print(f'{key}.json：{(out / f"{key}.json").stat().st_size / 1024:.0f} KB')
     if write:
-        write_meta(NAME, '台股日資料、月營收(本機計算)', '', '不定期(研究更新時手動執行)')
+        write_meta(NAME, '台股日資料、月營收(本機計算)', '', '處置股策略週一~五 23:45、週二~六 12:15(本機排程)；其他研究不定期(手動執行)')
     return res
 
 

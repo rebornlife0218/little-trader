@@ -2,7 +2,7 @@
 本機資料集(股價來自本機 PostgreSQL，GitHub Actions 連不到)：Windows 工作排程器「LittleTrader_local」以 pythonw.exe 執行
   等 cm 同步(工作排程器 CM_PostgreSQL_Sync)跑完 → 各資料集 update.py → 發佈到 data 分支 → 觸發一次重新部署；
   股票查詢的資料(price_query)直接同步到 Cloudflare D1
-用法：python pipeline/run_local.py [資料集 ...]   (預設全部本機資料集)；記錄寫在 ~/.cache/little-trader/local.log
+用法：python pipeline/run_local.py [資料集[:參數] ...]   (預設全部本機資料集；冒號後面是傳給 update.py 的參數，逗號分隔)；記錄寫在 ~/.cache/little-trader/local.log
 需要：本機 PostgreSQL 與 pgpass.conf、gh 已登入(gh auth login)
 
 不用 Git Bash：電腦在新式待命(睡眠)時由排程喚醒執行，msys 的 bash.exe 會啟動失敗(0xC0000142)，
@@ -20,7 +20,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = 'rebornlife0218/little-trader'
-DATASETS = ['tw_strategy', 'disposition', 'etf_compare', 'price_query']
+DATASETS = ['tw_strategy', 'disposition', 'tw_research:disp', 'etf_compare', 'price_query']
+# tw_research:disp 每天只重跑處置股策略(策略頁要列出隔天進場的處置股)，其他台股研究不定期手動執行 run_local.py tw_research；
+# 發佈時仍是整個 web/data/tw_research/ 資料夾(其他研究用本機上次算好的檔案)
 # price_query 不發佈到 data 分支：pipeline/price_query/sync.py 直接寫進 Cloudflare D1(股票查詢頁)；
 # wrangler.toml 還沒填 D1 的 database_id(尚未建立資料庫)時略過
 LOG = Path.home() / '.cache' / 'little-trader' / 'local.log'
@@ -119,7 +121,8 @@ def main():
     try:
         wait_cm_sync()
         token = run(['gh', 'auth', 'token'])[1]
-        for ds in datasets:
+        for spec in datasets:
+            ds, _, args = spec.partition(':')
             if ds == 'price_query':
                 if '00000000-0000-0000-0000-000000000000' in (ROOT / 'wrangler.toml').read_text(encoding='utf-8'):
                     log.info('price_query：D1 尚未建立，略過')
@@ -131,7 +134,7 @@ def main():
                     failed.append(ds)
                 continue
             try:
-                out = run([python, str(ROOT / 'pipeline' / ds / 'update.py')], cwd=ROOT, env=env)[1]
+                out = run([python, str(ROOT / 'pipeline' / ds / 'update.py'), *filter(None, args.split(','))], cwd=ROOT, env=env)[1]
                 log.info('%s：\n%s', ds, out)
                 publish(ds, token)
                 published += 1

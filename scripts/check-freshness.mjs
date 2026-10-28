@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const MAX_HOURS = 20;   // 檢查時間是台北 14:00：當天 12:15 那次沒跑還在容許範圍，前一晚 23:45 也沒跑才通知
-const LOCAL = ['tw_strategy', 'disposition', 'etf_compare'];
+const LOCAL = ['tw_strategy', 'disposition', 'tw_research', 'etf_compare'];
 const dir = process.argv[2];
 if (!dir) throw new Error('用法：node scripts/check-freshness.mjs <data 分支的目錄>');
 
