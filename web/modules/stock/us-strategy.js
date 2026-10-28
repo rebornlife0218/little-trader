@@ -284,9 +284,9 @@
           const b = STRATS.slice().sort((p, q) => C.st[q.key].sharpe - C.st[p.key].sharpe)[0].key;
           const x = C.st[b], S = C.st.spy, d = C.qret(b).map((v, j) => v - C.spyQ[j]), win = d.filter(v => v > 0).length, { card } = window.LTTW;
           $('#usBriefStats').innerHTML = [
-            card(`${(win / d.length * 100).toFixed(0)}%`, `勝率(${esc(short(b))}贏 SPY 的季數)`, `${win} / ${d.length} 季`),
-            card(pct(x.mult - 1, 0), '總報酬', `SPY：${pct(S.mult - 1, 0)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
-            card(pct(x.ret), '年化報酬', `SPY：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
+            card(`${(win / d.length * 100).toFixed(0)}%`, `勝率(${esc(short(b))}贏 SPY 的季數)`, `${win} / ${d.length} 季`, '', true),
+            card(pct(x.mult - 1, 0), '總報酬', `SPY：${pct(S.mult - 1, 0)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`, true),
+            card(pct(x.ret), '年化報酬', `SPY：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`, true),
             card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
             card(x.sharpe.toFixed(2), '夏普值', `SPY：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
             card(pct(x.mdd, 1), '最大回撤', `SPY：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`)].join('');

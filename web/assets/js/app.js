@@ -309,7 +309,7 @@ const LT = (() => {
       <hr class="lt-sep" aria-hidden="true">`;
   }
   // 近期明細等長表格：先顯示最新 n 列，按鈕展開全部或收合(rows = 每一列 <tr> 的 HTML，已依新到舊排好)
-  // 精簡版的績效卡片：手機只顯示前 4 張(勝率、總報酬、年化報酬、年化波動)，按「顯示更多績效」展開其餘(CSS 的 .brief-stats.open)
+  // 精簡版的績效卡片：手機只顯示勝率與報酬率(總報酬、年化報酬，卡片標 .stat.key)，按「顯示更多績效」展開其餘(CSS 的 .brief-stats.open)
   document.addEventListener('click', e => {
     const b = e.target.closest('.brief-more button'), g = b && b.parentElement.previousElementSibling;
     if (!g) return;

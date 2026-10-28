@@ -42,16 +42,17 @@
 
   /* ---------- 共用：台股策略一律和 0050 比較 ---------- */
   const beat = (v, b, hi = true) => (hi ? v > b : v < b) ? 'beat' : '';
-  const card = (v, label, sub, c = '') => `<div class="stat"><div class="v ${c}">${v}</div><div class="l">${label}${sub ? `<br>${sub}` : ''}</div></div>`;
+  const card = (v, label, sub, c = '', key = false) => `<div class="stat${key ? ' key' : ''}"><div class="v ${c}">${v}</div><div class="l">${label}${sub ? `<br>${sub}` : ''}</div></div>`;
   const heat = (v, beatIt) => { const c = v >= 0 ? 'var(--up)' : 'var(--down)', a = Math.min(55, Math.abs(v) * 110);
     return `<td class="${beatIt ? 'beat' : ''}" style="background:color-mix(in srgb, ${c} ${a.toFixed(0)}%, transparent)">${pct(v, 1)}</td>`; };
   const totalRet = x => pct(x.mult - 1, 0);
+  // key = 手機精簡版預設顯示的卡片(勝率與報酬率)
   // 勝率(有交易統計 t 時，單獨一張放最前面)、總報酬、年化報酬、年化波動、夏普值、索提諾比率、最大回撤、最長連續回撤天期(x = 策略，S = 0050，皆為 stats() 的結果)
-  const winCard = t => card(`${(t.win * 100).toFixed(1)}%`, '勝率', '', t.win >= 0.5 ? 'up' : '');
+  const winCard = t => card(`${(t.win * 100).toFixed(1)}%`, '勝率', '', t.win >= 0.5 ? 'up' : '', true);
   const vs0050Cards = (x, S, t) => [
     t ? winCard(t) : '',
-    card(totalRet(x), '總報酬', `0050：${totalRet(S)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`),
-    card(pct(x.ret), '年化報酬', `0050：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`),
+    card(totalRet(x), '總報酬', `0050：${totalRet(S)}`, `${cls(x.mult - 1)} ${beat(x.mult, S.mult)}`, true),
+    card(pct(x.ret), '年化報酬', `0050：${pct(S.ret)}`, `${cls(x.ret)} ${beat(x.ret, S.ret)}`, true),
     card((x.vol * 100).toFixed(1) + '%', '年化波動', `0050：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
     card(x.sharpe.toFixed(2), '夏普值', `0050：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
     card(x.sortino.toFixed(2), '索提諾比率', `0050：${S.sortino.toFixed(2)}`, beat(x.sortino, S.sortino)),

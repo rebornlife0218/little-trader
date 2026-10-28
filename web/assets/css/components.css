@@ -684,10 +684,12 @@
   @media (max-width:1100px){ .brief-items{grid-template-columns:repeat(2,minmax(0,1fr));} }
   .lt-brief .brief-stats{margin:0 0 14px;}
   .lt-brief .brief-more{display:none;}
-  @media (max-width:640px){   /* 手機：績效卡片只顯示前 4 張，其餘按鈕展開；不到 5 張就不顯示按鈕 */
-    .lt-brief .brief-stats:not(.open) > .stat:nth-child(n+5){display:none;}
+  @media (max-width:640px){   /* 手機：績效卡片只顯示勝率與報酬率(.stat.key)，其餘按鈕展開；沒有標 key 的卡片組只顯示前 4 張；沒有藏起來的卡片就不顯示按鈕 */
+    .lt-brief .brief-stats:has(> .stat.key):not(.open) > .stat:not(.key){display:none;}
+    .lt-brief .brief-stats:not(:has(> .stat.key)):not(.open) > .stat:nth-child(n+5){display:none;}
     .lt-brief .brief-stats{margin-bottom:10px;}
-    .lt-brief .brief-stats:has(> .stat:nth-child(5)) + .brief-more{display:flex;margin:0 0 14px;}
+    .lt-brief .brief-stats:has(> .stat.key):has(> .stat:not(.key)) + .brief-more,
+    .lt-brief .brief-stats:not(:has(> .stat.key)):has(> .stat:nth-child(5)) + .brief-more{display:flex;margin:0 0 14px;}
   }
   .brief-chart{padding:10px 12px 4px;border-radius:12px;background:var(--panel);border:1px solid var(--border);}
   .brief-recent{margin-top:16px;padding:12px 14px 14px;border-radius:12px;background:var(--panel);border:1px solid var(--border);}
