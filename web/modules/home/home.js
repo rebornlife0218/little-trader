@@ -1,4 +1,4 @@
-/* 首頁：網站介紹＋加權指數近 60 日迷你 K 線、各區塊入口(依區塊主題色與圖樣)、研究重點(各研究與策略的先講結論)
+/* 首頁：網站介紹＋加權指數近 60 日迷你 K 線、近期更新、各區塊入口(依區塊主題色與圖樣)、研究重點(各研究與策略的先講結論)
    K 線資料是公開的 indices 資料集；最新研究取自已載入的目錄頁(LT.catalog)項目的 summary，訪客看不到研究就顯示登入提示 */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -16,6 +16,35 @@
     ['bulb', '相信最厲害的洞見，往往藏在最意想不到的角落。'],
     ['mail', '有酷酷的想法或新發現？歡迎寄信交流：<br><a href="mailto:rebornlife0218@gmail.com">rebornlife0218@gmail.com</a>'],
   ];
+
+  // 近期更新：只列網站上看得到的大項目(新的研究或策略、改版)，新的放最上面；首頁預設顯示 3 則，展開後最多 10 則
+  // href 寫站內相對網址，沒有單一頁面可連的(全站改版)留空
+  const NEWS = [
+    ['10/26', 'stock', '台股策略', '新策略「老闆回頭發動了」', '做多策略，附完整回測與最近的進出場明細。', 'stock/tw-strategy/boss', '看策略'],
+    ['10/26', 'stock', '台股策略', '新策略「月營收年增率長期以來第一次破 20%」', '營收突然轉強的公司，之後股價怎麼走。', 'stock/tw-strategy/rev20', '看策略'],
+    ['10/26', 'option', '選擇權', '選擇權開放訪客瀏覽', '不用登入，就能看市場概況與 24 種策略損益圖。', 'option/market', '去看看'],
+    ['10/26', '', '全站', '研究與策略頁改版', '打開先看結論、勝率和報酬，往下才是完整報告。'],
+    ['10/26', 'stock', '台股策略', '策略的資金分配規則改版', '每檔要投入多少錢，只用當時已經知道的資訊決定，回測更貼近實際下單。', 'stock/tw-strategy', '看策略'],
+    ['10/26', 'stock', '處置股', '處置股策略改版', '選股條件更新，只回測處置新制上路後的資料。', 'stock/disposition/strategy', '看策略'],
+    ['10/25', 'stats', '統計學', '第 8、9 章加入更多實例', '新增生活化的例子與 R 程式，還能動手模擬兩種錯誤怎麼取捨。', 'stats/basic/8', '去上課'],
+    ['10/24', '', '全站', '研究可以分享給朋友', '研究頁的「分享」按鈕會產生專屬連結。'],
+    ['10/24', '', '全站', '全站改版', '每個區塊有自己的顏色與圖樣，手機上更好點選。'],
+    ['10/23', 'stock', '股票查詢', 'K 線圖標出每月營收', '營收成長或衰退直接標在 K 線上，一眼看出營收和股價的關係。', 'stock/query', '查股票'],
+  ];
+  const NEWS_SHOW = 3, NEWS_MAX = 10;
+  function news() {
+    const rows = NEWS.slice(0, NEWS_MAX).map(([d, sec, tag, title, text, href, go], i) => {
+      const inner = `<time>${esc(d)}</time><span class="news-tag${sec ? '' : ' all'}">${esc(tag)}</span>
+        <span class="news-t"><b>${esc(title)}</b><span>${esc(text)}</span></span><span class="news-go">${href ? esc(go) + ' ›' : ''}</span>`;
+      return `<li${i >= NEWS_SHOW ? ' class="more"' : ''}${sec ? ` data-sec="${sec}"` : ''}>${href ? `<a href="${href}">${inner}</a>` : `<div class="nolink">${inner}</div>`}</li>`;
+    });
+    const more = rows.length - NEWS_SHOW;
+    return `<section class="home-news">
+      <h2 class="home-h2">近期更新</h2>
+      <ul class="home-news-list">${rows.join('')}</ul>
+      ${more > 0 ? `<button type="button" class="news-toggle" aria-expanded="false" data-more="${more}">看更早的更新(${more})</button>` : ''}
+    </section>`;
+  }
 
   // 加權指數近 n 日的迷你 K 線(SVG；紅漲綠跌，顏色用 CSS 變數，主題切換不用重畫)
   function miniK(T, n = 60) {
@@ -73,6 +102,8 @@
           <div class="home-mkt" id="homeMkt"><div class="page-loading"><span class="spinner"></span>載入中…</div></div>
         </section>
 
+        ${news()}
+
         <h2 class="home-h2">所有內容</h2>
         <div class="home-secs">
           ${LT.SECTIONS.map(sec => {
@@ -94,6 +125,12 @@
             ? `<div class="cat-grid is-list">${studies.map(s => `<a class="cat-row" href="${s.href}" data-sec="${s.sec}"><b>${esc(s.name)}</b><span>${esc(s.summary)}</span><em>${esc(s.page)}</em></a>`).join('')}</div>`
             : `<div class="home-lock"><span>ETF、股票的研究與策略，登入 Google 就能看每份研究的結論。</span>${LT.loginButton('用 Google 登入')}</div>`}
         </section>`;
+      const tg = el.querySelector('.news-toggle');
+      if (tg) tg.addEventListener('click', () => {
+        const open = tg.closest('.home-news').classList.toggle('open');
+        tg.setAttribute('aria-expanded', open);
+        tg.textContent = open ? '收起' : `看更早的更新(${tg.dataset.more})`;
+      });
       market(el.querySelector('#homeMkt'), ctx);
     },
   });
