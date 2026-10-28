@@ -46,7 +46,7 @@
   const heat = (v, beatIt) => { const c = v >= 0 ? 'var(--up)' : 'var(--down)', a = Math.min(55, Math.abs(v) * 110);
     return `<td class="${beatIt ? 'beat' : ''}" style="background:color-mix(in srgb, ${c} ${a.toFixed(0)}%, transparent)">${pct(v, 1)}</td>`; };
   const totalRet = x => pct(x.mult - 1, 0);
-  // key = 手機精簡版預設顯示的卡片(勝率與報酬率)
+  // key = 手機精簡版預設顯示的卡片(勝率、總報酬、年化報酬、最大回撤)
   // 勝率(有交易統計 t 時，單獨一張放最前面)、總報酬、年化報酬、年化波動、夏普值、索提諾比率、最大回撤、最長連續回撤天期(x = 策略，S = 0050，皆為 stats() 的結果)
   const winCard = t => card(`${(t.win * 100).toFixed(1)}%`, '勝率', '', t.win >= 0.5 ? 'up' : '', true);
   const vs0050Cards = (x, S, t) => [
@@ -56,7 +56,7 @@
     card((x.vol * 100).toFixed(1) + '%', '年化波動', `0050：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
     card(x.sharpe.toFixed(2), '夏普值', `0050：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
     card(x.sortino.toFixed(2), '索提諾比率', `0050：${S.sortino.toFixed(2)}`, beat(x.sortino, S.sortino)),
-    card(pct(x.mdd, 1), '最大回撤', `0050：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`),
+    card(pct(x.mdd, 1), '最大回撤', `0050：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`, true),
     card(`${x.ddDays} 天`, '最長連續回撤', `0050：${S.ddDays} 天`, beat(x.ddDays, S.ddDays, false)),
   ].join('');
   // 交易筆數、每筆平均報酬、每筆中位數報酬、平均一天持有檔數、平均一檔持倉天期(t = tradeStats() 的結果；勝率在 vs0050Cards 的第一張)
@@ -137,7 +137,7 @@
 
     // 精簡版(先講結論、策略說明、累積報酬圖) → 報告(CLAUDE.md「研究報告」)：一、研究目的 → 二、資料處理 → 三、研究方法 → 四、實證結果與分析 → 五、結論
     el.querySelector('#twBody').innerHTML = `
-      ${LT.brief({ hero: '<blockquote><p id="twHero"></p></blockquote>', stats: 'twBriefStats', chart: 'twBrief', recent: 'twRecent', items: [
+      ${LT.brief({ updated: 'tw_strategy', hero: '<blockquote><p id="twHero"></p></blockquote>', stats: 'twBriefStats', chart: 'twBrief', recent: 'twRecent', items: [
         ['邏輯', '波動小的股票不一定賺得比較少：每月挑過去半年漲跌最平穩的股票，等權重持有，想用較小的起伏賺到報酬。'],
         ['進出場', '每月最後一個交易日收盤後選股，隔天開盤換股：先賣出落選的、再買進新入選的。'],
         ['停利停損', '不設停利停損，到下次換股才調整。'],
@@ -446,7 +446,7 @@
     const stopTxt = P.tp != null && P.sl != null ? `${up}到 ${P.tp * 100}% 停利、${dn}到 ${P.sl * 100}% 停損` : P.sl != null ? `${dn}到 ${P.sl * 100}% 停損，不設停利` : P.tp != null ? `${up}到 ${P.tp * 100}% 停利，不設停損` : '不設停利停損';
     const holdTxt = P.exit === 'close' && P.hold === 1 ? '同一天進出' : `最多 ${P.hold} 個交易日`;
     el.innerHTML = `
-      ${LT.brief({ hero: '<blockquote><p id="evHero"></p></blockquote>', stats: 'evStats', chart: 'evChart', recent: 'evRecent', items: [
+      ${LT.brief({ updated: 'tw_strategy', hero: '<blockquote><p id="evHero"></p></blockquote>', stats: 'evStats', chart: 'evChart', recent: 'evRecent', items: [
         ['邏輯', cfg.idea], ['進出場', `每天收盤後選股，隔天開盤${T0.in}；${exitTxt}`], ['停利停損', stopTxt], ['持有期間', holdTxt]] })}
       <div class="panel">
         <div class="doc">

@@ -683,8 +683,10 @@
   .brief-item span + b{margin-top:8px;}
   @media (max-width:1100px){ .brief-items{grid-template-columns:repeat(2,minmax(0,1fr));} }
   .lt-brief .brief-stats{margin:0 0 14px;}
+  .lt-brief .brief-upd{width:max-content;margin:0 0 8px auto;padding:4px 10px;border-radius:999px;border:1px solid var(--border);background:var(--panel2);color:var(--dim);font-size:12px;font-family:var(--font-num);}
+  .lt-brief .brief-upd[hidden]{display:none;}
   .lt-brief .brief-more{display:none;}
-  @media (max-width:640px){   /* 手機：績效卡片只顯示勝率與報酬率(.stat.key)，其餘按鈕展開；沒有標 key 的卡片組只顯示前 4 張；沒有藏起來的卡片就不顯示按鈕 */
+  @media (max-width:640px){   /* 手機：績效卡片只顯示勝率、報酬率與最大回撤(.stat.key)，其餘按鈕展開；沒有標 key 的卡片組只顯示前 4 張；沒有藏起來的卡片就不顯示按鈕 */
     .lt-brief .brief-stats:has(> .stat.key):not(.open) > .stat:not(.key){display:none;}
     .lt-brief .brief-stats:not(:has(> .stat.key)):not(.open) > .stat:nth-child(n+5){display:none;}
     .lt-brief .brief-stats{margin-bottom:10px;}

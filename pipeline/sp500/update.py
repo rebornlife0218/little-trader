@@ -14,7 +14,7 @@
 持有期間股票下市(沒有股價)就以最後價格轉為現金；交易成本由網頁依換手率另外扣除。
 
 執行方式
-  python pipeline/sp500/update.py          增量：讀回已發佈的結果，只重算最近幾季(GitHub Actions 每週)
+  python pipeline/sp500/update.py          增量：讀回已發佈的結果，只重算最近幾季(GitHub Actions 每個美股交易日收盤後)
   python pipeline/sp500/update.py --full   從 2000 年完整重算(需要本機的 Tiingo 快取或 TIINGO_API_KEY)
   加上 --offline 只用本機快取，不向 Tiingo 下載
 
@@ -287,7 +287,7 @@ def main():
         'note': '每季最後一個交易日收盤換股；nav 為未扣交易成本的每日淨值；q[].turn 為換手率(新舊權重差的絕對值加總)',
     })
     write_meta(NAME, 'S&P500 歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo',
-               'https://github.com/fja05680/sp500', '每週六更新(美股收盤後)',
+               'https://github.com/fja05680/sp500', '週二~六 07:00(美股每個交易日收盤後)',
                files=['backtest.json'], price_sources=src, rf_last=round(float(irx_out.iloc[-1]), 4))
     print('完成', dates[0], '~', dates[-1], len(out_q), '季')
 

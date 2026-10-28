@@ -437,7 +437,7 @@
     const feat = v => [].concat(v).map((x, i) => `<td>${x == null ? '—' : cfg.fmt[i](x)}</td>`).join('');
     const T = B.strat;
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
+      ${LT.brief({ updated: 'tw_research', chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
         ...cfg.items(B), ['停利停損', NO_STOP], ['持有期間', '處置期間(新制約 5 ～ 7 個交易日)。']] })}
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);

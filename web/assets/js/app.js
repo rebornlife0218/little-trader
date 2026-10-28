@@ -289,6 +289,7 @@ const LT = (() => {
      LT.brief({ hero, items: [['邏輯', '…'], ['進出場', '…'], ['停利停損', '…'], ['持有期間', '…']], chart: 'id' }) 回傳 HTML，放在內容最上方
        hero(選填)：先講結論的 HTML(網頁依回測數字產生時)；省略時由報告開頭的 > 先講結論自動放進來(hoistConclusion)
        items：每項一句話，給第一次看的人；值是空的項目不顯示。第一項(邏輯)佔兩格寬，第三項之後(停利停損、持有期間)合併在同一張小卡。
+       updated(選填)：每天自動更新的策略填資料集名稱，右上角顯示 meta.json 的最近更新時間(月/日 時:分)
        stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。recent(選填)：圖下方「近期明細」的容器 id(用 LT.moreTable 填入，說明文字放在 recent + 'Note')。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
      精簡版和下方報告之間用分隔線區隔(只有樣式，不加文字) */
   // 小卡：第一項(邏輯)佔兩格寬；第二項(進出場)一張；其餘(停利停損、持有期間)合併成一張
@@ -299,7 +300,12 @@ const LT = (() => {
       rest.length && `<div class="brief-item">${rest.map(row).join('')}</div>`].filter(Boolean).join('');
   }
   function brief(o) {
+    if (o.updated) dataset(o.updated).then(m => setTimeout(() => document.querySelectorAll(`.brief-upd[data-ds="${o.updated}"]`).forEach(x => {
+      const t = String(m.updated_at || '').match(/^\d{4}-(\d\d)-(\d\d) (\d\d:\d\d)/);
+      if (t) { x.textContent = `最近更新 ${+t[1]}/${+t[2]} ${t[3]}`; x.hidden = false; }
+    }))).catch(() => {});
     return `<section class="lt-brief">
+        ${o.updated ? `<div class="brief-upd" data-ds="${esc(o.updated)}" hidden></div>` : ''}
         <div class="brief-hero doc lt-hero">${o.hero || ''}</div>
         <div class="brief-items">${briefCards(o.items.filter(x => x && x[1]))}</div>
         ${o.stats ? `<div class="statgrid brief-stats" id="${o.stats}"></div><div class="btnrow-l brief-more"><button type="button" aria-expanded="false">顯示更多績效</button></div>` : ''}
@@ -309,7 +315,7 @@ const LT = (() => {
       <hr class="lt-sep" aria-hidden="true">`;
   }
   // 近期明細等長表格：先顯示最新 n 列，按鈕展開全部或收合(rows = 每一列 <tr> 的 HTML，已依新到舊排好)
-  // 精簡版的績效卡片：手機只顯示勝率與報酬率(總報酬、年化報酬，卡片標 .stat.key)，按「顯示更多績效」展開其餘(CSS 的 .brief-stats.open)
+  // 精簡版的績效卡片：手機只顯示勝率、總報酬、年化報酬、最大回撤(卡片標 .stat.key)，按「顯示更多績效」展開其餘(CSS 的 .brief-stats.open)
   document.addEventListener('click', e => {
     const b = e.target.closest('.brief-more button'), g = b && b.parentElement.previousElementSibling;
     if (!g) return;
