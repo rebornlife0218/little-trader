@@ -1,6 +1,7 @@
 /* 股票 · 台股 · 處置股(目錄頁 LT.catalog，網址 stock/disposition/<子主題>)
    · 處置股介紹(intro)：新制(2026/8/10)說明與處置股的股價表現(資料集 disposition，pipeline/disposition/update.py)；統計都由 events.json 即時計算，文字敘述依資料自動調整
-   · 處置股策略(strategy)：處置第一天收盤買進的回測與研究報告(資料集 tw_research 的 disp.json，畫面在 tw-research.js 的 LTTWR.disp) */
+   · 處置股策略(strategy)：處置第一天收盤買進的回測與研究報告(資料集 tw_research 的 disp.json，畫面在 tw-research.js 的 LTTWR.disp)
+   · 處置期間的 K 棒(kbar)：處置前後五個時點收紅 K / 黑 K 的比例，新舊制、有沒有當沖條件分開看(資料集 tw_research 的 disp_kbar.json，畫面在 LTTWR.dispKbar) */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const pct = (v, d = 1) => Number.isFinite(v) ? (v > 0 ? '+' : '') + (v * 100).toFixed(d) + '%' : '—';
@@ -140,6 +141,7 @@
     desc: '成交異常被交易所列為處置的股票：新制說明、處置期間的股價表現與策略回測',
     groups: [{ name: '', items: [
       { key: 'intro', name: '處置股介紹', desc: '什麼是處置股、什麼情況會被處置、2026/8/10 新制改了什麼，以及新制上路後處置期間的股價表現', run: intro },
+      { key: 'kbar', name: '處置期間的 K 棒', desc: '處置前一天、處置第一天、第二天、最後一天、出關後第一天，處置股收紅 K 還是黑 K；新制前後、有沒有當沖條件分開看', run: (el, ctx) => window.LTTWR.dispKbar(el, ctx) },
       { key: 'strategy', name: '處置股策略', desc: '處置第一天收盤買進融資使用率高、投信加碼的處置股，處置結束後一天開盤賣出，和 0050 比較', run: (el, ctx) => window.LTTWR.disp(el, ctx) },
     ] }],
   });

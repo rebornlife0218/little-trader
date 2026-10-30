@@ -12,6 +12,8 @@
   rev_turn   營收由負轉正：營收年增率上月 < 0、本月 > 0 公告後 T1 開盤買進，持有 5、10、20 日；門檻敏感度、四種營收變化的事件研究
   disp       處置股策略：處置第一天收盤買進(處置前一天融資使用率 ≥ 20%，且投信持股比率近 20 日增加)，處置結束後一天開盤賣；只回測新制(2026/8/10)上路後，
              門檻與出場的依據用 2016 年起的全部處置事件；資金：新股票的目標金額 = 總資產 ÷ 持有檔數(不設上限，使用者指定)，現金不夠時由舊持股平均分攤；網頁在 股票 › 處置股 › 處置股策略
+  disp_kbar  處置期間的 K 棒：2016 年起的處置，處置前一天、第一天、第二天、最後一天、出關後第一天收紅 K 還是黑 K(原始開盤、收盤)，
+             新舊制、有沒有當沖條件分開看；不是回測，沒有淨值；網頁在 股票 › 處置股 › 處置期間的 K 棒
 共用定義：
   - 月營收只用月底後 15 天內的公告；年增率用單月合併營收，缺值時用單月營收
   - T0 = 公告日(非交易日則為之前最後一個交易日)，T1 = T0 的下一個交易日
@@ -1051,7 +1053,109 @@ def disp_groups(T, res, evs):
     return out
 
 
-STUDIES = {'rev_pre': rev_pre, 'rev_growth': rev_growth, 'rev_drop': rev_drop, 'rev_turn': rev_turn, 'disp': disp}
+# ---------- 處置期間的 K 棒 ----------
+KB_POINTS = ['處置前一天', '處置第一天', '處置第二天', '處置最後一天', '出關後第一天']
+KB_GROUPS = ['沒有當沖條件', '有當沖條件']
+KB_MIN = {'二': '2', '五': '5', '十': '10', '二十': '20', '二十五': '25', '四十五': '45', '六十': '60'}   # 處置內容的撮合間隔(每 N 分鐘)
+SQL_KBAR = '''
+  SELECT "股票代號", "處置時間起"::date, "處置時間迄"::date, "處置條件", "處置內容" FROM cm.tw_disposition
+  WHERE "股票代號" ~ '^[1-9][0-9]{3}$' AND "股票代號" NOT LIKE '91%' '''
+
+
+def kbar_dt(cond, body):
+    """進處置時有沒有同時達到當沖標準：上市寫在處置條件(「及當日沖銷標準」)，上櫃常只寫在處置內容(「第四條第一項第十三款」)"""
+    cond, body = cond or '', body or ''
+    return '有當沖條件' if '沖銷' in cond or '沖銷' in body or '第十三款' in body else '沒有當沖條件'
+
+
+def disp_kbar(X):
+    """處置期間的 K 棒：處置前一天、第一天、第二天、最後一天、出關後第一天收紅 K 還是黑 K，新舊制、有沒有當沖條件分開看"""
+    with pg_connect() as c:
+        rows = c.execute(SQL_KBAR).fetchall()
+    return disp_kbar_calc(X.D, X.jx, X.RO, X.RC, X.VOL, rows)
+
+
+def disp_kbar_calc(D, jx, O, C, V, rows):
+    """D = 交易日、jx = {代號: 欄}、O/C/V = 原始開盤、收盤、成交量(日期 × 代號)、rows = [(代號, 起, 迄, 處置條件, 處置內容)]
+    同一檔處置期間重疊或相連(中間沒有交易日)合併成一檔，用第一筆的條件；新舊制以這一檔的處置起日區分"""
+    Dv, nd = D.values, len(D)
+    eps = []
+    for code, st, en, cond, body in sorted((r for r in rows if r[0] in jx), key=lambda r: (r[0], r[1])):
+        a = int(np.searchsorted(Dv, np.datetime64(st)))
+        b = int(np.searchsorted(Dv, np.datetime64(en), side='right')) - 1
+        if a > b or a >= nd:
+            continue
+        m = re.search(r'每(\S{1,3})分鐘', body or '')
+        if eps and eps[-1]['code'] == code and a <= eps[-1]['b'] + 1:
+            eps[-1]['b'] = max(eps[-1]['b'], b)
+        else:
+            eps.append({'code': code, 'j': jx[code], 'a': a, 'b': b, 'start': pd.Timestamp(st), 'g': kbar_dt(cond, body),
+                        'min': m and KB_MIN.get(m.group(1), m.group(1))})
+    E_ = pd.DataFrame(eps)
+    E_['rule'] = np.where(E_['start'] >= NEW_RULE, '新制', '舊制')
+    j, a, b = E_['j'].to_numpy(), E_['a'].to_numpy(), E_['b'].to_numpy()
+    PC = np.vstack([np.full((1, C.shape[1]), np.nan), C[:-1]])
+    for k, idx in zip(KB_POINTS, [a - 1, a, np.where(a + 1 <= b, a + 1, -1), b, b + 1]):
+        ok = (idx >= 0) & (idx < nd)
+        i = np.where(ok, idx, 0)
+        o, c, c0 = O[i, j], C[i, j], PC[i, j]
+        ok &= (V[i, j] > 0) & np.isfinite(o) & np.isfinite(c)
+        E_[k + 'K'] = np.where(ok, np.sign(c - o), np.nan)
+        E_[k + 'gap'] = np.where(ok, o / c0 - 1, np.nan)
+        E_[k + 'in'] = np.where(ok, c / o - 1, np.nan)
+        E_[k + 'chg'] = np.where(ok, c / c0 - 1, np.nan)
+
+    def tab(x):
+        out = {}
+        for k in KB_POINTS:
+            s = x[k + 'K'].dropna()
+            out[k] = {'n': len(s), 'red': rnd((s > 0).mean()), 'black': rnd((s < 0).mean()), 'flat': rnd((s == 0).mean()),
+                      'gap': rnd(x[k + 'gap'].median()), 'in': rnd(x[k + 'in'].median()), 'chg': rnd(x[k + 'chg'].median()),
+                      'chgMean': rnd(x[k + 'chg'].mean())}
+        return out
+    T = {(r, '全部'): tab(x) for r, x in E_.groupby('rule')}
+    T.update({(r, g): tab(x) for (r, g), x in E_.groupby(['rule', 'g'])})
+    E_['L'] = b - a + 1
+    info = {(r, g): {'n': len(x), 'days': rnd(x['L'].median(), 1)} for (r, g), x in E_.groupby(['rule', 'g'])}
+    info.update({(r, '全部'): {'n': len(x), 'days': rnd(x['L'].median(), 1), 'from': x['start'].min().strftime('%Y-%m-%d'),
+                              'to': x['start'].max().strftime('%Y-%m-%d')} for r, x in E_.groupby('rule')})
+
+    # 報告：時點當列，每組兩欄(紅 K / 黑 K、當天漲跌中位數)，檔數寫在欄名(用處置第一天有成交的檔數)
+    def wide(keys, names):
+        head = ['時點'] + [h for k, nm in zip(keys, names) for h in (f'{nm}({intc(T[k]["處置第一天"]["n"])} 檔)紅 K / 黑 K', '漲跌中位數')]
+        L = ['| ' + ' | '.join(head) + ' |', '|---|' + '---:|' * (len(head) - 1)]
+        for p in KB_POINTS:
+            L.append(f'| {p} | ' + ' | '.join(f'{pc(T[k][p]["red"], 0, False)} / {pc(T[k][p]["black"], 0, False)} | {pc(T[k][p]["chg"])}' for k in keys) + ' |')
+        return '\n'.join(L)
+    mins = E_.groupby('rule')['min'].value_counts().unstack(0).fillna(0).astype(int)
+    mins = mins.loc[sorted(mins.index, key=lambda s: int(s) if s.isdigit() else 999)]
+    top = lambda r: mins[r].idxmax()  # noqa: E731
+    F = {'start': D[0].strftime('%Y/%m/%d'), 'end': D[-1].strftime('%Y/%m/%d'), 'new_rule': NEW_RULE.strftime('%Y/%m/%d')}
+    for r, s in (('舊制', 'o'), ('新制', 'n')):
+        F[f'{s}_n'], F[f'{s}_days'] = intc(info[(r, '全部')]['n']), f"{info[(r, '全部')]['days']:.0f}"
+        F[f'{s}_min'] = top(r)
+        for g, t in (('全部', ''), ('沒有當沖條件', '0'), ('有當沖條件', '1')):
+            F[f'{s}{t}_cnt'], F[f'{s}{t}_len'] = intc(info[(r, g)]['n']) if (r, g) in info else '0', f"{info[(r, g)]['days']:.0f}" if (r, g) in info else '–'
+            for p, q in zip(KB_POINTS, ('p0', 'p1', 'p2', 'p3', 'p4')):
+                x = T.get((r, g), {}).get(p)
+                if x:
+                    F[f'{s}{t}_{q}_red'], F[f'{s}{t}_{q}_black'] = pc(x['red'], 0, False), pc(x['black'], 0, False)
+                    F[f'{s}{t}_{q}_chg'], F[f'{s}{t}_{q}_n'] = pc(x['chg']), intc(x['n'])
+    F['tbl_rule'] = wide([('舊制', '全部'), ('新制', '全部')], ['舊制', '新制'])
+    F['tbl_old'] = wide([('舊制', g) for g in KB_GROUPS], KB_GROUPS)
+    F['tbl_new'] = wide([('新制', g) for g in KB_GROUPS], KB_GROUPS)
+    F['tbl_dt'] = '\n'.join(['| 制度 | 分組 | 檔數 | 處置期間(交易日，中位數) |', '|---|---|---:|---:|'] +
+                            [f'| {r} | {g} | {intc(info[(r, g)]["n"])} | {info[(r, g)]["days"]:.0f} |' for r in ('舊制', '新制') for g in KB_GROUPS if (r, g) in info])
+    F['tbl_min'] = '\n'.join(['| 撮合間隔(分鐘) | 舊制 | 新制 |', '|---:|---:|---:|'] +
+                             [f'| {i} | {intc(v["舊制"])} | {intc(v["新制"])} |' for i, v in mins.iterrows()])
+    out = {'asof': D[-1].strftime('%Y-%m-%d'), 'newRule': NEW_RULE.strftime('%Y-%m-%d'), 'points': KB_POINTS, 'groups': KB_GROUPS,
+           'info': [{'rule': r, 'g': g, **v} for (r, g), v in info.items()],
+           'rows': [{'rule': r, 'g': g, 'p': p, **v} for (r, g), t in T.items() for p, v in t.items()],
+           'report': report('disp_kbar', F)}
+    return out, F
+
+
+STUDIES = {'rev_pre': rev_pre, 'rev_growth': rev_growth, 'rev_drop': rev_drop, 'rev_turn': rev_turn, 'disp': disp, 'disp_kbar': disp_kbar}
 
 
 def main(keys=None, data=None, write=True):

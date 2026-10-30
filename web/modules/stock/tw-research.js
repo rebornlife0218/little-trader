@@ -468,5 +468,42 @@
     drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: cfg.name, nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
     draw();
   }
-  window.LTTWR = { disp };
+  /* ---------- 處置期間的 K 棒(disp_kbar.json)：五個時點收紅 K / 黑 K 的比例，新舊制、有沒有當沖條件分開看；不是回測，沒有淨值 ---------- */
+  async function dispKbar(el, ctx) {
+    const S = { name: '處置期間的 K 棒', series: 'disp' };
+    const B = await load(el, ctx, 'disp_kbar');
+    if (!B) return;
+    const P = B.points, row = (rule, g, p) => B.rows.find(r => r.rule === rule && r.g === g && r.p === p) || {};
+    const cnt = (rule, g = '全部') => (B.info.find(x => x.rule === rule && x.g === g) || {}).n || 0;
+    const pc0 = v => Number.isFinite(v) ? (v * 100).toFixed(0) + '%' : '—';
+    // 數列：{ name, rule, g, color }
+    const RULES = [{ name: '舊制', rule: '舊制', g: '全部', color: CEW }, { name: '新制', rule: '新制', g: '全部', color: SERIES.disp.color }];
+    const DT = [{ name: '舊制 · 沒有當沖條件', rule: '舊制', g: '沒有當沖條件', color: CEW }, { name: '舊制 · 有當沖條件', rule: '舊制', g: '有當沖條件', color: '#5b6b82' },
+      { name: '新制 · 沒有當沖條件', rule: '新制', g: '沒有當沖條件', color: SERIES.disp.color }, { name: '新制 · 有當沖條件', rule: '新制', g: '有當沖條件', color: '#F06FB0' }];
+    // 長條圖：五個時點 × 各數列；圖例放在 leg(省略時接在圖的下方)
+    const bars = (div, ss, k, leg) => {
+      const black = k === 'black';
+      LTChart.bars(div, { x: P, xAll: true, xFmt: v => v, label: black ? '收黑 K 的比例' : '當天漲跌中位數', height: 240,
+        ...(black ? { yMin: 0, yMax: 1, refY: [{ y: 0.5, color: 'var(--dim)' }] } : { refY: [{ y: 0 }] }),
+        yFmt: v => (v * 100).toFixed(black ? 0 : 1) + '%',
+        tipFmt: (s, v, i) => { const x = ss.find(t => t.name === s.name); return `${s.name}：${black ? '黑 K ' + pc0(v) : W().pct(v, 2)}(${row(x.rule, x.g, P[i]).n || 0} 檔)`; },
+        series: ss.map(s => ({ name: s.name, color: s.color, y: P.map(p => row(s.rule, s.g, p)[k]) })) });
+      if (leg) leg.innerHTML = LTChart.legend(ss); else div.insertAdjacentHTML('afterend', LTChart.legend(ss));
+    };
+    el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['怎麼比較', '把 2016 年起的每次處置，在處置前一天、處置第一天、第二天、最後一天、出關後第一天收紅 K 還是黑 K 統計出來，2026/8/10 上路的新制和舊制分開看。'],
+        ['分組', '進處置時有沒有同時達到當沖標準(有的話處置期間比較長)。'],
+        ['資料', `上市櫃普通股，含已下市櫃；舊制 ${cnt('舊制').toLocaleString()} 檔、新制 ${cnt('新制').toLocaleString()} 檔。`],
+        ['期間', `2016 年 ～ ${B.asof.replace(/-/g, '/')}。`]] })}
+      ${reportPanel(S, B.report)}`;
+    const $ = s => el.querySelector(s);
+    const card = (rule, p, k) => { const r = row(rule, '全部', p);
+      return W().card(pc0(r[k]), `${rule}${p}收${k === 'red' ? '紅' : '黑'} K`, `當天漲跌中位數 ${W().pct(r.chg, 1)}`, '', true); };
+    $('#twrBriefStats').innerHTML = card('舊制', '處置第一天', 'black') + card('新制', '處置第一天', 'red') + card('舊制', '出關後第一天', 'black') + card('新制', '出關後第一天', 'black');
+    bars($('#twrBrief'), RULES, 'black', $('#twrBriefLegend'));
+    drawFigs(el, { 'kbar_rule.png': div => bars(div, RULES, 'black'), 'chg_rule.png': div => bars(div, RULES, 'chg'),
+      'kbar_dt.png': div => bars(div, DT, 'black'), 'chg_dt.png': div => bars(div, DT, 'chg') });
+  }
+  window.LTTWR = { disp, dispKbar };
 })();
