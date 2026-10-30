@@ -16,6 +16,6 @@
     "modules/stock/earnings.js",
     "modules/stock/us-strategy.js"
   ],
-  "memberDatasets": ["etf_upcoming", "etf_compare", "etf_research", "earnings", "sp500", "disposition", "tw_strategy", "tw_research"],
+  "memberDatasets": ["etf_upcoming", "etf_compare", "etf_research", "earnings", "sp500", "disposition", "tw_strategy", "tw_research", "tw_gap"],
   "adminScripts": ["modules/admin/admin.js"]
 }

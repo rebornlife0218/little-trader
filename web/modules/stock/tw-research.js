@@ -1,4 +1,5 @@
-/* 股票 · 台股 · 其他研究：依主題(營收、因子、事件、機器學習)分類的研究(資料集 tw_research，pipeline/tw_research/update.py)
+/* 股票 · 台股 · 其他研究：依主題(營收、跳空、因子、事件、機器學習)分類的研究(資料集 tw_research，pipeline/tw_research/update.py；
+   跳空與隔夜報酬用資料集 tw_gap，pipeline/tw_gap/update.py)
    目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究；同一系列的研究標同一個顏色。
    淨值與交易統計已在 pipeline 用本機資料庫算好(整數股、交易成本與資金規則同台股策略，根目錄 CLAUDE.md)，網頁端只計算績效統計、畫圖與顯示報告(Markdown)。
    績效統計與圖表共用 tw-strategy.js 的 LTTW。新增研究：pipeline 加一個 <key>.json，這裡的 CATS 加一筆(run = 畫面函式)
@@ -8,13 +9,16 @@
   const W = () => window.LTTW;
   const DATASET = 'tw_research';
   // 系列：同一系列的研究用同一個顏色標記
-  const SERIES = { rev: { name: '營收系列', color: 'var(--amber)' }, disp: { name: '處置股', color: '#B07CF0' } };
+  const SERIES = { rev: { name: '營收系列', color: 'var(--amber)' }, disp: { name: '處置股', color: '#B07CF0' }, gap: { name: '跳空', color: '#5fd0c5' } };
   const CATS = [
     { key: 'revenue', name: '營收', desc: '月營收公告前後的股價行為與選股', studies: [
       { key: 'rev_pre', name: '營收公告前布局', series: 'rev', desc: '月底先買進預期營收會好的股票，營收公告後隔天開盤賣出', summary: '營收可以事先預測，但不限市值時輸給 0050；只在市值第二小的一群裡選股，才和 0050 相當', run: (...a) => revPre(...a) },
       { key: 'rev_growth', name: '營收成長特徵', series: 'rev', desc: '營收年增率 > 10% 公告後，哪些特徵最能區分後續報酬', summary: '好營收公告後隔天才買，平均是虧的；剛轉強的公司比一直很強的好', run: (...a) => revGrowth(...a) },
       { key: 'rev_drop', name: '營收衰退開低', series: 'rev', desc: '營收衰退公告後隔天開低 5% 以上，開盤買進', summary: '開低買進只在冷門股有效，實際很難買到量，遠輸 0050', run: (...a) => revDrop(...a) },
       { key: 'rev_turn', name: '營收由負轉正', series: 'rev', desc: '營收年增率由負轉正公告後做多，和持續成長、持續衰退比較', summary: '市場對轉正的反應最大，但隔天開盤才買已經太晚，持有 20 日仍輸 0050', run: (...a) => revTurn(...a) },
+    ] },
+    { key: 'gap', name: '跳空', desc: '開盤跳空之後的股價表現', studies: [
+      { key: 'gap', name: '跳空與隔夜報酬', series: 'gap', desc: '開盤跳空幾倍標準差，和當天收盤買、隔天開盤賣的隔夜報酬有沒有關係', summary: '跳空越大當天越會回吐，但隔夜報酬和沒跳空的日子差不多；差別主要來自收盤有沒有鎖漲跌停', run: (...a) => gap(...a) },
     ] },
     { key: 'factor', name: '因子', desc: '橫斷面因子選股', studies: [] },
     { key: 'event', name: '事件', desc: '特定事件前後的股價表現', studies: [] },
@@ -32,10 +36,10 @@
   });
 
   /* ---------- 共用 ---------- */
-  async function load(el, ctx, key) {
+  async function load(el, ctx, key, ds = DATASET) {
     el.innerHTML = `<div class="panel"><div class="page-loading"><span class="spinner"></span>載入中…</div></div>`;
     try {
-      const { data } = await LT.loadJSON(DATASET, key + '.json');
+      const { data } = await LT.loadJSON(ds, key + '.json');
       return ctx.alive() ? data : null;
     } catch (e) {
       if (ctx.alive()) el.innerHTML = `<div class="panel"><p class="mute">研究資料尚未產生：${esc(e.message)}</p></div>`;
@@ -510,6 +514,53 @@
     bars($('#twrBrief'), RULES, 'black', $('#twrBriefLegend'));
     bars($('#twrBriefChg'), RULES, 'chg');
     drawFigs(el, { 'kbar_dt.png': div => bars(div, DT, 'black'), 'chg_dt.png': div => bars(div, DT, 'chg') });
+  }
+  /* ---------- 跳空與隔夜報酬(資料集 tw_gap 的 gap.json)：依跳空倍數(跳空 ÷ 20 日日報酬標準差)分組的統計；不是回測，沒有淨值 ---------- */
+  async function gap(el, ctx, S) {
+    const B = await load(el, ctx, 'gap', 'tw_gap');
+    if (!B) return;
+    const C = SERIES.gap.color, CP = '#F06FB0';
+    const ks = [...B.down, ...B.up];   // 回補與成交量的圖沒有「沒跳空」那一組：左半往下跳、右半往上跳
+    const pc = v => Number.isFinite(v) ? W().pct(v, 2) : '—', rate = v => Number.isFinite(v) ? (v * 100).toFixed(0) + '%' : '—';
+    // 分組長條：ss = [{ name, y, n, color }](n = 各組筆數，滑鼠提示用，可省略)；o.rate = 比例(0～100%)
+    const bars = (div, x, ss, o = {}) => {
+      LTChart.bars(div, { x, xAll: true, xFmt: v => v, height: 240, label: o.label, title: o.title,
+        ...(o.rate ? { yMin: 0, yMax: 1, yFmt: v => (v * 100).toFixed(0) + '%' } : { refY: [{ y: 0 }], yFmt: v => +(v * 100).toFixed(2) + '%' }),
+        tipFmt: (s, v, i) => { const t = ss.find(z => z.name === s.name); return `${s.name}：${o.rate ? rate(v) : pc(v)}${t.n ? `(${t.n[i].toLocaleString()} 筆)` : ''}`; },
+        series: ss.map(s => ({ name: s.name, color: s.color, y: s.y })) });
+      if (o.legend !== false) div.insertAdjacentHTML('afterend', LTChart.legend(ss));
+    };
+    const ov = [{ name: '全部', y: B.all.ov, n: B.all.n, color: C }, { name: '排除收漲跌停', y: B.nl.ov, n: B.nl.n, color: CEW }];
+    // 回到前一天 K 棒的比例：當天、到隔天收盤前兩張
+    const fillFig = F => div => {
+      div.innerHTML = '<div></div><div style="margin-top:14px;"></div>';
+      const ss = j => [{ name: '回到實體 K 棒內', y: F['body' + j], n: F.n, color: C }, { name: '回到 K 棒最低(往上跳)／最高(往下跳)', y: F['far' + j], n: F.n, color: CEW }];
+      bars(div.children[0], ks, ss(0), { rate: true, title: '當天', legend: false });
+      bars(div.children[1], ks, ss(1), { rate: true, title: '到隔天收盤前' });
+    };
+    const VOLS = ['量縮', '中等', '爆量'], VC = { 量縮: C, 中等: CEW, 爆量: CP };
+    const F = B.fillOv;
+    el.innerHTML = `
+      ${LT.brief({ chart: 'twrBrief', items: [
+        ['怎麼比較', '把每檔股票每天的開盤跳空，除以它過去 20 天的波動(標準差)分組，看跳空當天收盤買、隔天開盤賣的隔夜報酬，和沒跳空的日子比較。'],
+        ['分組', '跳空當天有沒有收在漲跌停、開在前一天 K 棒外還是 K 棒內、跳空當天的成交量。'],
+        ['資料', `上市櫃普通股，含已下市櫃；20 日均量超過 500 張，排除處置股、連續漲跌停與大盤極端的日子，共 ${B.n.toLocaleString()} 個股票日。`],
+        ['期間', `${B.start.replace(/-/g, '/')} ～ ${B.asof.replace(/-/g, '/')}。`]] })}
+      ${reportPanel(S, B.report)}`;
+    const $ = s => el.querySelector(s);
+    bars($('#twrBrief'), B.bins, ov, { label: '隔夜平均報酬', legend: false });
+    $('#twrBriefLegend').innerHTML = LTChart.legend(ov);
+    $('#twrBriefLegend').insertAdjacentHTML('afterend', '<p class="note">隔夜 = 隔天開盤 ÷ 跳空當天收盤 − 1(還原價、未扣成本)。橫軸是跳空倍數 = 跳空 ÷ 20 日日報酬標準差，負的是往下跳，-0.1～0.1 是沒跳空。</p>');
+    drawFigs(el, {
+      'ov.png': div => bars(div, B.bins, ov, { label: '隔夜平均報酬' }),
+      'intra.png': div => bars(div, B.bins, [{ ...ov[0], y: B.all.intra }, { ...ov[1], y: B.nl.intra }], { label: '當天盤中平均報酬' }),
+      'fill_out.png': fillFig(B.fill.out),
+      'fill_in.png': fillFig(B.fill.in),
+      'fill_ov.png': div => bars(div, ks, [{ name: '當天有回到 K 棒內', y: F.back, n: F.nBack, color: C }, { name: '當天沒回到', y: F.stay, n: F.nStay, color: CP },
+        { name: '當天沒回到，排除收漲跌停', y: F.stayNl, n: F.nStayNl, color: CEW }], { label: '隔夜平均報酬' }),
+      'vol_ov.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].ov, color: VC[q] })), { label: '隔夜平均報酬(排除收漲跌停)' }),
+      'vol_fill.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].fill0, color: VC[q] })), { rate: true, label: '當天回到實體 K 棒內的比例' }),
+    });
   }
   window.LTTWR = { disp, dispKbar };
 })();
