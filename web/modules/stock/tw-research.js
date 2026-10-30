@@ -490,20 +490,26 @@
         series: ss.map(s => ({ name: s.name, color: s.color, y: P.map(p => row(s.rule, s.g, p)[k]) })) });
       if (leg) leg.innerHTML = LTChart.legend(ss); else div.insertAdjacentHTML('afterend', LTChart.legend(ss));
     };
+    // 研究(不是策略)：精簡版不放績效卡片，改放新制前後(不分組)的圖與表
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+      ${LT.brief({ chart: 'twrBrief', items: [
         ['怎麼比較', '把 2016 年起的每次處置，在處置前一天、處置第一天、第二天、最後一天、出關後第一天收紅 K 還是黑 K 統計出來，2026/8/10 上路的新制和舊制分開看。'],
         ['分組', '進處置時有沒有同時達到當沖標準(有的話處置期間比較長)。'],
         ['資料', `上市櫃普通股，含已下市櫃；舊制 ${cnt('舊制').toLocaleString()} 檔、新制 ${cnt('新制').toLocaleString()} 檔。`],
         ['期間', `2016 年 ～ ${B.asof.replace(/-/g, '/')}。`]] })}
       ${reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
-    const card = (rule, p, k) => { const r = row(rule, '全部', p);
-      return W().card(pc0(r[k]), `${rule}${p}收${k === 'red' ? '紅' : '黑'} K`, `當天漲跌中位數 ${W().pct(r.chg, 1)}`, '', true); };
-    $('#twrBriefStats').innerHTML = card('舊制', '處置第一天', 'black') + card('新制', '處置第一天', 'red') + card('舊制', '出關後第一天', 'black') + card('新制', '出關後第一天', 'black');
+    // 新制前後：時點當列，舊制、新制各兩欄(紅 K / 黑 K、當天漲跌中位數)，檔數用處置第一天有成交的檔數
+    $('#twrBriefLegend').insertAdjacentHTML('afterend', `
+      <div id="twrBriefChg" style="margin-top:14px;"></div>
+      <div class="tablewrap" style="margin-top:14px;"><table class="stattable"><thead><tr><th>時點</th>${RULES.map(s =>
+        `<th>${s.name}(${row(s.rule, s.g, '處置第一天').n.toLocaleString()} 檔)紅 K / 黑 K</th><th>漲跌中位數</th>`).join('')}</tr></thead><tbody>
+        ${P.map(p => `<tr><td>${p}</td>${RULES.map(s => { const r = row(s.rule, s.g, p);
+          return `<td>${pc0(r.red)} / ${pc0(r.black)}</td><td class="${W().cls(r.chg)}">${W().pct(r.chg, 1)}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>
+      <p class="note">紅 K：收盤 &gt; 開盤；黑 K：收盤 &lt; 開盤；其餘是平盤。漲跌中位數 = 當天收盤 ÷ 前一天收盤 − 1 的中位數。</p>`);
     bars($('#twrBrief'), RULES, 'black', $('#twrBriefLegend'));
-    drawFigs(el, { 'kbar_rule.png': div => bars(div, RULES, 'black'), 'chg_rule.png': div => bars(div, RULES, 'chg'),
-      'kbar_dt.png': div => bars(div, DT, 'black'), 'chg_dt.png': div => bars(div, DT, 'chg') });
+    bars($('#twrBriefChg'), RULES, 'chg');
+    drawFigs(el, { 'kbar_dt.png': div => bars(div, DT, 'black'), 'chg_dt.png': div => bars(div, DT, 'chg') });
   }
   window.LTTWR = { disp, dispKbar };
 })();
