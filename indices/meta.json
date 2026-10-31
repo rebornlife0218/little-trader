@@ -1,0 +1,101 @@
+{
+  "dataset": "indices",
+  "updated_at": "2026-10-30 22:28",
+  "version": "202610302228",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "Yahoo Finance、臺灣證券交易所(台灣加權)",
+    "url": "https://finance.yahoo.com/"
+  },
+  "schedule": "每個工作日 05:30、15:30",
+  "indices": {
+    "SP500": {
+      "rows": 9023,
+      "first": "1991-01-02",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "NASDAQ": {
+      "rows": 9023,
+      "first": "1991-01-02",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "NK225": {
+      "rows": 8790,
+      "first": "1991-01-04",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "KOSPI50": {
+      "rows": 7355,
+      "first": "1996-12-11",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "HSI": {
+      "rows": 8841,
+      "first": "1991-01-02",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "SSEC": {
+      "rows": 7104,
+      "first": "1997-07-02",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "STI": {
+      "rows": 8962,
+      "first": "1991-01-02",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "STOXX50": {
+      "rows": 4911,
+      "first": "2007-03-30",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "FTSE100": {
+      "rows": 9051,
+      "first": "1991-01-02",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "Yahoo Finance",
+      "volume": "成交量"
+    },
+    "TAIEX": {
+      "rows": 6892,
+      "first": "1999-01-05",
+      "last": "2026-10-30",
+      "has_volume": true,
+      "source": "臺灣證券交易所",
+      "volume": "成交金額(元)"
+    }
+  },
+  "extra": {
+    "TAIEX_TR": {
+      "rows": 5863,
+      "first": "2003-01-02",
+      "last": "2026-10-30",
+      "source": "臺灣證券交易所 發行量加權股價報酬指數"
+    }
+  }
+}

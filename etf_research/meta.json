@@ -1,0 +1,12 @@
+{
+  "dataset": "etf_research",
+  "updated_at": "2026-10-26 23:12",
+  "version": "202610262312",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "ETF持股明細、ETF折溢價、台股日資料(本機計算)",
+    "url": ""
+  },
+  "schedule": "不定期(研究更新時手動執行)",
+  "asof": "2026-10-21"
+}
