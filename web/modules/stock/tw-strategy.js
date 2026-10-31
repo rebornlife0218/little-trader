@@ -103,10 +103,10 @@
   // 策略清單(依做多 / 做空分組)：新增策略時在 strats 加一筆(run = 畫面函式)，尚未完成的設 soon: true(卡片顯示「努力建置中」)
   const SIDES = [
     { key: 'long', name: '做多', desc: '買進股票，賺上漲的錢', strats: [
-      { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去半年波動最小的股票，持有一個月', summary: '波動和回撤都比 0050 低，但報酬遠遠落後 0050', run: (...a) => lowvol(...a),
+      { key: 'lowvol', name: '低波動選股', desc: '每月挑選過去一段時間波動最小的股票，持有到下次換股', summary: '波動和回撤都比 0050 低，但報酬遠遠落後 0050', run: (...a) => lowvol(...a),
         topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
-      { key: 'rev20', name: '月營收年增率長期以來第一次破20%', desc: '營收年增率一年來第一次超過 20%，買進分點少、前五大分點集中買超時，隔天開盤買進，停損 15%、最多持有 15 天', summary: '營收剛轉強、少數分點集中買進的公司短線做多，總報酬贏過 0050，但交易少、持股集中', run: eventStrat('rev20') },
-      { key: 'boss', name: '老闆回頭發動了', desc: '外資連賣兩天後轉買、賣出的券商分點比買進的多，融資與融券同時增加時，隔天開盤買進，停利 30%、停損 15%、最多持有 10 天', summary: '外資回頭、籌碼集中的股票短線做多，總報酬贏過 0050，但回測從 2020 年才開始', run: eventStrat('boss') },
+      { key: 'rev20', name: '月營收年增率長期以來第一次破20%', desc: '營收年增率長期以來第一次大幅成長，買進分點少、少數分點集中買超時，隔天開盤買進，設有停損、短線持有', summary: '營收剛轉強、少數分點集中買進的公司短線做多，總報酬贏過 0050，但交易少、持股集中', run: eventStrat('rev20') },
+      { key: 'boss', name: '老闆回頭發動了', desc: '外資連賣後轉買、賣出的券商分點比買進的多，融資與融券同時增加時，隔天開盤買進，設有停利停損、短線持有', summary: '外資回頭、籌碼集中的股票短線做多，總報酬贏過 0050，但回測從 2020 年才開始', run: eventStrat('boss') },
       { key: 'margin', name: '融資都沒退，算我輸嗎', desc: '不公開，輸入密碼後查看', summary: '不公開，輸入密碼後查看', run: eventStrat('margin') },
     ] },
     { key: 'short', name: '做空', desc: '放空股票，賺下跌的錢', strats: [
@@ -322,7 +322,7 @@
     // 先講結論與結論：依回測數字產生(資料更新時自動跟著變)
     function conclude(C) {
       const S = C.st.b0050, lv = C.st.lv10p, t10 = C.st.lv10, E = C.st.ew;
-      $('#twHero').innerHTML = `<b>先講結論</b>：每月買過去半年波動最小的股票，${lv.vol < S.vol ? '波動確實比 0050 低' : '波動沒有比 0050 低'}(年化 ${(lv.vol * 100).toFixed(1)}% vs ${(S.vol * 100).toFixed(1)}%)，`
+      $('#twHero').innerHTML = `<b>先講結論</b>：每月買過去一段時間波動最小的股票，${lv.vol < S.vol ? '波動確實比 0050 低' : '波動沒有比 0050 低'}(年化 ${(lv.vol * 100).toFixed(1)}% vs ${(S.vol * 100).toFixed(1)}%)，`
         + `但總報酬 ${totalRet(lv)}，${lv.mult > S.mult ? '贏過' : '落後'} 0050 的 ${totalRet(S)}(低波動 10%，${periodTxt(C)})。`;
       if (!full) return;
       $('#twConcl').innerHTML = `
@@ -341,10 +341,12 @@
     {   // 精簡版的績效卡片(低波動 10%)與累積報酬圖：兩種低波動組合 vs 0050
       const C0 = calc(), K = [...STRATS.map(s => s.key), 'b0050'];
       $('#twBriefStats').innerHTML = vs0050Cards(C0.st.lv10p, C0.st.b0050, C0.ts.lv10p) + tradeCards(C0.ts.lv10p);
+      if (full) {   // 近期明細要登入(訪客的精簡版沒有持股)
       const pk = B.picks, P = pk.lv10p;   // 近期明細：低波動 10% 最新一次選股的持股(波動由小到大)；還沒進場時下個交易日開盤換股，全部框起來
       $('#twRecentNote').textContent = `低波動 10% 的${pk.entered ? '本月持股' : '下個月持股'}：${pk.signal} 收盤選股，共 ${P.length} 檔，波動由小到大排列。${pk.entered ? '' : '框起來的是下個交易日開盤要換進的持股。'}`;
       LT.moreTable($('#twRecent'), ['代號', '名稱', '產業', '年化波動', '每日成交金額(中位數)'],
         P.map(([c, n, i, v, m]) => `<tr${pk.entered ? '' : ' class="next-act"'}><td>${LT.stockLink(c)}</td><td>${esc(n)}${pk.entered ? '' : '<span class="next-tag">下個交易日換股</span>'}</td><td style="text-align:left">${esc(i)}</td><td>${(v * 100).toFixed(1)}%</td><td>${m >= 1 ? m.toFixed(1) + ' 億' : (m * 100).toFixed(0) + ' 百萬'}</td></tr>`));
+      }
       navCharts({ d: B.d, i0: 0, navs: Object.fromEntries(K.map(k => [k, C0.navs[k]])), meta: Object.fromEntries(K.map(k => [k, { name: meta(k).name, color: meta(k).color }])),
         main: 'lv10p', chart: $('#twBrief'), legend: $('#twBriefLegend') });
     }
@@ -411,7 +413,7 @@
     el.innerHTML = `
       <div class="panel">
         <h3>需要密碼</h3>
-        <p>這個策略不公開，請輸入密碼。</p>
+        <p>這個策略不公開，請輸入 6 位數密碼。</p>
         <form class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end;">
           <div class="paramitem"><label for="evPw">密碼</label><input id="evPw" type="password" inputmode="numeric" autocomplete="off"></div>
           <div class="paramitem"><button type="submit">解鎖</button></div>
@@ -529,6 +531,8 @@
         <li><b>每筆交易</b>：${ts.n.toLocaleString()} 筆，勝率 ${(ts.win * 100).toFixed(0)}%，每筆平均 ${pct(ts.mean, 2)}、中位數 ${pct(ts.median, 2)}(扣成本${long ? '' : '與借券費'})。</li>
         <li><b>資金使用</b>：${(held * 100).toFixed(0)}% 的交易日有部位，有部位時平均 ${avgPos.toFixed(1)} 檔。</li>`;
       $('#evStats').innerHTML = vs0050Cards(x, S, ts) + tradeCards(ts);
+      navCharts({ d: B.d, i0, navs, meta, main: 's', chart: $('#evChart'), legend: $('#evChartLegend') });
+      if (!full) return;   // 訪客：只有上半部(近期明細也要登入)
       $('#evRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計，已扣進場成本${long ? '' : '與借券費'}。`;
       // 下個交易日要進出場的框起來、排在最前面：進場 = 最新一個交易日收盤的選股；出場 = 持有中、下個交易日持有期滿(含漲跌停延後中的)
       const due = P.exit === 'open' ? P.hold : P.hold - 1, tag = t => `<span class="next-tag">${t}</span>`;
@@ -539,8 +543,6 @@
         ...entries.map(p => `<tr class="next-act"><td>${LT.stockLink(p[0])}</td><td>${esc(p[1])}${tag('下個交易日' + T0.in)}</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td></tr>`),
         ...exiting.map(t => tradeRow(t).replace('<tr>', '<tr class="next-act">').replace(`<td>${esc(t.n)}</td>`, `<td>${esc(t.n)}${tag('下個交易日' + T0.out)}</td>`)),
         ...T.filter(t => !exiting.includes(t)).sort((a, b) => b.e.localeCompare(a.e) || a.c.localeCompare(b.c)).map(tradeRow)]);
-      navCharts({ d: B.d, i0, navs, meta, main: 's', chart: $('#evChart'), legend: $('#evChartLegend') });
-      if (!full) return;   // 訪客：只有上半部
       $('#evView').innerHTML = `
         <div class="panel">
           <h3>回測績效</h3>
@@ -583,5 +585,5 @@
   }; }
 
   // 共用給其他台股頁面(tw-research.js)：績效統計與圖表的算法和這頁一致
-  window.LTTW = { stats, card, winCard, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
+  window.LTTW = { unlock, stats, card, winCard, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
 })();

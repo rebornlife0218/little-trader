@@ -99,6 +99,7 @@ test('分享連結：只有會員能產生，不公開的策略不能分享；�
   assert.equal((await post({ kind: 'guest', gid: 'g', quotaKey: 'g' }, 'etf/research/arkk')).status, 401);
   const member = { kind: 'member', uid: 'u1', email: null, quotaKey: 'u1' };
   assert.equal((await post(member, 'stock/tw-strategy/margin')).status, 400);
+  assert.equal((await post(member, 'stock/disposition/strategy')).status, 400, '上鎖的處置股策略不能分享');
   assert.equal((await post(member, '../../etc')).status, 400);
   const open = async code => F.shareOpen({ params: { code }, env, request: new Request(SITE + '/s/' + code), waitUntil: () => {} });
   let r = await open('bad');

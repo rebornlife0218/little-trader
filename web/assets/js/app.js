@@ -293,7 +293,8 @@ const LT = (() => {
        hero(選填)：先講結論的 HTML(網頁依回測數字產生時)；省略時由報告開頭的 > 先講結論自動放進來(hoistConclusion)
        items：每項一句話，給第一次看的人；值是空的項目不顯示。第一項(邏輯)佔兩格寬，第三項之後(停利停損、持有期間)合併在同一張小卡。
        updated(選填)：每天自動更新的策略填資料集名稱，右上角顯示 meta.json 的最近更新時間(月/日 時:分)
-       stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。recent(選填)：圖下方「近期明細」的容器 id(用 LT.moreTable 填入，說明文字放在 recent + 'Note')。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
+       stats(選填)：績效卡片的容器 id(勝率、報酬…，放在圖的上方，由頁面填入)。recent(選填)：圖下方「近期明細」的容器 id(用 LT.moreTable 填入，說明文字放在 recent + 'Note')；
+         近期明細要登入，訪客看到登入提示(沒有這兩個容器，頁面要在 full 時才填)。chart：圖的容器 id(圖例的容器 id = chart + 'Legend')，由頁面自己畫
      精簡版和下方報告之間用分隔線區隔(只有樣式，不加文字) */
   // 小卡：第一項(邏輯)佔兩格寬；第二項(進出場)一張；其餘(停利停損、持有期間)合併成一張
   function briefCards(items) {
@@ -313,7 +314,8 @@ const LT = (() => {
         <div class="brief-items">${briefCards(o.items.filter(x => x && x[1]))}</div>
         ${o.stats ? `<div class="statgrid brief-stats" id="${o.stats}"></div><div class="btnrow-l brief-more"><button type="button" aria-expanded="false">顯示更多績效</button></div>` : ''}
         ${o.chart ? `<div class="brief-chart"><div id="${o.chart}"></div><div id="${o.chart}Legend"></div></div>` : ''}
-        ${o.recent ? `<div class="brief-recent"><h4>近期明細</h4><p class="note" id="${o.recent}Note"></p><div id="${o.recent}"></div></div>` : ''}
+        ${!o.recent ? '' : isMember() ? `<div class="brief-recent"><h4>近期明細</h4><p class="note" id="${o.recent}Note"></p><div id="${o.recent}"></div></div>`
+          : `<div class="brief-recent recent-lock"><h4>近期明細</h4><p class="mute">最近的交易，以及下個交易日要進出場的股票，登入 Google 後就能看。</p>${loginButton()}</div>`}
       </section>
       <hr class="lt-sep" aria-hidden="true">`;
   }

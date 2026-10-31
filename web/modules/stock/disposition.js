@@ -142,7 +142,7 @@
     groups: [{ name: '', items: [
       { key: 'intro', name: '處置股介紹', desc: '什麼是處置股、什麼情況會被處置、2026/8/10 新制改了什麼，以及新制上路後處置期間的股價表現', run: intro },
       { key: 'kbar', name: '處置期間的 K 棒', desc: '處置前一天、處置第一天、第二天、最後一天、出關後第一天，處置股收紅 K 還是黑 K；新制前後、有沒有當沖條件分開看', report: true, run: (el, ctx) => window.LTTWR.dispKbar(el, ctx) },
-      { key: 'strategy', name: '處置股策略', desc: '處置第一天收盤買進融資使用率高、投信加碼的處置股，處置結束後一天開盤賣出，和 0050 比較', report: true, run: (el, ctx) => window.LTTWR.disp(el, ctx) },
+      { key: 'strategy', name: '處置股策略', desc: '處置第一天收盤買進融資使用率高、投信加碼的處置股，處置結束後一天開盤賣出，和 0050 比較', report: true, tags: '🔒 需要密碼', run: (el, ctx) => window.LTTWR.disp(el, ctx) },
     ] }],
   });
 })();

@@ -13,8 +13,8 @@
   const CATS = [
     { key: 'revenue', name: '營收', desc: '月營收公告前後的股價行為與選股', studies: [
       { key: 'rev_pre', name: '營收公告前布局', series: 'rev', desc: '月底先買進預期營收會好的股票，營收公告後隔天開盤賣出', summary: '營收可以事先預測，但不限市值時輸給 0050；只在市值第二小的一群裡選股，才和 0050 相當', run: (...a) => revPre(...a) },
-      { key: 'rev_growth', name: '營收成長特徵', series: 'rev', desc: '營收年增率 > 10% 公告後，哪些特徵最能區分後續報酬', summary: '好營收公告後隔天才買，平均是虧的；剛轉強的公司比一直很強的好', run: (...a) => revGrowth(...a) },
-      { key: 'rev_drop', name: '營收衰退開低', series: 'rev', desc: '營收衰退公告後隔天開低 5% 以上，開盤買進', summary: '開低買進只在冷門股有效，實際很難買到量，遠輸 0050', run: (...a) => revDrop(...a) },
+      { key: 'rev_growth', name: '營收成長特徵', series: 'rev', desc: '營收成長公告後，哪些特徵最能區分後續報酬', summary: '好營收公告後隔天才買，平均是虧的；剛轉強的公司比一直很強的好', run: (...a) => revGrowth(...a) },
+      { key: 'rev_drop', name: '營收衰退開低', series: 'rev', desc: '營收衰退公告後隔天大幅開低，開盤買進', summary: '開低買進只在冷門股有效，實際很難買到量，遠輸 0050', run: (...a) => revDrop(...a) },
       { key: 'rev_turn', name: '營收由負轉正', series: 'rev', desc: '營收年增率由負轉正公告後做多，和持續成長、持續衰退比較', summary: '市場對轉正的反應最大，但隔天開盤才買已經太晚，持有 20 日仍輸 0050', run: (...a) => revTurn(...a) },
     ] },
     { key: 'gap', name: '跳空', desc: '開盤跳空之後的股價表現', studies: [
@@ -48,7 +48,12 @@
     }
   }
   // 先講結論：登入的人由報告開頭的引言自動放上來(hoistConclusion)；訪客的精簡版只帶這一段(hero)
-  const heroOf = (B, full) => !full && B.hero ? md(B.hero) : '';
+  // (加密的研究解開後是完整資料，訪客一樣只顯示報告開頭的引言)
+  const heroOf = (B, full) => {
+    if (full) return '';
+    const h = B.hero || ((B.report || '').match(/^\s*((?:>.*(?:\r?\n|$))+)/) || [])[1];
+    return h ? md(h) : '';
+  };
   // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png，見 drawFigs)
   function md(src) {
     const box = document.createElement('div');
@@ -443,8 +448,9 @@
   };
   async function disp(el, ctx, key = 'disp') {
     const cfg = DISP[key], S = { name: cfg.name, series: 'disp' };
-    const [B, full] = await load(el, ctx, key);
+    let [B, full] = await load(el, ctx, key);
     if (!B) return;
+    if (B.enc && !(B = await W().unlock(el, ctx, key, B.enc))) return;   // 上鎖的策略：輸入密碼後才解得開(同台股策略頁)
     const feat = v => [].concat(v).map((x, i) => `<td>${x == null ? '—' : cfg.fmt[i](x)}</td>`).join('');
     const T = B.strat;
     el.innerHTML = `
@@ -464,6 +470,8 @@
       const { stats, vs0050Cards, tradeCards } = W();
       $('#twrBriefStats').innerHTML = `${vs0050Cards(stats(T.nav), stats(B.b0050), t)}${tradeCards(t)}${cards}`;
     }
+    draw();
+    if (!full) return;   // 訪客：只有上半部(近期明細也要登入)
     // 近期明細：主策略的交易，最新的在前，先顯示 20 筆
     // 框起來排最前面：已公告、還沒開始的處置(處置第一天收盤買進)；持有中、處置已經結束的(下個交易日開盤賣出)
     const tag = t => `<span class="next-tag">${t}</span>`, md = d => d.slice(5).replace('-', '/');
@@ -477,7 +485,6 @@
       ...all.filter(ended).map(r => row(r, ' class="next-act"', tag('下個交易日開盤賣出'))),
       ...all.filter(r => !ended(r)).map(r => row(r))]);
     drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: cfg.name, nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
-    draw();
   }
   /* ---------- 處置期間的 K 棒(disp_kbar.json)：五個時點收紅 K / 黑 K 的比例，新舊制、有沒有當沖條件分開看；不是回測，沒有淨值 ---------- */
   async function dispKbar(el, ctx) {

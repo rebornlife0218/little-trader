@@ -292,9 +292,9 @@
             card((x.vol * 100).toFixed(1) + '%', '年化波動', `SPY：${(S.vol * 100).toFixed(1)}%`, beat(x.vol, S.vol, false)),
             card(x.sharpe.toFixed(2), '夏普值', `SPY：${S.sharpe.toFixed(2)}`, beat(x.sharpe, S.sharpe)),
             card(pct(x.mdd, 1), '最大回撤', `SPY：${pct(S.mdd, 1)}`, `down ${beat(x.mdd, S.mdd)}`, true)].join('');
-          // 近期明細：這個策略每一季的持股，最新一季在最前面
-          $('#usRecentNote').textContent = `${meta(b).name}每一季的持股，最新一季在最前面；上季報酬是選股時用的訊號。`;
-          LT.moreTable($('#usRecent'), ['換股季度', '代號', '權重', '上季報酬'], B.q.slice().reverse().filter(q => q.picks && q.picks[b]).flatMap(q =>
+          // 近期明細(要登入)：這個策略每一季的持股，最新一季在最前面
+          if (full) $('#usRecentNote').textContent = `${meta(b).name}每一季的持股，最新一季在最前面；上季報酬是選股時用的訊號。`;
+          if (full) LT.moreTable($('#usRecent'), ['換股季度', '代號', '權重', '上季報酬'], B.q.slice().reverse().filter(q => q.picks && q.picks[b]).flatMap(q =>
             q.picks[b].map(([t, w, r]) => `<tr><td>${esc(q.q)}</td><td><a href="https://finance.yahoo.com/quote/${encodeURIComponent(t.replace('.', '-'))}" target="_blank" rel="noopener">${esc(t)}</a></td><td>${(w * 100).toFixed(1)}%</td><td class="${cls(r)}">${pct(r, 1)}</td></tr>`)));
           window.LTTW.navCharts({ d: B.d, i0: C.i0, navs: { [b]: C.navs[b], spy: C.navs.spy }, meta: { [b]: { name: meta(b).name, color: meta(b).color }, spy: { name: meta('spy').name, color: meta('spy').color } },
             main: b, chart: $('#usBrief'), legend: $('#usBriefLegend') });

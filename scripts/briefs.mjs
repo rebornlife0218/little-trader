@@ -20,14 +20,17 @@ const withHero = (o, j) => ({ ...o, hero: heroOf(j.report) });
 
 // 資料集 → (檔名, 完整資料) → 精簡版；回傳 null 表示這個檔沒有精簡版(訪客拿不到)
 export const BRIEFS = {
-  // 台股策略(stock/tw-strategy.js)：低波動選股的精簡版要用到每月換股紀錄與持股；事件型策略要用到所有交易(近期明細)
+  // 台股策略(stock/tw-strategy.js)：低波動選股的精簡版要用到每月換股紀錄；近期明細要登入，所以不放持股、選股與股票代號
+  //   事件型策略的績效卡片要用每筆交易的報酬與天數：交易只留報酬、出場原因、天數、出場年度與借券天數，拿掉代號、名稱與日期
   tw_strategy: (f, j) => j.enc ? j   // 不公開的策略：整份加密，要密碼才能解開
-    : f === 'backtest.json' ? pick(j, ['asof', 'd', 'nav', 'npos', 'tstat', 'm', 'picks'])
-    : { ...pick(j, ['key', 'side', 'asof', 'd', 'nav', 'npos', 'trades', 'expo', 'params', 'info']), recent: (j.recent || []).slice(0, 1) },
+    : f === 'backtest.json' ? pick(j, ['asof', 'd', 'nav', 'npos', 'tstat', 'm'])
+    : { ...pick(j, ['key', 'side', 'asof', 'd', 'nav', 'npos', 'expo', 'params', 'info']),
+        trades: (j.trades || []).map(t => ['', '', '', t[3] ? String(t[3]).slice(0, 4) : t[3], t[4], t[5], t[6], 0, 0, t[9]]) },
   // 美股策略(stock/us-strategy.js)：精簡版依回測起點與成本算出最好的策略，要用到全部淨值與每季持股
-  sp500: (f, j) => f === 'backtest.json' ? pick(j, ['asof', 'd', 'nav', 'q']) : null,
+  sp500: (f, j) => f === 'backtest.json' ? { ...pick(j, ['asof', 'd', 'nav']), q: j.q.map(({ picks, ...q }) => q) } : null,   // 每季持股(近期明細)要登入
   // 台股其他研究、處置股策略與處置期間的 K 棒(stock/tw-research.js)：只帶精簡版那一個版本
   tw_research: (f, j) => {
+    if (j.enc) return j;   // 上鎖的研究(處置股策略)：整份加密，要密碼才能解開
     const base = withHero(pick(j, ['asof', 'd', 'b0050']), j);
     const one = (T, keys) => T && pick(T, keys);
     switch (f) {
@@ -38,7 +41,7 @@ export const BRIEFS = {
       case 'rev_drop.json': return { ...base, strats: [one(j.strats[0], ['key', 'name', 'nav', 'ts'])] };
       case 'rev_growth.json': return { ...base, strats: [one(j.strats.find(x => x.h === '5日' && x.g === '分數 = 3') || j.strats[0], ['h', 'g', 'nav', 'ts'])] };
       case 'rev_turn.json': return { ...base, strats: [one(j.strats.find(x => x.h === '20日' && x.g === '由負轉正') || j.strats[0], ['h', 'g', 'nav', 'ts'])] };
-      case 'disp.json': return { ...base, ...pick(j, ['cols', 'upcoming']), strat: one(j.strat, ['name', 'nav', 'ts', 'trades']) };
+      case 'disp.json': return { ...base, strat: one(j.strat, ['name', 'nav', 'ts']) };   // 近期明細(交易、即將進場)要登入
       case 'disp_kbar.json': return withHero({ ...pick(j, ['asof', 'points']), rows: j.rows.filter(r => r.g === '全部'), info: j.info.filter(r => r.g === '全部') }, j);
       default: return null;
     }

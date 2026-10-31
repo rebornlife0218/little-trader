@@ -4,7 +4,7 @@ import { json, type Env, type Data } from '../_lib/types';
 
 // 只有研究與策略的單一內容可以分享(區塊/頁面/項目)；不公開的策略不能分享
 const PATH = /^(etf|stock|option|index|stats|other)\/[a-z0-9-]{1,40}\/[a-z0-9_-]{1,40}$/;
-const PRIVATE = new Set(['stock/tw-strategy/margin']);
+const PRIVATE = new Set(['stock/tw-strategy/margin', 'stock/disposition/strategy']);
 const label = (v: unknown) => typeof v === 'string' ? v.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 60) : '';
 const ABC = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';   // 去掉容易看錯的 0 O 1 l I
 const newCode = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), b => ABC[b % ABC.length]).join('');

@@ -85,6 +85,14 @@ test('精簡版的先講結論：只取報告開頭的 > 引言', async () => {
   const b = BRIEFS.tw_gap('gap.json', { asof: 'x', start: 'y', n: 1, bins: [], all: { n: [1], ov: [2], intra: [3] }, nl: { n: [1], ov: [2], intra: [3] }, fill: {}, vol: {}, report: '> **先講結論**：丙\n\n## 一、研究目的\n機密' });
   assert.equal(b.hero, '> **先講結論**：丙');
   assert.ok(!('report' in b) && !('fill' in b) && !('intra' in b.all), '精簡版不能有完整報告的欄位');
+  // 近期明細要登入：精簡版不能有股票代號、名稱、日期與選股
+  const t = BRIEFS.tw_strategy('rev20.json', { d: [], nav: {}, trades: [['2330', '台積電', '2026-01-02', '2026-01-10', 0.1, 'time', 5, 0, 0, 8]], recent: [{ d: 'x', p: [['2330']] }], cols: [], skipped: [] });
+  assert.deepEqual(t.trades[0].slice(0, 4), ['', '', '', '2026']);
+  assert.ok(!('recent' in t) && !('cols' in t) && !('skipped' in t));
+  assert.ok(!('picks' in BRIEFS.tw_strategy('backtest.json', { d: [], picks: { lv10p: [['2330']] } })));
+  assert.ok(!('picks' in BRIEFS.sp500('backtest.json', { d: [], nav: {}, q: [{ q: '2026Q1', picks: { s1: [['AAPL']] } }] }).q[0]));
+  const enc = { enc: { iter: 1, salt: 'a', iv: 'b', ct: 'c' } };
+  assert.deepEqual(BRIEFS.tw_research('disp.json', enc), enc, '上鎖的研究：精簡版就是整份加密檔');
 });
 
 test('訪客載入的程式(index.html)只註冊訪客能看的區塊', () => {
