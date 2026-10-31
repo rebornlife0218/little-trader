@@ -308,9 +308,7 @@
   /* 常見迷思表格：均線、類型欄位置中對齊 */
   table.stattable.myth td.line, table.stattable.myth td.kind{text-align:center;font-family:var(--font-body);font-weight:600;}
   table.stattable.myth td.line small{display:block;margin-top:2px;color:var(--mute);font-weight:400;font-size:10.5px;font-family:var(--font-num);}
-  table.stattable.myth td.line{border-right:1px solid var(--grid);}
-  table.stattable.myth td small.few{display:block;margin-top:2px;color:var(--mute);font-size:10.5px;font-family:var(--font-body);}
-  h4.subhead{margin:20px 0 8px;font-size:13.5px;color:var(--text);}
+  table.stattable.myth td.line{border-right:1px solid var(--grid);}  h4.subhead{margin:20px 0 8px;font-size:13.5px;color:var(--text);}
 
   /* 週期性分析：平均漲跌橫條、總統選舉 */
   table.stattable.cycle td.barcell{min-width:120px;}

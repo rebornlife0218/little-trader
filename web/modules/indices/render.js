@@ -378,6 +378,9 @@ let _indicesBooted = false;
 function mountIndices(container, theme){
   container.innerHTML = '<div id="app"></div>';
   state.theme = theme;
+  // 網址帶模式時直接切到該模式(例如首頁近期更新連到 index/crash/myth)
+  const m = LT.path()[2];
+  if (theme==='crash' && MODES.some(x=>x.key===m && x.key!=='m4')) state.mode = m;
   if (!_indicesBooted){ _indicesBooted = true; init(); } else { render(); }
 }
 // topics：後台熱門主題列出的子項目(名稱要和 render() 裡 LT.view 記錄的一樣)

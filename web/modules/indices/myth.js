@@ -142,7 +142,6 @@ function renderMyth(){
   const backHead = isDown=> `<th rowspan="2">${prm.confirmDays}日內${isDown?'站回均線<br>(有支撐)':'跌回均線<br>(有壓力)'}</th>`
     + (show2 ? `<th rowspan="2">2日內${isDown?'站回均線':'跌回均線'}</th>` : '');
   const backCells = s=> rate(s.backRate) + (show2 ? rate(s.back2Rate) : '');
-  const countCell = s=> `<td>${s.count}${s.count && s.count<MYTH_FEW ? '<small class="few">樣本少</small>' : ''}</td>`;
   const table = (groups, isDown)=>`
     <div class="tablewrap"><table class="stattable myth">
       <thead>
@@ -155,7 +154,7 @@ function renderMyth(){
       <tbody>${groups.map(g=>[['first', isDown?'初次跌破':'初次突破'], ['later', isDown?'後續跌破':'後續突破']].map(([t,label],j)=>{
         const s = mythSummary(g[t]);
         return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small><small>初次 ≥${settleOf(g.line.p, prm)}日</small></td>`:''}
-          <td class="kind">${label}</td>${countCell(s)}${backCells(s)}${pct(s.ext)}
+          <td class="kind">${label}</td><td>${s.count}</td>${backCells(s)}${pct(s.ext)}
           ${win(s.win5)}${win(s.win10)}${win(s.win20)}${win(s.win60)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}${pct(s.avg60)}</tr>`;
       }).join('')).join('')}</tbody>
     </table></div>`;
@@ -175,7 +174,7 @@ function renderMyth(){
         return [['red','紅K','var(--candle-up)'],['black','黑K','var(--candle-down)']].map(([c,label,color],j)=>{
           const s = mythSummary(all.filter(e=>e.candle===c));
           return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`:''}
-            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td>${countCell(s)}${backCells(s)}${pct(s.ext)}
+            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${backCells(s)}${pct(s.ext)}
             ${win(s.win5)}${win(s.win10)}${win(s.win20)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}</tr>`;
         }).join('');
       }).join('')}</tbody>
@@ -215,7 +214,7 @@ function renderMyth(){
             onchange="setMythParam('confirmDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
         </div>
       </div>
-      <div class="note">跌破＝前一日收盤在均線之上、當日收盤落到均線之下；突破反之。跌破前已連續站在均線之上(突破則為之下)達均線天數的 ${prm.settlePct}% 以上才算「初次」(${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')})，剛穿越不久又再穿越的算「後續」(反覆)。次數少於 ${MYTH_FEW} 次時標示「樣本少」，參考性較低。有支撐＝跌破後 ${prm.confirmDays} 日內收盤又站回均線(假跌破)；有壓力＝突破後 ${prm.confirmDays} 日內又跌回均線(假突破)；表格另外列出 2 日內站回(跌回)均線的比例。報酬以穿越當天收盤價為基準。</div>
+      <div class="note">跌破＝前一日收盤在均線之上、當日收盤落到均線之下；突破反之。跌破前已連續站在均線之上(突破則為之下)達均線天數的 ${prm.settlePct}% 以上才算「初次」(${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')})，剛穿越不久又再穿越的算「後續」(反覆)。次數少於 ${MYTH_FEW} 次時，下方結論會註明樣本少、參考性較低。有支撐＝跌破後 ${prm.confirmDays} 日內收盤又站回均線(假跌破)；有壓力＝突破後 ${prm.confirmDays} 日內又跌回均線(假突破)；表格另外列出 2 日內站回(跌回)均線的比例。報酬以穿越當天收盤價為基準。</div>
     </div>
 
     <div class="panel">
