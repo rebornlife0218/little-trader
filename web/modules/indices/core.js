@@ -40,7 +40,7 @@ let state = {
   openPattern: null, // 型態總覽中展開的型態
   mode: 'crash',   // 大盤漲跌分析的模式：'crash' 跌深反彈 | 'myth' 常見迷思 | 'cycle' 週期性分析 | 'm4'
   myth: {},        // key -> 常見迷思統計 (null = 需重算)
-  mythParams: {settleDays:15, confirmDays:1},
+  mythParams: {settlePct:50, confirmDays:1},   // settlePct：初次的定義 = 均線天數的幾 %
   cycle: {},       // key -> 週期性分析統計 (null = 需重算)
   cycleParams: {span:0, monthDef:'cal'},
   cursor: {},      // key -> K線圖上點選的資料索引
