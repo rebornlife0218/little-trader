@@ -45,7 +45,7 @@
                 <li><b>國內成分 vs 國外成分</b>：尾碼看不出來，要看追蹤的指數或投資範圍。國外成分 ETF(例如美國股票、美國公債)多了<b>匯率風險</b>與時差，淨值以國外收盤計算，台股盤中的價格比較容易出現折溢價。</li>
                 <li><b>風險由低到高</b>(證交所投資人教育的排列)：一般台股 ETF → 海外股債 ETF(跨市場、匯率) → 期貨 ETF(期現貨價差、轉倉風險) → 槓桿/反向 ETF(長期報酬偏離倍數，限制較多)。期貨與槓反 ETF 屬於需要簽署風險預告書的商品。</li>
               </ul>
-              <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.twse.com.tw/zh/products/securities/etf/products/li.html" target="_blank" rel="noopener">臺灣證券交易所 · 槓桿型及反向型ETF</a>；尾碼分類整理自<a href="https://tw.stock.yahoo.com/news/00980a%E3%80%8100980d%E3%80%8100980t%E4%B8%8D%E4%B8%80%E6%A8%A3%EF%BC%9F%E7%9C%8B%E6%87%8213%E7%A8%AEetf%E5%B0%BE%E7%A2%BC-%E5%BF%AB%E9%80%9F%E8%BE%A8%E8%AD%98%E6%8A%95%E8%B3%87%E9%A1%9E%E5%9E%8B-034928443.html" target="_blank" rel="noopener">Yahoo股市(2025-08-07，依證交所分類)</a>。新類型持續推出，以證交所公告為準。</p>
+              <p class="mute" style="font-size:12px;">備註：新類型持續推出，以證交所公告為準。</p>
             </div>
           </div>
           <div class="panel doc">
