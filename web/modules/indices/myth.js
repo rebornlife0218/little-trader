@@ -154,6 +154,7 @@ function renderMyth(){
       <thead>
         <tr><th rowspan="2">均線</th><th rowspan="2">${isDown?'跌破':'突破'}當天</th><th rowspan="2">次數</th>
           <th rowspan="2">${prm.confirmDays}日內${isDown?'站回均線<br>(有支撐)':'跌回均線<br>(有壓力)'}</th>
+          <th rowspan="2">20日內平均<br>${isDown?'最大續跌':'最大續漲'}</th>
           <th colspan="3">勝率(上漲機率)</th><th colspan="3">平均報酬率</th></tr>
         <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+5日</th><th>+10日</th><th>+20日</th></tr>
       </thead>
@@ -162,7 +163,7 @@ function renderMyth(){
         return [['red','紅K','var(--candle-up)'],['black','黑K','var(--candle-down)']].map(([c,label,color],j)=>{
           const s = mythSummary(all.filter(e=>e.candle===c));
           return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`:''}
-            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${rate(s.backRate)}
+            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}
             ${win(s.win5)}${win(s.win10)}${win(s.win20)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}</tr>`;
         }).join('');
       }).join('')}</tbody>
