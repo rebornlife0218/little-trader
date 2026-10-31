@@ -57,7 +57,7 @@
     const order = nd => [...nd.kids.values()].sort((a, b) => (b.known - a.known) || ((b.r || ZERO).n - (a.r || ZERO).n));
     const render = nd => {
       const r = nd.r || ZERO, kids = order(nd).map(render).join('');
-      const extra = (nd.r && nd.r.locked ? ` <small class="mute">訪客被擋 ${n0(nd.r.locked)}</small>` : '') + (nd.known ? '' : ' <small class="mute">(舊版紀錄)</small>');
+      const extra = (nd.r && nd.r.locked ? ` <small class="mute">訪客看到登入提示 ${n0(nd.r.locked)}</small>` : '') + (nd.known ? '' : ' <small class="mute">(舊版紀錄)</small>');
       const cls = r.n ? '' : ' tr-zero';
       return kids
         ? `<details class="tr-node${cls}"><summary><span class="tr-name">${esc(nd.name)}${extra}</span>${cells(r)}</summary><div class="tr-kids">${kids}</div></details>`
@@ -122,12 +122,12 @@
           </div>
           <div class="panel"><h3 style="margin-top:0;">最受歡迎的主題 <small class="mute">(點 ▸ 一層一層展開)</small></h3>${topicTree(S)}
             <p class="note">列出網站上所有的主題，還沒有人看過的顯示 0(灰色)；結構裡已經沒有的舊頁面或舊名稱標「舊版紀錄」。區塊、頁面的次數是進入那一頁的次數；頁面底下的細項(分頁、研究、下拉選單)是切換到那個畫面的次數，每一層是底下所有細項的加總，快速連續切換只算最後停下來的畫面。
-              「訪客被擋」：沒登入的人點進需要登入的區塊的次數，可以看出大家想看但被擋住的主題。</p></div>
+              「訪客看到登入提示」：沒登入的人打開研究、策略，只看得到上半部、下半部是「登入 Google 看完整報告」的次數(區塊、頁面是底下的加總；以前區塊要登入時被擋下的次數也算在裡面)，可以看出大家想看完整報告的主題。</p></div>
           ${memberPanel(S)}
           <div class="panel"><h3 style="margin-top:0;">分享紀錄 <small class="mute">(全部期間)</small></h3>${(S.shares || []).length ? table(['分享的人', '報告', '分享時間', '點開次數', '登入後看的人', '新會員', '看的人是誰'],
               S.shares.map(r => `<tr><td>${esc(r.sharer || '')}</td><td><a href="${esc(r.path)}">${esc(r.title || r.path)}</a></td><td>${esc(r.created)}</td><td>${n0(r.clicks)}</td><td>${n0(r.viewers)}<small class="mute">(${n0(r.views)} 次)</small></td><td>${n0(r.new_members)}</td><td style="text-align:left;white-space:normal">${esc(r.who || '—')}</td></tr>`))
               : '<p class="mute">還沒有人分享報告。</p>'}
-            <p class="note">研究、策略頁的「分享」按鈕會產生專屬連結(同一個人分享同一份報告是同一個連結)。點開次數含沒登入的人(社群網站抓預覽不算)；「登入後看的人」是透過這個連結進來、登入 Google 後看了報告的帳號(分享的人自己不算)；「新會員」是點了這個連結才第一次登入的人。</p></div>
+            <p class="note">研究、策略頁的「分享」按鈕會產生專屬連結(同一個人分享同一份報告是同一個連結)。點開次數含沒登入的人(社群網站抓預覽不算；沒登入的人看得到上半部，完整報告要登入)；「登入後看的人」是透過這個連結進來、登入 Google 後看了報告的帳號(分享的人自己不算)；「新會員」是點了這個連結才第一次登入的人。</p></div>
           <div class="panel"><h3 style="margin-top:0;">每日請求數</h3><div id="admChart"></div></div>
           <div class="adm-grid">
             <div class="panel"><h3 style="margin-top:0;">熱門股票</h3>${table(['#', '股票', '查詢次數', '查詢人數', '登入 / 訪客'],

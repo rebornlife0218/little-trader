@@ -21,6 +21,9 @@
       { key: 'etf_follow', name: 'A 系列 ETF 跟單', series: 'active', desc: '主動式 ETF 每天公布持股，經理人加碼、調整、新納入之後跟著買，有沒有超額報酬', summary: '抱到經理人減碼才賣才有超額報酬，主要來自 00981A；組合起來仍輸 0050' },
     ] },
   ];
+  // 先講結論(訪客看不到完整報告時另外放在最上方)
+  const ARKK_HERO = '<b>先講結論</b>：ARKK 基金本身 5 年年化 +41.3%，但多數投資人在大漲後才追高買進，同期實際只賺到年化 +9.9%；主題型 ETF 追高的代價很大。';
+  const LSI_HERO = '<b>先講結論</b>：已經有一筆錢時，一次投入大約 2/3 的時間贏過分批投入(定期定額)，等下跌才買(逢低買入)平均更差；怕一次投入的波動，不如先調低股票比重再一次投入。';
   const tagOf = s => `<span class="series-tag"><i style="background:${RSERIES[s].color}"></i>${esc(RSERIES[s].name)}</span>`;
 
   // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png)
@@ -50,8 +53,8 @@
   }
   async function etfFollow(el, alive) {
     el.innerHTML = `<div class="panel"><div class="page-loading"><span class="spinner"></span>載入中…</div></div>`;
-    let B;
-    try { B = (await LT.loadJSON('etf_research', 'etf_follow.json')).data; } catch (e) {
+    let B, full;
+    try { ({ data: B, full } = await LT.loadReport('etf_research', 'etf_follow.json')); } catch (e) {
       if (alive()) el.innerHTML = `<div class="panel"><p class="mute">研究資料尚未產生：${esc(e.message)}</p></div>`;
       return;
     }
@@ -64,12 +67,12 @@
     const sub = T => B.b0050s[`${T.mode}｜${T.group}`];   // 和策略同一個期初的 0050(期初現金，隔天開盤買進)
     let mode = '加碼', group = '全部', hold = '跟單出場';
     el.innerHTML = `
-      ${LT.brief({ chart: 'efBrief', stats: 'efBriefStats', items: [
+      ${LT.brief({ hero: !full && B.hero ? md(B.hero) : '', chart: 'efBrief', stats: 'efBriefStats', items: [
         ['邏輯', '主動式 ETF 每天公布持股；經理人加碼某檔股票時跟著買，看能不能賺到經理人選股的報酬。'],
         ['進出場', 'ETF 公布加碼後的隔天開盤買進；等這檔 ETF 之後減碼或剔除時，隔天開盤賣出(跟單出場)。'],
         ['停利停損', '不設停利停損，跟著經理人的動作出場。'],
-        ['持有期間', '到經理人減碼為止(平均約 3 ～ 4 週)；另比較固定持有 5 日、20 日。']] })}
-      <div class="panel">
+        ['持有期間', '到經理人減碼為止；另比較固定持有幾天就賣。']] })}
+      ${!full ? LT.reportLock() : `<div class="panel">
         <h3>A 系列 ETF 跟單 ${tagOf('active')}</h3>
         <div class="doc">
           <p><b>資料</b>：${B.etfs.length} 檔主動式 ETF(${B.etfs.map(e => `${e.code} ${esc(e.name)}`).join('、')})每天公布的持股，從各自上市日到 ${B.asof.replace(/-/g, '/')}。日期 D 的持股是 D 收盤後的部位，假設 D 收盤後就看得到。</p>
@@ -88,7 +91,7 @@
       <div class="panel">
         <h3>研究報告 ${tagOf('active')}</h3>
         <div class="doc">${md(B.report)}</div>
-      </div>`;
+      </div>`}`;
     const extra = t => [
       t.fail ? W.card(`${t.fail.toLocaleString()} 筆`, '開盤漲停買不到', '放棄的訊號') : '',
       t.nocash ? W.card(`${t.nocash.toLocaleString()} 筆`, '買不起一股而放棄', `每檔上限為總資產的 ${(t.cap * 100).toFixed(1)}%`) : '',
@@ -125,15 +128,16 @@
         main: 's', chart: $('#efChart'), legend: $('#efLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
       $('#efAll').innerHTML = allTable(T);
     }
-    $('#efMode').onchange = () => { mode = $('#efMode').value; fillGroup(); draw(); };
-    $('#efGroup').onchange = () => { group = $('#efGroup').value; draw(); };
-    $('#efHold').onchange = () => { hold = $('#efHold').value; fillGroup(); draw(); };
     {   // 精簡版的累積報酬圖：加碼｜全部｜跟單出場 vs 0050
       const T0 = SK('加碼', '全部', '跟單出場') || B.strats[0];
       $('#efBriefStats').innerHTML = W.vs0050Cards(statsC(T0.nav), statsC(sub(T0)), T0.ts) + W.tradeCards(T0.ts) + extra(T0.ts);
       W.navCharts({ d: B.d, i0: T0.i0, navs: { s: T0.nav, b0050: sub(T0) }, meta: { s: { name: `${T0.mode}｜${T0.group}｜${hname(T0.hold)}`, color: MC[T0.mode] }, b0050: { name: '0050 買進持有', color: 'var(--blue)' } },
         main: 's', chart: $('#efBrief'), legend: $('#efBriefLegend'), xFmt: (v, tip) => tip ? v : v.slice(0, 7).replace('-', '/') });
     }
+    if (!full) return;   // 訪客：只有上半部
+    $('#efMode').onchange = () => { mode = $('#efMode').value; fillGroup(); draw(); };
+    $('#efGroup').onchange = () => { group = $('#efGroup').value; draw(); };
+    $('#efHold').onchange = () => { hold = $('#efHold').value; fillGroup(); draw(); };
     $('#efAll').onclick = e => { const r = e.target.closest('tr[data-k]'); if (!r) return; [mode, group, hold] = r.dataset.k.split('｜'); fillGroup(); draw(); $('#efView').scrollIntoView({ behavior: 'smooth' }); };
     fillGroup(); draw();
 
@@ -191,21 +195,21 @@
     el.innerHTML = `<div class="panel"><div class="empty"><p>正在載入資料…</p></div></div>`;
     const { C, E, twList, MO, failed } = await LTETF.load();
     if (!ctx.alive()) return;
-    const $ = s => el.querySelector(s);
+    const $ = s => el.querySelector(s), full = LT.isMember();   // 下半部(完整報告)要登入；訪客的先講結論另外放在 hero
     ({ arkk: arkkView, lsi: lsiView })[key](el);
 
     function arkkView(body) {
       if (!C || !E) { body.innerHTML = failed; return; }
       body.innerHTML = `
-        ${LT.brief({ chart: 'pkArkkChart', items: [
+        ${LT.brief({ hero: full ? '' : `<blockquote><p>${ARKK_HERO}</p></blockquote>`, chart: 'pkArkkChart', items: [
           ['邏輯', '熱門主題型 ETF 大漲後，資金大量湧入；比較基金帳面上的報酬，和投資人實際賺到的報酬差多少。'],
           ['怎麼比較', '基金報酬 = 一開始買進後一直抱著；投資人報酬 = 依照資金實際流入流出的時間計算。'],
           ['資料', '晨星(Morningstar)的研究數字，加上 ARKK 的月底還原股價。'],
-          ['期間', '截至 2021 年 11 月的 5 年，以及截至 2023 年的 10 年。']] })}
-        <div class="panel">
+          ['期間', '晨星研究涵蓋的近幾年與近十年。']] })}
+        ${!full ? LT.reportLock() : `<div class="panel">
           <h3>ARKK 研究：基金賺錢，投資人卻賠錢 ${tagOf('how')}</h3>
           <div class="doc">
-            <blockquote><p><b>先講結論</b>：ARKK 基金本身 5 年年化 +41.3%，但多數投資人在大漲後才追高買進，同期實際只賺到年化 +9.9%；主題型 ETF 追高的代價很大。</p></blockquote>
+            <blockquote><p>${ARKK_HERO}</p></blockquote>
             <h3 class="md-h2">一、研究目的</h3>
             <p>ARK Innovation ETF(ARKK)是美國最知名的主題型 ETF，2020 年大漲後吸引大量資金湧入，接著在 2021～2022 年大幅下跌。這份整理要看：基金帳面上的報酬，和投資人實際拿到的報酬差多少？為什麼？</p>
             <h3 class="md-h2">二、資料處理</h3>
@@ -240,7 +244,7 @@
             </ul>
             <p class="mute" style="font-size:12px;">資料來源：${ARKK_REFS.map(r => `<a href="${r.url}" target="_blank" rel="noopener">${esc(r.name)}</a>`).join('；')}。上圖為 ARKK 的還原股價(美元)，研究數字引用自原文。</p>
           </div>
-        </div>`;
+        </div>`}`;
       const ak = MO.ARKK;
       if (ak) {
         const peakI = ak.a.reduce((b, v, i) => v > ak.a[b] ? i : b, 0);
@@ -252,15 +256,15 @@
     function lsiView(body) {
       if (!C || !E) { body.innerHTML = failed; return; }
       body.innerHTML = `
-        ${LT.brief({ stats: 'rsStats', chart: 'rsLine', items: [
+        ${LT.brief({ hero: full ? '' : `<blockquote><p>${LSI_HERO}</p></blockquote>`, stats: 'rsStats', chart: 'rsLine', items: [
           ['邏輯', '手上已經有一筆錢：一次投入、分好幾個月慢慢投入，還是等市場下跌再買，哪一種長期比較好？'],
           ['怎麼比較', '每個月都當成一個起點，三種做法各自持有到期間結束，比較年化報酬。'],
-          ['資料', '國外 6 個國家的研究，加上台股加權報酬指數(含股息)自己驗證。'],
-          ['期間', '持有 5、10、20 年或到現在，可以在下方調整。']] })}
-        <div class="panel">
+          ['資料', '國外多個國家的研究，加上台股加權報酬指數(含股息)自己驗證。'],
+          ['期間', '長期持有；完整報告可以調整標的、持有期間與分批的月數。']] })}
+        ${!full ? LT.reportLock() : `<div class="panel">
           <h3>單筆投入、定期定額、逢低買入(LSI vs DCA vs BTD) ${tagOf('how')}</h3>
           <div class="doc">
-            <blockquote><p><b>先講結論</b>：已經有一筆錢時，一次投入大約 2/3 的時間贏過分批投入(定期定額)，等下跌才買(逢低買入)平均更差；怕一次投入的波動，不如先調低股票比重再一次投入。</p></blockquote>
+            <blockquote><p>${LSI_HERO}</p></blockquote>
             <h3 class="md-h2">一、研究目的</h3>
             <p>手上已經有一筆錢，要一次投入、分批投入，還是等市場下跌再買？這份研究整理國外研究的結論，並用台股自己驗證。三種做法：</p>
             <ul>
@@ -316,7 +320,7 @@
             </ul>
             <p class="mute" style="font-size:12px;">資料來源：<a href="https://www.pwlcapital.com/resources/dollar-cost-averaging-vs-lump-sum-investing/" target="_blank" rel="noopener">PWL Capital · Dollar-Cost Averaging vs Lump Sum Investing(Ben Felix，2020)</a>；<a href="https://pwlcapital.com/buy-the-dip/" target="_blank" rel="noopener">PWL Capital · Buy the Dip(Felix &amp; Warwick，2021)</a>；<a href="https://www.betashares.com.au/insights/lump-sum-investment/" target="_blank" rel="noopener">Betashares 整理</a>。</p>
           </div>
-        </div>`;
+        </div>`}`;
       const seriesOf = key => {
         if (key === 'taiex' || key === 'taiex_tr') {   // 加權指數 / 報酬指數：日資料 → 月底
           const tx = E[key], mo = monthly({ d: tx.d, c: tx.c, a: tx.c });
@@ -325,12 +329,14 @@
         const mo = MO[key]; return { m: mo.m, v: mo.a };
       };
       const drawRolling = () => {
-        const S = seriesOf($('#rsSeries').value), H = +$('#rsH').value, N = +$('#rsN').value, cash = Math.max(0, +$('#rsCash').value || 0) / 100;
+        // 調整欄在完整報告裡；訪客用預設(加權報酬指數、持有 10 年、分 12 個月、現金年利率 1.5%)
+        const val = (id, d) => $(id) ? $(id).value : d, def = E && E.taiex_tr ? 'taiex_tr' : E && E.taiex ? 'taiex' : '0050';
+        const series = val('#rsSeries', def), S = seriesOf(series), H = +val('#rsH', 10), N = +val('#rsN', 12), cash = Math.max(0, +val('#rsCash', 1.5) || 0) / 100;
         // 最後一個月可能還沒結束，只用完整月份
-        const full = S.m[S.m.length - 1] === new Date().toISOString().slice(0, 7) ? S.m.length - 1 : S.m.length;
-        const P = S.v.slice(0, full), M = S.m.slice(0, full);
+        const nm = S.m[S.m.length - 1] === new Date().toISOString().slice(0, 7) ? S.m.length - 1 : S.m.length;
+        const P = S.v.slice(0, nm), M = S.m.slice(0, nm);
         const R = rollingStudy(P, H, N, [0.10, 0.20], cash);
-        if (R.length < 12) { $('#rsStats').innerHTML = `<p class="mute">資料不足：持有 ${H} 年需要比 ${H} 年多至少一年的資料，請改選較短的持有期間或歷史較長的標的。</p>`; $('#rsTable').innerHTML = ''; $('#rsHist').innerHTML = ''; $('#rsLine').innerHTML = ''; $('#rsInsight').innerHTML = ''; return; }
+        if (R.length < 12) { $('#rsStats').innerHTML = `<p class="mute">資料不足：持有 ${H} 年需要比 ${H} 年多至少一年的資料，請改選較短的持有期間或歷史較長的標的。</p>`; $('#rsLine').innerHTML = ''; if (full) { $('#rsTable').innerHTML = ''; $('#rsHist').innerHTML = ''; $('#rsInsight').innerHTML = ''; } return; }
         const mean = a => a.reduce((x, y) => x + y, 0) / a.length;
         const strat = [['lsi', '單筆投入', x => x.lsi], ['dca', `定期定額(${N} 個月)`, x => x.dca], ['b10', '逢低買入(跌 10%)', x => x.btd[0]], ['b20', '逢低買入(跌 20%)', x => x.btd[1]]];
         const diff = f => R.map(x => x.lsi - f(x));
@@ -340,6 +346,11 @@
         const tieTxt = f => { const t = tally(f); return t.tie ? `(另有 ${(t.tie / R.length * 100).toFixed(0)}% 結果相同)` : ''; };
         $('#rsStats').innerHTML = `<div class="stat"><div class="v" style="font-size:16px;">${ym(M[R[0].t])}～${ym(M[R[R.length - 1].t])}</div><div class="l">${R.length} 個起點 · ${H ? `每個持有 ${H} 年` : `都持有到 ${ym(M[M.length - 1])}(${(MIN_NOW / 12).toFixed(0)}～${((M.length - 1 - R[0].t) / 12).toFixed(0)} 年)`}</div></div>` +
           strat.slice(1).map(([k, n, f]) => `<div class="stat"><div class="v">${Number.isFinite(win(f)) ? (win(f) * 100).toFixed(0) + '%' : '—'}</div><div class="l">單筆贏過${n}的比例${tieTxt(f)} · 年化平均多 ${pctf(mean(diff(f)), 2)}</div></div>`).join('');
+        $('#rsLineLegend').innerHTML = LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }]);
+        LTChart.line($('#rsLine'), { x: R.map(x => M[x.t]), xType: 'date', label: '依起點的年化報酬', height: 260, xFmt: (m, tip) => tip ? `${ym(m)} 起` : m.slice(2).replace('-', '/'),
+          yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => pctf(v, 2), refY: [{ y: 0 }],
+          series: [{ name: '單筆投入', y: R.map(x => x.lsi), color: 'var(--amber)' }, { name: '定期定額', y: R.map(x => x.dca), color: 'var(--blue)' }, { name: '逢低買入(10%)', y: R.map(x => x.btd[0]), color: 'var(--up)', width: 1.3 }, { name: '逢低買入(20%)', y: R.map(x => x.btd[1]), color: 'var(--down)', width: 1.3 }] });
+        if (!full) return;   // 訪客：只有上半部(績效卡片與依起點的年化報酬圖)
         $('#rsTable').innerHTML = `<thead><tr><th>策略</th><th>平均年化</th><th>中位數</th><th>最差 10%(10th)</th><th>最好 10%(90th)</th><th>最差</th></tr></thead><tbody>
           ${strat.map(([k, n, f]) => { const v = R.map(f); return `<tr><td>${n}</td><td class="${cls(mean(v))}">${pctf(mean(v), 2)}</td><td>${pctf(pctl(v, 0.5), 2)}</td><td>${pctf(pctl(v, 0.1), 2)}</td><td>${pctf(pctl(v, 0.9), 2)}</td><td class="down">${pctf(Math.min(...v), 2)}</td></tr>`; }).join('')}</tbody>`;
         // 年化報酬差的分布
@@ -348,20 +359,18 @@
         d.forEach(v => { const i = Math.min(bins.length - 1, Math.floor((v - lo) / step)); bins[i].n++; });
         LTChart.bars($('#rsHist'), { x: bins.map(b => b.x + step / 2), label: '年化報酬差分布', height: 200, xFmt: v => (v * 100).toFixed(1) + '%', yFmt: v => Math.round(v), tipFmt: (s, v, i) => `${v} 個起點`,
           series: [{ name: '起點數', y: bins.map(b => b.n), color: 'var(--amber)' }], refX: [{ x: 0, label: '0：兩者相同', color: 'var(--dim)' }] });
-        $('#rsLineLegend').innerHTML = LTChart.legend([{ name: '單筆投入', color: 'var(--amber)' }, { name: '定期定額', color: 'var(--blue)' }, { name: '逢低買入(跌 10%)', color: 'var(--up)' }, { name: '逢低買入(跌 20%)', color: 'var(--down)' }]);
-        LTChart.line($('#rsLine'), { x: R.map(x => M[x.t]), xType: 'date', label: '依起點的年化報酬', height: 260, xFmt: (m, tip) => tip ? `${ym(m)} 起` : m.slice(2).replace('-', '/'),
-          yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => pctf(v, 2), refY: [{ y: 0 }],
-          series: [{ name: '單筆投入', y: R.map(x => x.lsi), color: 'var(--amber)' }, { name: '定期定額', y: R.map(x => x.dca), color: 'var(--blue)' }, { name: '逢低買入(10%)', y: R.map(x => x.btd[0]), color: 'var(--up)', width: 1.3 }, { name: '逢低買入(20%)', y: R.map(x => x.btd[1]), color: 'var(--down)', width: 1.3 }] });
         const w = win(x => x.dca), worst = R.slice().sort((a, b) => a.lsi - b.lsi).slice(0, Math.max(1, Math.round(R.length * 0.1)));
         $('#rsInsight').innerHTML = `
           <li>單筆投入在 ${(w * 100).toFixed(0)}% 的起點贏過定期定額，年化報酬平均${mean(d) >= 0 ? '多' : '少'} ${pctf(Math.abs(mean(d)), 2).replace('+', '')}；${w > 0.5 && mean(d) >= 0 ? '勝率與平均都和 PWL 研究的方向一致' : w > 0.5 ? '單筆較常勝出，但定期定額贏的時候贏比較多(例如起點剛好在大跌之前)，平均下來差不多' : '這段期間定期定額較常勝出，與 PWL 研究的多數國家不同'}。</li>
           <li>在單筆投入表現最差的 10% 起點裡，定期定額贏的比例是 ${(worst.filter(x => x.dca > x.lsi).length / worst.length * 100).toFixed(0)}%。</li>
           <li>逢低買入：等跌 10% 才進場，單筆贏的比例 ${(win(x => x.btd[0]) * 100).toFixed(0)}%${tieTxt(x => x.btd[0])}、年化平均多 ${pctf(mean(diff(x => x.btd[0])), 2)}；等跌 20%，單筆贏的比例 ${(win(x => x.btd[1]) * 100).toFixed(0)}%${tieTxt(x => x.btd[1])}、年化平均多 ${pctf(mean(diff(x => x.btd[1])), 2)}。${mean(diff(x => x.btd[0])) < 0 ? "這段期間「跌 10% 才買」平均反而略勝：台股 10% 的回檔很常見、等待時間短，常能買到較低的價格；但「跌 20% 才買」常常要等好幾年，錯過的漲幅遠大於買低的好處。" : "門檻越深，拿著現金的時間越長，錯過的漲幅越多。"}</li>
-          ${$('#rsSeries').value === 'taiex' ? '<li>加權指數 2000 年的高點直到 2017 年才站回，這段期間指數大多已比高點低 10% 以上，所以「跌 10% 才買」多半在起點就立刻進場、結果和單筆相同；加權指數也不含股息，含股息時越早進場越有利(可改選加權報酬指數比較)。</li>' : ''}
-          ${$('#rsSeries').value === 'taiex_tr' ? '<li>加權報酬指數把成分股的現金股利再投入，是 0050 這類市值型 ETF 追蹤的標的(未扣 ETF 費用)，比只看價格的加權指數更接近實際投資的結果。</li>' : ''}`;
+          ${series === 'taiex' ? '<li>加權指數 2000 年的高點直到 2017 年才站回，這段期間指數大多已比高點低 10% 以上，所以「跌 10% 才買」多半在起點就立刻進場、結果和單筆相同；加權指數也不含股息，含股息時越早進場越有利(可改選加權報酬指數比較)。</li>' : ''}
+          ${series === 'taiex_tr' ? '<li>加權報酬指數把成分股的現金股利再投入，是 0050 這類市值型 ETF 追蹤的標的(未扣 ETF 費用)，比只看價格的加權指數更接近實際投資的結果。</li>' : ''}`;
       };
-      ['#rsSeries', '#rsH', '#rsN'].forEach(id => { $(id).onchange = drawRolling; });
-      $('#rsCash').oninput = drawRolling;
+      if (full) {
+        ['#rsSeries', '#rsH', '#rsN'].forEach(id => { $(id).onchange = drawRolling; });
+        $('#rsCash').oninput = drawRolling;
+      }
       drawRolling();
     }
   }
@@ -369,7 +378,7 @@
   // 目錄頁(LT.catalog)：依類別分組的研究卡片，點進去是單一研究(網址 etf/research/<研究>)
   LT.catalog({
     section: 'etf', key: 'research', name: 'ETF研究',
-    desc: '投資方式、主動式 ETF 跟單；同一個顏色代表同一系列的研究',
+    desc: '投資方式、主動式 ETF 跟單；同一個顏色代表同一系列的研究', report: true,
     groups: RCATS.map(c => ({ name: c.name, desc: c.desc, items: c.studies.map(x => ({
       key: x.key, name: x.name, desc: x.desc, summary: x.summary, tags: tagOf(x.series), run: (el, ctx) => study(el, ctx, x.key),
     })) })),

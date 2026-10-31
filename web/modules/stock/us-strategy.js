@@ -56,15 +56,15 @@
   // 目錄頁(LT.catalog)：策略卡片，點進去是單一策略(網址 stock/us-strategy/<策略>)
   LT.catalog({
     section: 'stock', group: '美股', key: 'us-strategy', name: '策略', title: '美股策略',
-    desc: '選擇要看的策略，與買進持有 SPY 比較報酬與風險',
+    desc: '選擇要看的策略，與買進持有 SPY 比較報酬與風險', report: true,
     groups: [{ name: '', items: FAMILIES.map(f => ({ key: f.key, name: f.name, desc: f.desc, summary: f.summary, soon: f.soon, topics: f.topics, run: (el, ctx) => sp500(el, ctx) })) }],
   });
 
   /* ---------- S&P500 季度換股 ---------- */
   async function sp500(el, ctx) {
       el.innerHTML = `<div id="usBody"><div class="panel"><div class="page-loading"><span class="spinner"></span>載入中…</div></div></div>`;
-      let B;
-      try { B = (await LT.loadJSON('sp500', 'backtest.json')).data; }
+      let B, full;
+      try { ({ data: B, full } = await LT.loadReport('sp500', 'backtest.json')); }
       catch (e) { if (ctx.alive()) el.querySelector('#usBody').innerHTML = `<div class="panel"><p class="mute">回測資料尚未產生：${esc(e.message)}</p></div>`; return; }
       if (!ctx.alive()) return;
       const years = [...new Set(B.q.map(q => +q.q.slice(0, 4)))].filter(y => y % 5 === 0 || y === 2008);
@@ -79,8 +79,8 @@
           ['邏輯', '每季從當時的 S&amp;P500 成分股挑股票：買上一季的贏家、輸家，或報酬穩定的股票，看哪一種想法能贏過買進持有 SPY。'],
           ['進出場', '每季最後一個交易日收盤選股，同時以收盤價換股。'],
           ['停利停損', '不設停利停損，到下一季換股才調整。'],
-          ['持有期間', '一季(每季換股一次)。']] })}
-        <div class="panel">
+          ['持有期間', '到下次換股為止(每季換股)。']] })}
+        ${!full ? LT.reportLock() : `<div class="panel">
           <div class="doc">
             <h3 class="md-h2">一、研究目的</h3>
             <p>每季依上一季的表現，從當時的 S&amp;P500 成分股挑股票持有一季，能不能贏過買進持有 SPY？比較四種常見的想法：</p>
@@ -120,12 +120,13 @@
             <ul id="usConcl"></ul>
             <p><b>限制</b>：沒有計入稅、借券與流動性；換股價格用季末收盤價，實際交易會有滑價。歷史回測不代表未來。</p>
           </div>
-        </div>`;
+        </div>`}`;
 
       const $ = s => el.querySelector(s);
       // 共用的計算：期間、各組合淨值與統計、每季報酬
       const calc = () => {
-        const y0 = +$('#usFrom').value, cost = Math.max(0, +$('#usCost').value || 0) / 100;
+        // 回測起點與成本的調整欄在完整報告裡；訪客用預設(2000 年初、單邊 0.1%)
+        const y0 = $('#usFrom') ? +$('#usFrom').value : 2000, cost = Math.max(0, +($('#usCost') ? $('#usCost').value : 0.1) || 0) / 100;
         const q0 = B.q.findIndex(q => +q.q.slice(0, 4) >= y0), i0 = B.d.indexOf(B.q[q0].start);
         const Q = B.q.slice(q0), rf = Q.reduce((a, q) => a + q.rf, 0) / Q.length;
         const navs = {}, st = {};
@@ -273,6 +274,7 @@
         const beatN = STRATS.filter(s => st[s.key].mult > S.mult).length, tot = v => pct(v - 1, 0);
         $('#usHero').innerHTML = `<b>先講結論</b>：${C.y0} 年起，四種策略中風險調整後最好的是「${esc(best.name)}」(夏普值 ${x.sharpe.toFixed(2)}，SPY ${S.sharpe.toFixed(2)})；`
           + `四種策略有 ${beatN} 種總報酬贏過 SPY 的 ${tot(S.mult)}。`;
+        if (!full) return;
         $('#usConcl').innerHTML = STRATS.map(s => { const y = st[s.key];
           return `<li><b>${esc(s.name)}</b>：總報酬 ${tot(y.mult)}、年化 ${pct(y.ret, 1)}、夏普值 ${y.sharpe.toFixed(2)}、最大回撤 ${pct(y.mdd, 0)}，${y.mult > S.mult ? '贏過' : '輸給'} SPY。</li>`; }).join('')
           + `<li><b>SPY 買進持有</b>：總報酬 ${tot(S.mult)}、年化 ${pct(S.ret, 1)}、夏普值 ${S.sharpe.toFixed(2)}、最大回撤 ${pct(S.mdd, 0)}。</li>`;
@@ -297,11 +299,13 @@
           window.LTTW.navCharts({ d: B.d, i0: C.i0, navs: { [b]: C.navs[b], spy: C.navs.spy }, meta: { [b]: { name: meta(b).name, color: meta(b).color }, spy: { name: meta('spy').name, color: meta('spy').color } },
             main: b, chart: $('#usBrief'), legend: $('#usBriefLegend') });
         }
+        if (!full) return;   // 訪客：只有上半部
         if (view === 'all') renderAll(C); else renderOne(C, view);
         LTChart.bars($('#usCov'), { x: C.Q.map(q => q.q), label: '可取得股價的成分股比例', height: 180, yMin: 0, yMax: 1,
           xFmt: (v, tip) => tip ? v : v.endsWith('Q1') && +v.slice(0, 4) % 5 === 0 ? v.slice(0, 4) : '', yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v, i) => `${(v * 100).toFixed(0)}%(${C.Q[i].usable} / ${C.Q[i].members} 檔)`,
           series: [{ name: '覆蓋率', y: C.Q.map(q => q.usable / q.members), color: 'var(--blue)' }] });
       }
+      if (!full) { draw(); return; }
       $('#usFrom').onchange = draw; $('#usCost').oninput = draw;
       tabs.bind(el);   // 套用上次看的分頁並畫出來
   }

@@ -63,6 +63,30 @@ test('權限清單(access.json)：會員、管理員程式都存在，而且不�
   for (const s of ACCESS.memberSections) assert.ok(sectionKeys.includes(s), `memberSections 有未知區塊：${s}`);
 });
 
+test('研究與策略：需要登入的資料集一律用 LT.loadReport 載入(訪客拿精簡版)，每個都有精簡版規則；研究、策略的目錄頁標 report', async () => {
+  const { BRIEFS } = await import('../scripts/briefs.mjs');
+  for (const d of ACCESS.memberDatasets) assert.equal(typeof BRIEFS[d], 'function', `${d} 沒有精簡版規則(scripts/briefs.mjs 的 BRIEFS)`);
+  for (const f of walk(join(WEB, 'modules')).filter(f => f.endsWith('.js'))) {
+    const s = readFileSync(f, 'utf8');
+    for (const m of s.matchAll(/LT\.loadJSON\(\s*'(\w+)'/g))
+      assert.ok(!ACCESS.memberDatasets.includes(m[1]), `${rel(f)} 用 LT.loadJSON 載入需要登入的 ${m[1]}，訪客會拿不到；改用 LT.loadReport`);
+  }
+  const cat = (sec, key) => site.pages.find(p => p.section === sec && p.key === key);
+  for (const [sec, key] of [['stock', 'tw-strategy'], ['stock', 'tw-research'], ['stock', 'us-strategy'], ['etf', 'research']])
+    assert.equal(cat(sec, key).catalog.report, true, `${sec}/${key} 是研究或策略，LT.catalog 要設 report: true`);
+  const disp = cat('stock', 'disposition').catalog.groups.flatMap(g => g.items);
+  for (const k of ['kbar', 'strategy']) assert.equal(disp.find(i => i.key === k).report, true, `處置股 › ${k} 要設 report: true`);
+});
+
+test('精簡版的先講結論：只取報告開頭的 > 引言', async () => {
+  const { heroOf, BRIEFS } = await import('../scripts/briefs.mjs');
+  assert.equal(heroOf('\n> **先講結論**：甲\n> 乙\n\n## 一、研究目的\n內容'), '> **先講結論**：甲\n> 乙');
+  assert.equal(heroOf('## 標題\n> 不是開頭'), '');
+  const b = BRIEFS.tw_gap('gap.json', { asof: 'x', start: 'y', n: 1, bins: [], all: { n: [1], ov: [2], intra: [3] }, nl: { n: [1], ov: [2], intra: [3] }, fill: {}, vol: {}, report: '> **先講結論**：丙\n\n## 一、研究目的\n機密' });
+  assert.equal(b.hero, '> **先講結論**：丙');
+  assert.ok(!('report' in b) && !('fill' in b) && !('intra' in b.all), '精簡版不能有完整報告的欄位');
+});
+
 test('訪客載入的程式(index.html)只註冊訪客能看的區塊', () => {
   const pubSite = loadSite(WEB, { only: 'public' });
   assert.deepEqual(pubSite.errors, []);

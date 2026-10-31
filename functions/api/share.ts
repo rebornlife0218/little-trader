@@ -1,5 +1,5 @@
 /* POST api/share {path, title}：產生研究報告的分享連結(只給登入的會員)
-   同一個人分享同一份報告回傳同一個代碼；連結是 /s/<代碼>(functions/s/[code].ts)，打開的人要登入 Google 才看得到報告 */
+   同一個人分享同一份報告回傳同一個代碼；連結是 /s/<代碼>(functions/s/[code].ts)，打開的人看得到上半部，登入 Google 才看得到完整報告 */
 import { json, type Env, type Data } from '../_lib/types';
 
 // 只有研究與策略的單一內容可以分享(區塊/頁面/項目)；不公開的策略不能分享

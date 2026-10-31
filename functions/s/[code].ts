@@ -1,6 +1,6 @@
 /* GET /s/<代碼>：打開分享連結
    記一次點開(share_links.clicks)，在瀏覽器存下是哪個分享連結(lt_ref cookie，30 天)，再轉到報告頁；
-   報告在需要登入的區塊，沒登入的人會先看到登入提示，登入後看報告時由 api/track 記下是誰看的(share_views)。
+   沒登入的人看得到報告的上半部(精簡版)，完整報告要登入；登入後看報告時由 api/track 記下是誰看的(share_views)。
    LINE、FB 的預覽會跟著轉址，抓到報告頁的標題與預覽圖；不計入統計的帳號(管理員、測試帳號，_lib/exclude.ts)點開不算 */
 import type { Env } from '../_lib/types';
 import { readSession, isAdmin } from '../_lib/auth';

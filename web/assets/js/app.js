@@ -58,7 +58,8 @@ const LT = (() => {
   });
 
   /* ---------- 會員：訪客看不到的區塊(由後端 functions/_lib/access.json 決定，經 api/me 傳回) ----------
-     會員區塊的頁面程式不寫在 index.html，登入的會員才由 api/me 拿到清單、在這裡載入；
+     目前所有區塊都公開(memberSections、memberScripts 是空的)，只有研究與策略的完整報告要登入(LT.loadReport)。
+     要再設會員區塊時：頁面程式不寫在 index.html，登入的會員才由 api/me 拿到清單、在這裡載入；
      伺服器也會擋訪客直接下載這些程式與資料，所以畫面上的鎖只是提示 */
   let auth = { kind: 'guest', memberSections: [], scripts: [], api: false, canLogin: false };
   const locked = secKey => auth.kind !== 'member' && auth.memberSections.includes(secKey);
@@ -80,9 +81,9 @@ const LT = (() => {
   function lockedPanel(sec) {
     return `<header class="top"><div><h1>${esc(sec.name)}</h1><p>${esc(sec.desc || '')}</p></div></header>
       <div class="panel lock-panel">
-        <div class="lock-ico">🔒</div>
+        <div class="lock-ico">${LOCK_ICON}</div>
         <h2>登入 Google 看更多</h2>
-        <p class="mute">用 Google 帳號登入後，就能看 ETF、股票的所有內容；設有密碼的策略仍需要另外輸入密碼。</p>
+        <p class="mute">用 Google 帳號登入後就能看；設有密碼的策略仍需要另外輸入密碼。</p>
         ${loginButton()}
         ${LTAuth.error ? `<p class="lock-err">${esc(LTAuth.error)}</p>` : ''}
       </div>`;
@@ -173,7 +174,8 @@ const LT = (() => {
   /* 頁面裡的細項(分頁、下拉選單)：頁面在切換時呼叫 LT.view('ETF研究', '主動式ETF', 'A 系列 ETF 跟單')，最多三層。
      連續切換(例如換類別會自動帶出第一個研究)只記最後停下來的畫面：0.6 秒內沒有再變才送；同一個細項不重複記 */
   let viewTimer = null, lastView = '';
-  function view(...labels) {
+  function view(...labels) { sendView(labels, false); }
+  function sendView(labels, locked) {
     const page = current;
     const trail = labels.filter(Boolean).map(s => String(s).trim().slice(0, 40)).slice(0, 3);
     clearTimeout(viewTimer);
@@ -181,7 +183,7 @@ const LT = (() => {
       const key = trail.join(' › ');
       if (!page || page !== current || !trail.length || key === lastView) return;
       lastView = key;
-      track(page.section, page.key, page.name, false, trail);
+      track(page.section, page.key, page.name, locked, trail);
     }, 600);
   }
   // 第一次來訪：選擇用 Google 登入或以訪客身分繼續(記住選擇，不再詢問)
@@ -194,7 +196,7 @@ const LT = (() => {
     box.innerHTML = `<div class="welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
         <img src="assets/img/logo.svg" alt="" class="welcome-logo">
         <h2 id="welcomeTitle">歡迎來到 Little Trader</h2>
-        <p class="mute">訪客可以看指數、選擇權、統計學與其他；登入 Google 看更多：ETF、股票。</p>
+        <p class="mute">所有內容都可以直接看；登入 Google 就能看研究與策略的完整報告。</p>
         ${loginButton()}
         <button type="button" class="welcome-guest">以訪客身分繼續瀏覽</button>
       </div>`;
@@ -211,7 +213,8 @@ const LT = (() => {
   function setHome(page) { home = page; }
 
   /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
-     LT.catalog({ section, group, key, name, desc, groups: [{ name, desc, items: [{ key, name, desc, summary, tags, soon, run(el, ctx) }] }] })
+     LT.catalog({ section, group, key, name, desc, report, groups: [{ name, desc, items: [{ key, name, desc, summary, tags, soon, report, run(el, ctx) }] }] })
+       report(選填)：研究、策略(上半部公開、完整報告要登入，見 LT.loadReport)；可以整個目錄頁設，或個別項目設
        redirect(選填)：redirect(項目代碼) 回傳網址時轉過去(舊網址)，回傳空字串就回到列表
        summary(選填)：研究的先講結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
        - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
@@ -250,13 +253,13 @@ const LT = (() => {
           <div class="cat-body"></div>`;
         if (canShare) el.querySelector('.share-btn').onclick = () => share(`${base}/${encodeURIComponent(it.key)}`, it, el.querySelector('.share-msg'));
         const label = [it.groupName, it.name].filter(Boolean);
-        view(...label);
+        sendView(label, !isMember() && !!(it.report ?? def.report));   // 研究、策略：訪客只看得到上半部
         const body = el.querySelector('.cat-body');
         Promise.resolve(it.run(body, { alive: ctx.alive, view: (...more) => view(...label, ...more) })).then(() => { if (ctx.alive()) hoistConclusion(body); });
       },
     });
   }
-  /* ---------- 分享研究報告：產生專屬連結(api/share)，打開的人要登入 Google 才看得到；後台記錄誰分享、誰看了 ----------
+  /* ---------- 分享研究報告：產生專屬連結(api/share)，打開的人看得到上半部，登入 Google 才看得到完整報告；後台記錄誰分享、誰看了 ----------
      手機用系統的分享選單(LINE、FB…)，電腦複製連結 */
   const SHARE_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>';
   async function share(path, it, msg) {
@@ -271,7 +274,7 @@ const LT = (() => {
     if (navigator.share && matchMedia('(pointer:coarse)').matches) {
       try { await navigator.share({ title, text, url }); return; } catch (e) { if (e.name === 'AbortError') return; }
     }
-    try { await navigator.clipboard.writeText(url); say('已複製分享連結，對方登入 Google 後就能看'); }
+    try { await navigator.clipboard.writeText(url); say('已複製分享連結，對方登入 Google 後就能看完整報告'); }
     catch (e) { window.prompt('複製這個分享連結：', url); }
   }
   // 研究報告的「先講結論」(報告開頭的 > 引言)：搬到頁面最上方(有精簡版時放進精簡版的結論位置)，一打開就看得到
@@ -524,6 +527,25 @@ const LT = (() => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return { meta, data: await r.json() };
   }
+  /* ---------- 研究與策略：上半部(精簡版)公開，下半部(完整報告)要登入 ----------
+     LT.loadReport(資料集, 檔名)：登入的人拿完整版，訪客拿精簡版 brief/<檔名>(只有上半部用到的欄位，部署時由 scripts/briefs.mjs 產生；
+     完整版訪客下載會被後端擋下)。回傳 { meta, data, full }，full = false 時頁面只畫上半部，下半部放 LT.reportLock() */
+  const isMember = () => auth.kind === 'member';
+  async function loadReport(name, file) {
+    const full = isMember();
+    return { ...await loadJSON(name, full ? file : 'brief/' + file), full };
+  }
+  // 下半部的登入提示(取代完整報告)；目錄頁設 report: true 時，訪客的瀏覽紀錄記為 locked(後台「訪客看到登入提示」)
+  const LOCK_ICON = '<svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1.4"/></svg>';
+  function reportLock() {
+    return `<div class="panel lock-panel report-lock">
+        <div class="lock-ico">${LOCK_ICON}</div>
+        <h2>登入 Google 看完整報告</h2>
+        <p class="mute">上面是重點整理；研究目的、資料處理、研究方法、完整的實證結果與結論，用 Google 帳號登入後就能看。設有密碼的策略仍需要另外輸入密碼。</p>
+        ${loginButton()}
+        ${LTAuth.error ? `<p class="lock-err">${esc(LTAuth.error)}</p>` : ''}
+      </div>`;
+  }
   // 網頁不顯示資料來源與更新排程(meta.json 仍保留，用 version 更新快取)；舊頁面呼叫的 LT.sourceLine 一律回傳空字串
   function sourceLine() { return ''; }
 
@@ -630,5 +652,5 @@ const LT = (() => {
     });
   }
 
-  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, brief, moreTable, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, sourceLine, mdTables };
+  return { get auth() { return auth; }, locked, loginButton, stockLink, goBack, view, catalog, brief, moreTable, path, go, crumbs, tabs, UNDER_CONSTRUCTION, register, setHome, listPages, start, toggleSection, toggleTheme, theme, cssVar, SECTIONS, groupPages, dataset, dataUrl, loadJSON, loadReport, reportLock, isMember, sourceLine, mdTables };
 })();

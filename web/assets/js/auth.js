@@ -9,7 +9,7 @@ const LTAuth = (() => {
   const ready = !!(CFG.apiKey && CFG.clientId);
   const KEY = 'lt.oauth';
   const MAIN_SITE = 'https://little-trader.pages.dev/';
-  const FALLBACK_LOCKED = ['etf', 'stock'];   // 連不到 api/me(例如 GitHub Pages 備援站)時當作訪客
+  const FALLBACK_LOCKED = [];   // 連不到 api/me(例如 GitHub Pages 備援站)時當作訪客；所有區塊都公開，研究與策略的完整報告另外由 LT.loadReport 判斷
   const redirectUri = () => new URL('./', document.baseURI).href;   // 一律回到網站根目錄(Google 後台登記的網址)，不管從哪一頁登入
   const hex = n => Array.from(crypto.getRandomValues(new Uint8Array(n)), b => b.toString(16).padStart(2, '0')).join('');
   const jwtPayload = t => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0))));

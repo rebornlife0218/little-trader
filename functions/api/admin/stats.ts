@@ -46,18 +46,19 @@ export const onRequestGet: PagesFunction<Env, string, Data> = async ({ request, 
              (SELECT COUNT(DISTINCT subject) FROM page_views WHERE ts >= ?1 AND subject NOT IN ${ADMINS}) AS viewers`).bind(since, ex),
     // 最受歡迎的主題(後台一層一層點開)：區塊 › 頁面 › 頁面裡的細項(分頁、下拉選單，最多三層 l1 l2 l3)
     // 區塊與頁面算「換頁」的次數(l1 為 NULL)；細項算切換到那個畫面的次數，上層的次數 = 底下所有細項加總
-    // locked = 訪客點進需要登入的區塊被擋下的次數
+    // locked = 訪客看到登入提示的次數：打開研究、策略只看得到上半部(完整報告要登入，目錄頁的細項紀錄)，
+    //          以及舊版紀錄裡點進需要登入的區塊被擋下的次數；區塊、頁面的 locked 是底下所有紀錄的加總
     db.prepare(`
-      SELECT section, COUNT(*) AS n, COUNT(DISTINCT subject) AS people,
-             SUM(kind = 'member') AS member, SUM(kind = 'guest') AS guest, SUM(locked) AS locked
-      FROM page_views WHERE ts >= ?1 AND l1 IS NULL AND subject NOT IN ${ADMINS} GROUP BY section`).bind(since, ex),
+      SELECT section, SUM(l1 IS NULL) AS n, COUNT(DISTINCT CASE WHEN l1 IS NULL THEN subject END) AS people,
+             SUM(l1 IS NULL AND kind = 'member') AS member, SUM(l1 IS NULL AND kind = 'guest') AS guest, SUM(locked) AS locked
+      FROM page_views WHERE ts >= ?1 AND subject NOT IN ${ADMINS} GROUP BY section`).bind(since, ex),
     db.prepare(`
-      SELECT section, page, MAX(title) AS title, COUNT(*) AS n, COUNT(DISTINCT subject) AS people,
-             SUM(kind = 'member') AS member, SUM(kind = 'guest') AS guest
-      FROM page_views WHERE ts >= ?1 AND l1 IS NULL AND page <> '' AND subject NOT IN ${ADMINS} GROUP BY section, page`).bind(since, ex),
+      SELECT section, page, MAX(title) AS title, SUM(l1 IS NULL) AS n, COUNT(DISTINCT CASE WHEN l1 IS NULL THEN subject END) AS people,
+             SUM(l1 IS NULL AND kind = 'member') AS member, SUM(l1 IS NULL AND kind = 'guest') AS guest, SUM(locked) AS locked
+      FROM page_views WHERE ts >= ?1 AND page <> '' AND subject NOT IN ${ADMINS} GROUP BY section, page`).bind(since, ex),
     ...['l1', 'l1, l2', 'l1, l2, l3'].map(cols => db.prepare(`
       SELECT section, page, ${cols}, COUNT(*) AS n, COUNT(DISTINCT subject) AS people,
-             SUM(kind = 'member') AS member, SUM(kind = 'guest') AS guest
+             SUM(kind = 'member') AS member, SUM(kind = 'guest') AS guest, SUM(locked) AS locked
       FROM page_views WHERE ts >= ?1 AND ${cols.split(', ').pop()} IS NOT NULL AND subject NOT IN ${ADMINS}
       GROUP BY section, page, ${cols}`).bind(since, ex)),
     // 登入用戶分析：每位會員(第一次登入、最後上線)，以及期間內看了哪些頁面與細項(每一筆瀏覽紀錄就是看到的最深一層)

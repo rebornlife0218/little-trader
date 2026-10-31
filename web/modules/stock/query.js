@@ -1,5 +1,5 @@
 /* 股票 · 台股 · 股票查詢：上市櫃股票與 ETF 的價量、法人、融資券、借券與重要事件(2016 年起，含已下市櫃)
-   資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢；登入 Google 才能用(functions/_lib/access.json)
+   資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢；訪客也能用，但後端只給最近 31 天(登入 Google 不限期間，functions/_lib/types.ts 的 POLICY)
    api/prices 回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價, v 成交量, f 外資買賣超, t 投信買賣超,
    m 融資餘額, s 融券餘額, b 借券賣出餘額}(單位都是張)與 events = [[日期, 種類, 說明, 結束日期]]
    K 線圖：左上角切換原始價、還原價(開高低乘上當天的還原比例 a ÷ c)；點一下出現十字線，滾輪縮放、拖曳平移、← → 移動 */
@@ -320,7 +320,7 @@
         $('#pqOut').innerHTML = `
           <div class="panel">
             <h3 class="pq-title">${title}</h3>
-            <p class="mute" style="margin-top:-4px;">${R.d[i0]} ～ ${R.d[last]}，${(n - i0).toLocaleString()} 個交易日${j.truncated ? '(訪客只能查最近 1 個月)' : ''}</p>
+            <p class="mute" style="margin-top:-4px;">${R.d[i0]} ～ ${R.d[last]}，${(n - i0).toLocaleString()} 個交易日${j.truncated ? '(訪客只能查最近 1 個月，登入 Google 就能看 2016 年起的完整資料)' : ''}</p>
             <div class="statgrid" style="margin:12px 0;">
               ${card(num(R.c[last]), `最新收盤(${R.d[last].slice(5).replace('-', '/')})`)}
               ${card(pct(a1 / a0 - 1), '含息報酬(還原股價)', cls(a1 / a0 - 1))}

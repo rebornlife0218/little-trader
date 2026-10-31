@@ -52,11 +52,13 @@ test('來源檢查：別的網站呼叫 API 一律 403，允許的來源只回�
 });
 
 test('會員程式：訪客 401，登入後可以下載且不讓 CDN 快取；公開程式照常', async () => {
-  const f = '/' + F.ACCESS.memberScripts[0];
+  const f = '/' + (F.ACCESS.memberScripts[0] || F.ACCESS.adminScripts[0]);   // 目前沒有會員區塊時，用後台程式檢查「訪客 401」
   let r = await call(F.modulesMw, req(f));
   assert.equal(r.passed, false); assert.equal(r.res.status, 401);
-  r = await call(F.modulesMw, req(f, { Cookie: await memberCookie() }));
-  assert.equal(r.passed, true); assert.match(r.res.headers.get('Cache-Control'), /private/);
+  if (F.ACCESS.memberScripts.length) {
+    r = await call(F.modulesMw, req(f, { Cookie: await memberCookie() }));
+    assert.equal(r.passed, true); assert.match(r.res.headers.get('Cache-Control'), /private/);
+  }
   r = await call(F.modulesMw, req('/modules/stats/basic.js'));
   assert.equal(r.passed, true);
 });
@@ -79,6 +81,17 @@ test('會員資料集：訪客 401(meta.json 公開)，登入後可以下載；�
   assert.equal(r.res.status, 401);
   r = await call(F.dataMw, req('/data/indices/TAIEX.json'));
   assert.equal(r.passed, true);
+});
+
+test('研究與策略：精簡版(brief/)訪客可以下載，完整報告要登入；用編碼過的路徑也繞不過', async () => {
+  for (const ds of F.ACCESS.memberDatasets) {
+    let r = await call(F.dataMw, req(`/data/${ds}/brief/x.json`));
+    assert.equal(r.passed, true, `${ds} 的精簡版要公開`);
+    r = await call(F.dataMw, req(`/data/${ds}/x.json`));
+    assert.equal(r.res.status, 401, `${ds} 的完整報告要登入`);
+    r = await call(F.dataMw, req(`/data/${ds}/brief%2F..%2Fx.json`));
+    assert.equal(r.passed, false, `${ds}：編碼過的 brief%2F.. 不能繞過`);
+  }
 });
 
 test('分享連結：只有會員能產生，不公開的策略不能分享；代碼不對就回首頁', async () => {

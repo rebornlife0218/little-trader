@@ -6,7 +6,7 @@
 
 ```
 web/                                網站(部署時整個資料夾就是網站根目錄)
-  index.html                        外框，在此依序載入框架與訪客也能看的模組 <script defer>(平行下載、依序執行)；會員區塊的程式登入後才由 app.js 載入。
+  index.html                        外框，在此依序載入框架與所有模組 <script defer>(平行下載、依序執行)；目前沒有會員區塊(要再設時，會員區塊的程式登入後才由 app.js 載入)。
                                     <base href="/"> 是網站根目錄(所有網址都寫相對路徑)；標題、說明、分享預覽(og:)是部署時產生各頁 HTML 的範本
   assets/
     js/app.js                       框架：側欄區塊 SECTIONS、頁面註冊、路由(一般網址，見「網址」)、麵包屑、分頁元件 LT.tabs、目錄頁 LT.catalog、資料載入、會員區塊的鎖與登入畫面
@@ -68,15 +68,16 @@ pipeline/                           資料抓取，一個資料集一個資料�
   price_query/sync.py               股票查詢的資料：cm schema → Cloudflare D1(本機執行，只上傳有變動的部分)
 
 functions/                          Cloudflare Pages Functions(後端，只在 Cloudflare 主站運作)
-  _lib/access.json                  權限設定(唯一的設定處)：會員限定的區塊、頁面程式、資料集，以及後台程式
+  _lib/access.json                  權限設定(唯一的設定處)：會員限定的區塊、頁面程式(目前都沒有)、研究與策略的資料集(完整報告要登入)，以及後台程式
   _lib/auth.ts                      Firebase ID token 驗證、會員 session cookie、訪客 id
   _lib/types.ts                     環境變數、股票查詢的期間與每日額度 POLICY
   _lib/security.ts                  API 的資安防護：來源檢查(CORS)、安全標頭、每分鐘次數限制
   api/                              me(目前身分)、session(登入)、logout、track(頁面瀏覽紀錄)、share(分享連結)、symbols、prices(股票查詢)、admin/stats(後台)；_middleware.ts 辨識身分並寫查詢日誌
-  data/_middleware.ts               會員限定的資料集只給會員(meta.json 公開)
+  data/_middleware.ts               研究與策略的完整資料只給會員(meta.json 與精簡版 brief/ 公開)
   modules/_middleware.ts            會員限定的頁面程式只給會員、後台程式只給管理員
 migrations/                         D1 資料表(users、guest_links、query_logs、page_views、share_links、share_views、usage_daily、rate_minute、symbols、price_chunks、meta)
-scripts/build-site.mjs              部署前產生 _routes.json(只有需要檢查的路徑經過 functions)、各頁面的 HTML(標題與分享預覽)、sitemap.xml、GitHub Pages 的公開版
+scripts/build-site.mjs              部署前產生研究與策略的精簡版(scripts/briefs.mjs)、_routes.json(只有需要檢查的路徑經過 functions)、各頁面的 HTML(標題與分享預覽)、sitemap.xml、GitHub Pages 的公開版
+scripts/briefs.mjs                  研究與策略的公開精簡版：每個需要登入的資料集，頁面上半部用到的欄位(白名單)與先講結論
 scripts/site-map.mjs                在 Node 裡載入頁面程式，列出所有頁面與網址(build-site.mjs 與自動測試共用)
 scripts/check-freshness.mjs         本機排程的資料多久沒更新(check-local.yml 呼叫)
 scripts/share/                      研究的 IG 圖卡(本機執行)：make-share.mjs 產生 IG/<研究>/1～5.png；ig-card.mjs 是圖卡版面、ig-topics.mjs 是各研究的圖卡內容
@@ -106,7 +107,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 | 網址 | 角色 | 部署方式 |
 |---|---|---|
 | https://little-trader.pages.dev/ (Cloudflare Pages，專案 `little-trader`) | 主要網址：完整版＋後端(登入、會員權限、股票查詢) | `deploy.yml` 的 `cloudflare-pages` 工作，在 repo 根目錄用 wrangler 直接上傳(Direct Upload)，一起上傳 `functions/` |
-| https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪：公開版(沒有後端、不能登入，會員區塊顯示「到主站登入」) | `deploy.yml` 的 `github-pages` 工作，用 `scripts/build-site.mjs` 拿掉會員限定的程式與資料 |
+| https://rebornlife0218.github.io/little-trader/ | 備援，保留不刪：公開版(沒有後端、不能登入，研究與策略只有上半部，下半部顯示「到主站登入」) | `deploy.yml` 的 `github-pages` 工作，用 `scripts/build-site.mjs` 拿掉會員限定的程式與完整資料(保留精簡版) |
 
 - 觸發點不變：推送到 main、資料集排程、`run_local.py`(`gh workflow run deploy.yml`)都會一次部署兩邊。只改網站內容的話，照舊 commit + push 即可，不用碰 Cloudflare。
 - 部署前先跑自動測試(`deploy.yml` 的 `test` 工作，同本機的 `npm test`)，沒過就不部署；改程式後 push 前請先在本機跑 `npm test`。
@@ -136,20 +137,25 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 身分 | 看得到 |
 |---|---|
-| 訪客 | 指數、選擇權、統計學、其他 |
-| 登入 Google(程式裡稱 member) | 全部；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
+| 訪客 | 所有區塊；研究與策略只看得到上半部(精簡版：先講結論、策略說明、績效卡片、累積報酬圖、近期明細)，下半部是「登入 Google 看完整報告」；股票查詢只有最近 31 天 |
+| 登入 Google(程式裡稱 member) | 全部，含研究與策略的完整報告；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
 | 管理員(`users.role = 'admin'`) | 另外有後台 `other/admin`；後台統計(含分享紀錄)不計入管理員與測試帳號(`functions/_lib/exclude.ts`：管理員，以及列在裡面的 email；repo 公開，只放 email 小寫的 SHA-256)，連同這些帳號登入前在同一個瀏覽器用訪客身分的紀錄(登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`)；這些帳號點開分享連結也不算點開次數 |
 
 **怎麼運作**
 
 - 登入(`assets/js/auth.js`)：轉到 Google 登入頁 → 回來時用 Firebase REST API(`accounts:signInWithIdp`)換成 Firebase ID token → `POST api/session`，後端驗證 token(`jose`，Google 公開金鑰)後發 `lt_sess` cookie(HttpOnly、HMAC 簽章、30 天)。不用 Firebase SDK，因為它會從 Google 載入外部腳本，違反 CSP 只允許同源的規則；CSP 只為登入多開 `connect-src https://identitytoolkit.googleapis.com`。
-- 開網頁時 `app.js` 先呼叫 `api/me`：會員才拿到會員區塊的程式清單並載入；訪客在側欄與首頁看到「🔒 登入 Google 看更多」，點進去是登入提示(網頁上不用「會員」這個詞)。第一次來訪會跳出「用 Google 登入 / 以訪客身分繼續瀏覽」(選訪客會記在 localStorage `lt.guest`，不再詢問；這個標記只控制畫面)。
+- 開網頁時 `app.js` 先呼叫 `api/me` 知道是不是登入的人(目前沒有會員區塊，`memberSections`、`memberScripts` 是空的；要再設時，會員才拿到會員區塊的程式清單並載入，訪客在側欄與首頁看到「登入 Google 看更多」)。網頁上不用「會員」這個詞。第一次來訪會跳出「用 Google 登入 / 以訪客身分繼續瀏覽」(選訪客會記在 localStorage `lt.guest`，不再詢問；這個標記只控制畫面)。
 - 真正的權限在後端：`functions/data/_middleware.ts`、`functions/modules/_middleware.ts` 擋訪客下載會員限定的資料與程式(回 401)，畫面上的鎖只是提示。
+- **研究與策略的完整報告**：`memberDatasets`(etf_research、sp500、tw_strategy、tw_research、tw_gap)的檔案要登入；部署時 `scripts/build-site.mjs` 用 `scripts/briefs.mjs` 從每個檔拆出精簡版 `data/<資料集>/brief/<檔名>`，只放頁面上半部用到的欄位(白名單，新欄位預設不公開；研究報告只帶開頭的 `> **先講結論**`，存成 `hero`)，精簡版公開、不經過 functions(`_routes.json` 的 exclude)。
+  - 頁面用 `LT.loadReport(資料集, 檔名)` 載入：登入的人拿完整版、訪客拿精簡版，回傳 `{ meta, data, full }`；`full = false` 時只畫上半部，下半部放 `LT.reportLock()`(登入提示)。完整報告用到的調整欄(例如借券費、回測起點)在下半部，訪客用預設值算上半部。
+  - 直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)沒有需要保護的資料，用 `LT.isMember()` 判斷，訪客一樣只畫上半部(報告文字在公開的頁面程式裡，只是畫面上不顯示)。策略的完整報告大多是用上半部同一份資料(淨值、交易)算出來的，後端保護的是只有下半部用到的欄位(參數、敏感度、報告文字)。
+  - 目錄頁(`LT.catalog`)設 `report: true`(整個目錄頁或個別項目)：訪客打開時，瀏覽紀錄記為 locked，後台顯示「訪客看到登入提示」的次數。
+  - 新增研究或策略：資料集加到 `memberDatasets`，`scripts/briefs.mjs` 加這個檔的精簡版規則(上半部改用到新欄位時也要一起改)；`tests/site.test.mjs` 檢查需要登入的資料集都用 `LT.loadReport` 載入、都有精簡版規則。
 - 權限清單只寫在 `functions/_lib/access.json`：後端檢查、部署時的 `_routes.json`、GitHub Pages 公開版、網頁要載入的程式都從這裡來。
-  - **新增會員區塊的頁面**：程式放在 `web/modules/<區塊>/`，路徑加到 `memberScripts`(依側欄順序，同一小組要連續)，**不要**寫進 `index.html`。
-  - **新增會員限定的資料集**：名稱加到 `memberDatasets`。
+  - **新增會員區塊的頁面**(目前沒有)：程式放在 `web/modules/<區塊>/`，路徑加到 `memberScripts`(依側欄順序，同一小組要連續)，**不要**寫進 `index.html`。
+  - **新增要登入的資料集**：名稱加到 `memberDatasets`，並在 `scripts/briefs.mjs` 寫精簡版規則。
   - 要把整個區塊改成公開或會員限定：改 `memberSections`，並把該區塊的程式在 `index.html` 與 `memberScripts` 之間搬動。
-- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否被擋在需要登入的區塊)，存在 `page_views`；頁面裡切換分頁、研究、下拉選單時，頁面呼叫 `LT.view(第一層, 第二層, 第三層)` 再記一筆細項(`l1`～`l3`，例如 ETF研究 › 主動式ETF › A 系列 ETF 跟單)，0.6 秒內連續切換只記最後停下來的畫面。後台的「最受歡迎的主題」是可一層一層展開的樹狀表：區塊 › 頁面 › 細項，區塊與頁面算進入次數，細項算切換次數(上層是底下所有細項的加總)。同一頁重新整理會再記一筆。後台的「登入用戶分析」列出登入用戶最常看的主題(依人數)與每位會員看了哪些主題(主題 = 頁面 › 看到的最深一層細項，只算登入後的瀏覽)；Google 登入只拿 email 與名稱(scope `openid email profile`)，沒有年齡、性別。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
+- 頁面瀏覽紀錄：每次換頁網頁送一筆 `POST api/track`(區塊、頁面、是否登入、訪客是否看到登入提示 locked：打開研究、策略只看得到上半部，或以前點進需要登入的區塊被擋下)，存在 `page_views`；頁面裡切換分頁、研究、下拉選單時，頁面呼叫 `LT.view(第一層, 第二層, 第三層)` 再記一筆細項(`l1`～`l3`，例如 ETF研究 › 主動式ETF › A 系列 ETF 跟單)，0.6 秒內連續切換只記最後停下來的畫面。後台的「最受歡迎的主題」是可一層一層展開的樹狀表：區塊 › 頁面 › 細項，區塊與頁面算進入次數，細項算切換次數(上層是底下所有細項的加總)。同一頁重新整理會再記一筆。後台的「登入用戶分析」列出登入用戶最常看的主題(依人數)與每位會員看了哪些主題(主題 = 頁面 › 看到的最深一層細項，只算登入後的瀏覽)；Google 登入只拿 email 與名稱(scope `openid email profile`)，沒有年齡、性別。`api/track` 有自己的每分鐘上限 30 次(`PER_MINUTE_TRACK`)，不佔一般 API 的額度。
 - 每個 `/api` 請求都寫一筆 `query_logs`(`/api/me`、`/api/track` 除外)：會員 uid 或訪客 id、股票代號、查詢期間、狀態碼、耗時、IP、國家、User-Agent。日誌含個資(IP、email)，要定期清理(例如保留 180 天)：`npx wrangler d1 execute little-trader --remote --command "DELETE FROM query_logs WHERE ts < datetime('now', '-180 days'); DELETE FROM page_views WHERE ts < datetime('now', '-180 days'); DELETE FROM usage_daily WHERE day < date('now', '-30 days')"`。
 - API 的資安防護(`functions/_lib/security.ts`，由 `api/_middleware.ts` 套用到所有 `/api`)：
   - **來源檢查(CORS)**：只有 `wrangler.toml` 的 `ALLOWED_ORIGINS`(目前是 `little-trader.pages.dev` 與本機開發)能從瀏覽器呼叫；`Origin` 不在清單內、或 `Sec-Fetch-Site: cross-site` 一律 403，連登入、登出的 POST 也擋(順便防 CSRF)。允許的來源才回 `Access-Control-Allow-Origin`(是那個來源本身，不是 `*`)。綁自己的網域時要加進 `ALLOWED_ORIGINS`。CORS 只擋得了別人的網頁，擋不了程式直接呼叫，那部分靠次數限制。
@@ -158,7 +164,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
   - **驗證**：`Authorization: Bearer <Firebase ID token>` 或網頁登入後的 session cookie 都算會員；token 不合法回 401，不降級成訪客。
   - **資料在後端過濾**：訪客的查詢期間在後端截成最近 31 天，只讀那幾年的資料區塊、逐日篩選後才回傳，訪客拿不到更早的資料。
   - **安全標頭**：API 回應加上 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Content-Security-Policy: default-src 'none'`、`Referrer-Policy: no-referrer`、`Cache-Control: private, no-store`；靜態檔的安全標頭在 `web/_headers`(只有 Cloudflare 會套用)。
-- Functions 用量：免費方案每天 10 萬次請求；`_routes.json` 讓只有 `/api/*` 與會員限定的檔案經過 functions，其他靜態檔不計。
+- Functions 用量：免費方案每天 10 萬次請求；`_routes.json` 讓只有 `/api/*` 與會員限定的檔案(研究與策略的完整資料)經過 functions，精簡版與其他靜態檔不計。
 
 **第一次設定(只做一次)**
 
@@ -182,7 +188,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 ## 股票查詢
 
-- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `stock/query/<代號>`(`modules/stock/query.js`，登入 Google 才能用；不列在側欄)。查詢頁也可以改代號、選期間：
+- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `stock/query/<代號>`(`modules/stock/query.js`，訪客也能用，但只看得到最近 31 天；不列在側欄)。查詢頁也可以改代號、選期間：
   - 標題列：代號、名稱、上市／上櫃／創新板、股本(億元，實收資本額；ETF 沒有股本)。
   - K 線圖(canvas)：左上角切換原始價、還原價(開高低乘上當天的還原收盤價 ÷ 收盤價)；5、20、60MA；點一下出現十字線(左側價格軸標收盤價)，資訊列列出開高低收、各 MA(後面 ↑↓ 是當天斜率)、成交量、外資與投信買賣超、融資券餘額、借券賣出餘額、當天的事件；滾輪縮放、拖曳平移、← → 移動。為了讓 60MA 從第一天就有值，查詢時多抓前 120 個日曆天(圖一開始只顯示查詢期間)。
   - 事件：月營收在公告日的 K 棒上方畫小菱形(紅色 = 單月營收年成長、綠色 = 年衰退，點 K 棒在資訊列看年成長 %)；「息」除權息、「分割」分割或減資、「停」暫停交易標在 K 棒下方；處置期間畫淡色底。
@@ -192,7 +198,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價、成交量、外資與投信買賣超、融資(`資餘`)與融券(`券餘`)餘額、借券賣出餘額，單位都已用 2330 核對(都是張)。事件來自 `cm.tw_monthly_revenue`(公告日、單月合併營收年成長，沒有合併數字時用單月營收)、`cm.tw_trading_halt`、`cm.tw_disposition`；除權息、分割或減資沒有現成欄位，由「還原收盤價 ÷ 收盤價」的跳動推算(超過四捨五入誤差才算；跳動超過 25% 視為分割或減資)，日期對到該股票的交易日(公告日沒交易就放在下一個交易日)。名稱、市場、股本來自 `cm.tw_company_info`(上市上櫃代碼：1 上市、2 上櫃、7 創新板)；資料庫沒有 ETF，改用證交所(上市)、櫃買中心(上櫃)當天的收盤行情補名稱與市場(累積在 `~/.cache/little-trader/etf_names.json`)。
 - 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON，欄位與事件都在裡面)，全部約 2.2 萬筆、92 MB；查 10 年只讀約 11 列。
 - 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳(約 4 分鐘)。`run_local.py` 每天在 cm 同步後執行。
-- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：登入 Google 不限期間、每天 1000 次；訪客最近 31 天、每天 30 次(查詢頁只開放登入的人，訪客的限制是 API 的保險)。額度以台北日期計，登入的人依帳號、訪客依 IP；另有每分鐘上限(見「會員與權限」)。
+- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：登入 Google 不限期間、每天 1000 次；訪客最近 31 天、每天 30 次(查詢頁會提示訪客登入看完整期間)。額度以台北日期計，登入的人依帳號、訪客依 IP；另有每分鐘上限(見「會員與權限」)。
 
 ## 資料集
 
@@ -232,7 +238,7 @@ sp500 的特殊處理：
 
 ## 新增頁面
 
-在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)。會員區塊(ETF、股票)的頁面改加到 `functions/_lib/access.json` 的 `memberScripts`，不寫進 `index.html`(見「會員與權限」)：
+在 `web/modules/<區塊>/` 新增 JS，並在 `web/index.html` 的「研究模組」處加上 `<script defer src="...">`(一律加 defer，網頁才會平行下載、不會卡住畫面)。目前所有區塊都公開；要設會員區塊時，該區塊的頁面改加到 `functions/_lib/access.json` 的 `memberScripts`，不寫進 `index.html`(見「會員與權限」)；研究、策略的資料用 `LT.loadReport`(見「會員與權限」的完整報告)：
 
 ```js
 LT.register({ section: 'etf', key: 'x', name: '外部網站', href: 'https://...' });       // 側欄直接開新分頁
@@ -270,7 +276,7 @@ LT.register({
   項目可以加 `summary`(研究的先講結論精簡版，不寫會隨資料變動的數字)：分組裡有 summary 時改成條列，標題下面直接寫結論。研究內容畫完後，報告開頭的先講結論(`> **先講結論**：…`)如果不在第一個區塊，會自動搬到內容最上方(app.js 的 `hoistConclusion`)。
 
   `<區塊>/<頁面>` 是分組的卡片列表，`<區塊>/<頁面>/<項目>` 是單一內容(上方的麵包屑可以回到列表，可分享、加書籤)；`run(el, ctx)` 畫內容，`ctx.alive()` 同一般頁面，內容裡還有分頁時呼叫 `ctx.view('分頁名稱')`。後台的熱門主題自動記到「分組 › 項目」。目前用在 ETF研究、台股其他研究、台股策略、美股策略。
-- **研究與策略的精簡版**：每份研究、策略的內容最上方用 `LT.brief({ hero, items, chart })` 產生精簡版：先講結論 → 策略說明(`items`：邏輯、進出場、停利停損、持有期間，研究可改成「怎麼比較、資料、期間」，每項一兩句、不用術語；邏輯的小卡佔兩格寬，第三項之後合併成一張) → 績效卡片(`stats`，前 3 張依序是勝率、總報酬、年化報酬；手機只顯示勝率、總報酬、年化報酬、最大回撤，其餘按「顯示更多績效」展開。用 `LTTW.card(…, key = true)` 標記手機要顯示的卡片(`.stat.key`)；沒有標 key 的卡片組，手機只顯示前 4 張) → 累積報酬與回撤圖(容器 id = `chart`，圖例 = `chart + 'Legend'`，由頁面自己畫，通常是主要版本 vs 0050) → 策略的近期明細(`recent`，用 `LT.moreTable(容器, 表頭, 列, 20)` 先顯示最新 20 筆、按鈕展開)。下面才是完整報告；兩者之間由樣式區隔(漸層底色、漸層分隔線)，網頁上不寫說明文字。先講結論由網頁產生時放進 `hero`，否則報告開頭的 `> **先講結論**` 會自動放進來。每天自動更新的策略傳 `updated: '<資料集>'`，精簡版右上角顯示該資料集 `meta.json` 的最近更新時間(月/日 時:分；台股策略 tw_strategy、處置股策略 tw_research、美股策略 sp500)。
+- **研究與策略的精簡版**：每份研究、策略的內容最上方用 `LT.brief({ hero, items, chart })` 產生精簡版：先講結論 → 策略說明(`items`：邏輯、進出場、停利停損、持有期間，研究可改成「怎麼比較、資料、期間」，每項一兩句、不用術語；邏輯的小卡佔兩格寬，第三項之後合併成一張) → 績效卡片(`stats`，前 3 張依序是勝率、總報酬、年化報酬；手機只顯示勝率、總報酬、年化報酬、最大回撤，其餘按「顯示更多績效」展開。用 `LTTW.card(…, key = true)` 標記手機要顯示的卡片(`.stat.key`)；沒有標 key 的卡片組，手機只顯示前 4 張) → 累積報酬與回撤圖(容器 id = `chart`，圖例 = `chart + 'Legend'`，由頁面自己畫，通常是主要版本 vs 0050) → 策略的近期明細(`recent`，用 `LT.moreTable(容器, 表頭, 列, 20)` 先顯示最新 20 筆、按鈕展開)。下面才是完整報告；兩者之間由樣式區隔(漸層底色、漸層分隔線)，網頁上不寫說明文字。先講結論由網頁產生時放進 `hero`，否則報告開頭的 `> **先講結論**` 會自動放進來(訪客拿不到報告，頁面改用精簡版的 `hero` 欄位)。策略說明的小卡不寫具體門檻與天數(例如「設有停利與停損」「短線，最多持有幾個交易日」)，數字留在完整報告。訪客只畫到這裡，下面放 `LT.reportLock()`(見「會員與權限」)。每天自動更新的策略傳 `updated: '<資料集>'`，精簡版右上角顯示該資料集 `meta.json` 的最近更新時間(月/日 時:分；台股策略 tw_strategy、處置股策略 tw_research、美股策略 sp500)。
 - **股票代號連結**：表格裡的台股代號用 `LT.stockLink(代號, 顯示文字)`，點了跳到股票查詢並直接查那一檔，查詢頁有按鈕可以跳回來(目前用在處置股、策略)。
 - **後台熱門主題的完整清單**：後台的「最受歡迎的主題」會先列出網站上所有主題(還沒人看過的顯示 0)，來源是側欄的頁面、目錄頁的分組與項目，以及註冊時的 `topics`(頁面裡的分頁、指數、章節等子項目，字串或 `{ name, items }`，名稱要和 `LT.view` 記錄的一樣；目錄頁的項目也可以加 `topics`)。新增分頁或子項目時記得一起加。
 - **後台的熱門主題細項**：頁面裡有分頁、下拉選單時，在切換的地方呼叫 `LT.view('分頁名稱', '類別', '研究名稱')`(最多三層，名稱用畫面上看到的文字)，後台就能一層一層看各細項的瀏覽次數。目錄頁會自動記錄；其他頁面目前用在選擇權市場概況(分頁)、大盤漲跌分析與 K棒型態分析(模式 › 指數)、初級統計學(章)，以及目錄頁裡的低波動選股、美股策略(分頁)。
@@ -284,12 +290,12 @@ LT.register({
 - **區塊內分小組**：註冊頁面時加上 `group: '台股'`，側欄與首頁會顯示小組標題(同組頁面要連續註冊)，例如股票區塊的台股、美股。
 - **區塊主題**：app.js 換頁時設定 `<html data-sec="區塊">`，`components.css` 的「區塊主題」依此給 `--sec`(主題色)與 `--motif`(頁首右側的主題圖樣，SVG 遮罩)；側欄每個區塊也有 `data-sec`。頁面裡要用區塊色時寫 `var(--sec)`。頁首右側有選單等元件時不顯示圖樣。個別頁面可以換圖樣：app.js 也設定 `<html data-page="頁面 key">`，例如財報是行事曆、ETF研究與台股其他研究是研究報告。
 - **無障礙**：次要文字 `--mute` 在暗色、淺色主題對底色與面板都 ≥ 4.5:1(自動測試會檢查)；全站有 `:focus-visible` 焦點框；觸控裝置與手機寬度下，按鈕、連結、輸入框、展開列至少 44px 高；尊重「減少動態效果」。
-- **首頁**(`modules/home/home.js`)：開場是網站介紹(線條小圖示)與加權指數近 60 日迷你 K 線(公開的 indices 資料集)；接著是「近期更新」(`NEWS` 陣列，手動維護：只列新的研究或策略，新的放最上面；預設顯示 3 則，展開後最多 10 則，沒有單一頁面可連的不給連結)；再來是各區塊的入口，套用各自的主題色與圖樣；最後的「研究重點」列出目錄頁項目的 `summary`(會員才看得到，不公開的策略不列)。
+- **首頁**(`modules/home/home.js`)：開場是網站介紹(線條小圖示)與加權指數近 60 日迷你 K 線(公開的 indices 資料集)；接著是「近期更新」(`NEWS` 陣列，手動維護：只列新的研究或策略，新的放最上面；預設顯示 3 則，展開後最多 10 則，沒有單一頁面可連的不給連結)；再來是各區塊的入口，套用各自的主題色與圖樣；最後的「研究重點」列出目錄頁項目的 `summary`(所有人都看得到，不公開的策略不列)。
 - **策略頁**：低波動選股、事件型策略(tw-strategy.js 的 eventStrat)、S&P500 季度換股也照研究報告的結構(先講結論 → 研究目的 → 資料處理 → 研究方法 → 四、實證結果與分析 → 五、結論；事件型另有六、延伸：最近的訊號)；先講結論與結論由網頁依回測數字產生。章節標題在面板之間用 `<h2 class="sec-h">`。
 - **字型**：用 CSS 變數 `--font-body`(內文，中文優先的 Noto Sans TC)、`--font-display`(標題，Space Grotesk)、`--font-num`(數字)，不要直接寫字型名稱；數字預設等寬(`tabular-nums`)。canvas 圖表的座標字用 IBM Plex Mono。
 - **研究報告**：結構見 CLAUDE.md「研究報告」；報告是 Markdown(資料集的 `report`)時，開頭的 `> ` 引言就是先講結論(樣式 `.doc blockquote`)；直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)用 `<blockquote>` 與 `<h3 class="md-h2">` 照同樣的結構寫。
 - **分享研究**：目錄頁的單一內容(研究、策略)在頁首有「分享」按鈕(app.js 的 `share`；登入的會員才有，要密碼的策略沒有)，呼叫 `POST api/share`(`functions/api/share.ts`)產生專屬連結 `/s/<8 碼代碼>`(同一個人分享同一份報告是同一個連結，存在 D1 的 `share_links`)。手機用系統分享選單，電腦複製連結。
-  打開連結(`functions/s/[code].ts`)：點開次數 +1(社群網站抓預覽不算)、存 `lt_ref` cookie(30 天)、轉到報告頁；報告在需要登入的區塊，沒登入的人先看到登入提示。登入後看報告時，`api/track` 依 `lt_ref` 記到 `share_views`(誰、看了幾次；分享的人自己不算)。後台「分享紀錄」列出誰分享了哪份報告、點開次數、登入後看的人與新會員(點了連結才第一次登入)。`_routes.json` 已包含 `/s/*`。
+  打開連結(`functions/s/[code].ts`)：點開次數 +1(社群網站抓預覽不算)、存 `lt_ref` cookie(30 天)、轉到報告頁；沒登入的人看得到上半部，完整報告的位置是登入提示。登入後看報告時，`api/track` 依 `lt_ref` 記到 `share_views`(誰、看了幾次；分享的人自己不算)。後台「分享紀錄」列出誰分享了哪份報告、點開次數、登入後看的人與新會員(點了連結才第一次登入)。`_routes.json` 已包含 `/s/*`。
 - **IG 圖卡**：`node scripts/share/make-share.mjs [研究 key …]`，在本機開網站並截出圖卡；新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。累積報酬圖的縱軸用 `LTChart.line(el, log => ({ … }))`(傳函式)：主圖左上角小標旁有「對數｜一般」切換鈕(預設一般)，設定全站共用(記在瀏覽器)，同一頁的累積報酬圖一起切換；策略與研究頁的報酬回撤圖(`LTTW.navCharts`)都用這個，頁面上不另放縱軸選單。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
@@ -299,8 +305,8 @@ LT.register({
 `npm test`(Node 內建的 node:test，第一次先 `npm install`)，部署前 GitHub Actions 也會跑，沒過就不部署：
 
 - `tests/site.test.mjs`：在 Node 裡載入全部頁面程式(`scripts/site-map.mjs`，假的瀏覽器環境)，檢查都註冊得起來、網址不重複、目錄頁的項目有 `run()`、`topics` 格式；`access.json` 的會員與後台程式都存在且不寫在 index.html、訪客載入的程式只註冊訪客區塊、每個頁面程式都有被載入；`<script>` 都加 defer、沒有 CDN 與外部腳本、沒有殘留的 `#/` 舊網址。
-- `tests/build.test.mjs`：在暫存資料夾跑一次 `build-site.mjs`，檢查 `_routes.json`、各頁 HTML 的標題與分享預覽、公開版拿掉會員檔案並改成子目錄。
-- `tests/functions.test.mjs`：用 esbuild 把 `functions/` 打包後直接呼叫：別的網站來的請求 403、不回 `Access-Control-Allow-Origin: *`、會員程式與資料集訪客 401(meta.json 公開)、登入後可下載、簽章不對的 cookie 視同訪客、後台程式一般會員不能下載。
+- `tests/build.test.mjs`：在暫存資料夾跑一次 `build-site.mjs`，檢查 `_routes.json`(精簡版不經過 functions)、精簡版拆得出來且不含完整報告、各頁 HTML 的標題與分享預覽、公開版拿掉會員檔案(保留精簡版)並改成子目錄。
+- `tests/functions.test.mjs`：用 esbuild 把 `functions/` 打包後直接呼叫：別的網站來的請求 403、不回 `Access-Control-Allow-Origin: *`、會員程式與資料集訪客 401(meta.json、精簡版 brief/ 公開，編碼過的路徑繞不過)、登入後可下載、簽章不對的 cookie 視同訪客、後台程式一般會員不能下載。
 
 新增頁面或改權限時通常不用改測試；新的規則(例如 CLAUDE.md 新增的網站原則)能自動檢查的，就加一個 test。
 
@@ -334,7 +340,7 @@ python pipeline/options/update.py
 python -m http.server 8000 -d web
 ```
 
-開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(會員區塊顯示「到主站登入」)，而且只能從首頁點進去(http.server 不認得 `stats/basic/8` 這類網址，在子頁面重新整理會 404)；要測登入、會員區塊與股票查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
+開啟 http://localhost:8000。這樣只有靜態檔、沒有後端，網頁會當作訪客(研究與策略的下半部顯示「到主站登入」；本機的 web/data 沒有精簡版，先執行 `node scripts/briefs.mjs web` 產生)，而且只能從首頁點進去(http.server 不認得 `stats/basic/8` 這類網址，在子頁面重新整理會 404)；要測登入、會員區塊與股票查詢，改用 `npm install` 後 `npm run dev`(見「會員與權限」的本機測試)。
 
 ## 手動更新資料
 

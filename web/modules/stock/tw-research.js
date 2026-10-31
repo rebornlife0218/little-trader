@@ -29,23 +29,26 @@
   // 目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究(網址 stock/tw-research/<研究>)
   LT.catalog({
     section: 'stock', group: '台股', key: 'tw-research', name: '其他研究', title: '台股其他研究',
-    desc: '依主題分類的研究；同一個顏色代表同一系列的研究。回測一律和買進持有 0050 比較',
+    desc: '依主題分類的研究；同一個顏色代表同一系列的研究。回測一律和買進持有 0050 比較', report: true,
     groups: CATS.map(c => ({ name: c.name, desc: c.desc, items: c.studies.map(x => ({
       key: x.key, name: x.name, desc: x.desc, summary: x.summary, tags: tag(x.series), run: (el, ctx) => x.run(el, ctx, x),
     })) })),
   });
 
   /* ---------- 共用 ---------- */
+  // 回傳 [資料, full]：登入的人拿完整版(full = true)；訪客拿精簡版(只有上半部用到的欄位，下半部放 LT.reportLock())
   async function load(el, ctx, key, ds = DATASET) {
     el.innerHTML = `<div class="panel"><div class="page-loading"><span class="spinner"></span>載入中…</div></div>`;
     try {
-      const { data } = await LT.loadJSON(ds, key + '.json');
-      return ctx.alive() ? data : null;
+      const { data, full } = await LT.loadReport(ds, key + '.json');
+      return ctx.alive() ? [data, full] : [];
     } catch (e) {
       if (ctx.alive()) el.innerHTML = `<div class="panel"><p class="mute">研究資料尚未產生：${esc(e.message)}</p></div>`;
-      return null;
+      return [];
     }
   }
+  // 先講結論：登入的人由報告開頭的引言自動放上來(hoistConclusion)；訪客的精簡版只帶這一段(hero)
+  const heroOf = (B, full) => !full && B.hero ? md(B.hero) : '';
   // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png，見 drawFigs)
   function md(src) {
     const box = document.createElement('div');
@@ -134,16 +137,16 @@
 
   /* ---------- 營收公告前布局：版本(不限市值、市值四分位) × 前 10 / 前 5 檔 ---------- */
   async function revPre(el, ctx, S) {
-    const B = await load(el, ctx, 'rev_pre');
+    const [B, full] = await load(el, ctx, 'rev_pre');
     if (!B) return;
     let ver = 'all', grp = 't10';
     const G = { t10: '前 10 檔', t5: '前 5 檔' };
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
-        ['邏輯', '營收大多在每月 10 日前公布，公布前先用已經公布的營收趨勢，預測誰下個月的營收會好，提前買進。'],
-        ['進出場', '每月 21 日後第一個交易日開盤，買進綜合分數最高的 10 檔；各檔營收公告後的下一個交易日開盤賣出。'],
-        ['停利停損', NO_STOP], ['持有期間', '約 2 ～ 4 週(到營收公告)。']] })}
-      <div class="panel">
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '營收大多在月初公布，公布前先用已經公布的營收趨勢，預測誰下個月的營收會好，提前買進。'],
+        ['進出場', '每月下旬開盤，買進綜合分數最高的幾檔；各檔營收公告後的下一個交易日開盤賣出。'],
+        ['停利停損', NO_STOP], ['持有期間', '到營收公告為止。']] })}
+      ${!full ? LT.reportLock() : `<div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
           <p><b>規則</b>：營收月份 M 的 21 日(含)之後第一個交易日開盤，買進綜合分數最高的 10 檔或 5 檔；每檔在 M 月營收公告後的第一個交易日開盤賣出(月底後 15 天內沒公告，在 M+1 月 16 日後第一個交易日賣出)。前一個交易日收盤後選股，只用當晚已知的資料。</p>
@@ -159,9 +162,10 @@
       <div class="panel"><h3>所有版本比較(21 日進場)</h3><div id="twrAll"></div></div>
       <div class="panel"><h3>綜合分數十分位(不限市值，21 日進場)</h3><div id="twrDec"></div>
 </div>
-      ${reportPanel(S, B.report)}`;
+      ${reportPanel(S, B.report)}`}`;
     const $ = s => el.querySelector(s);
     briefChart(el, B.d, B.versions[0].nav.t10, B.b0050, '不限市值｜前 10 檔', SERIES[S.series].color, B.versions[0].ts.t10);
+    if (!full) return;   // 訪客：只有上半部
     // 市值範圍(每月的最小、最大值)：第一個月 → 最後一個月；Q1 只列上限、Q4 只列下限
     function capTxt(v) {
       const n = v.cap.lo.length, r = i => v.key === 'q1' ? `${Math.round(v.cap.hi[i])} 億以下` : v.key === 'q4' ? `${Math.round(v.cap.lo[i])} 億以上` : `${Math.round(v.cap.lo[i])}～${Math.round(v.cap.hi[i])} 億`;
@@ -209,15 +213,15 @@
 
   /* ---------- 營收衰退開低：日內 / T+1 × 全部 / 均額 ≥ 1 千萬 ---------- */
   async function revDrop(el, ctx, S) {
-    const B = await load(el, ctx, 'rev_drop');
+    const [B, full] = await load(el, ctx, 'rev_drop');
     if (!B) return;
     let k = B.strats[0].key;
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', stats: 'twrBriefStats', items: [
         ['邏輯', '營收衰退的公司公告後，隔天開盤常常大跌；跌太多時，開盤買進賭當天的反彈。'],
-        ['進出場', '營收年增率 < -10% 公告後，隔天開盤跳空跌 5% 以上就開盤買進，當天收盤賣出(另比較隔天開盤賣)。'],
-        ['停利停損', NO_STOP], ['持有期間', '1 天(當天或隔天賣出)。']] })}
-      <div class="panel">
+        ['進出場', '營收大幅衰退的公告後，隔天開盤跳空大跌就開盤買進，當天收盤賣出(另比較隔天開盤賣)。'],
+        ['停利停損', NO_STOP], ['持有期間', '當天或隔天賣出。']] })}
+      ${!full ? LT.reportLock() : `<div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
           <p><b>規則</b>：月營收年增率 < -10% 的公告(月底後 15 天內的首次公告)，公告後第一個交易日(T1)開盤相對前一天收盤跳空 ≤ -5%，T1 開盤買進。<b>日內</b>：T1 收盤賣出；<b>T+1</b>：隔一個交易日開盤賣出。另測事前 20 日平均成交金額 ≥ 1 千萬(可實際交易的股票)的版本。</p>
@@ -229,9 +233,10 @@
       </div>
       <div id="twrView"></div>
       <div class="panel"><h3>四種策略比較</h3><div id="twrAll"></div></div>
-      ${reportPanel(S, B.report)}`;
+      ${reportPanel(S, B.report)}`}`;
     const $ = s => el.querySelector(s);
     briefChart(el, B.d, B.strats[0].nav, B.b0050, B.strats[0].name, SERIES[S.series].color, B.strats[0].ts);
+    if (!full) return;   // 訪客：只有上半部
     function draw() {
       const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.key === k), x = stats(T.nav), Sx = stats(B.b0050);
@@ -262,7 +267,7 @@
 
   /* ---------- 營收成長特徵：持有期 × 分數組合；事件研究與特徵 IC ---------- */
   async function revGrowth(el, ctx, S) {
-    const B = await load(el, ctx, 'rev_growth');
+    const [B, full] = await load(el, ctx, 'rev_growth');
     if (!B) return;
     const HS = [...new Set(B.strats.map(s => s.h))], GS = [...new Set(B.strats.map(s => s.g))];
     let h = '5日', g = '分數 = 3';
@@ -271,11 +276,11 @@
       投信5日買超比: '投信 5 日買超比', '近5日主力買賣超(%)': '近 5 日主力買賣超' };
     const HN = { 日內: '日內(T1 收盤賣)', 'T+1': 'T+1(T2 開盤賣)', '5日': '5 日(T5 收盤賣)' };
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
-        ['邏輯', '營收年增率超過 10% 的公司公告後，找出哪些特徵(成長幅度、股價位置、法人買賣…)最能分出後續會漲還是會跌。'],
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', stats: 'twrBriefStats', items: [
+        ['邏輯', '營收成長的公司公告後，找出哪些特徵(成長幅度、股價位置、法人買賣…)最能分出後續會漲還是會跌。'],
         ['進出場', '營收公告後的下一個交易日開盤買進，持有期滿收盤賣出；只買特徵分數高的事件。'],
-        ['停利停損', NO_STOP], ['持有期間', '當天、隔天或 5 個交易日(三種版本比較)。']] })}
-      <div class="panel">
+        ['停利停損', NO_STOP], ['持有期間', '短線持有(比較幾種持有期間)。']] })}
+      ${!full ? LT.reportLock() : `<div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
           <p><b>事件</b>：月營收年增率 > 10% 的公告(月底後 15 天內的首次公告)，事前 10 日平均成交金額 ≥ 1 千萬；公告後第一個交易日(T1)開盤買進。</p>
@@ -297,9 +302,10 @@
         <h3>特徵有效性：每月 IC 的 t 值</h3>
         <div id="twrIc"></div>
       </div>
-      ${reportPanel(S, B.report)}`;
+      ${reportPanel(S, B.report)}`}`;
     const $ = s => el.querySelector(s);
     { const T0 = B.strats.find(x => x.h === '5日' && x.g === '分數 = 3') || B.strats[0]; briefChart(el, B.d, T0.nav, B.b0050, `${T0.h}｜${T0.g}`, SERIES[S.series].color, T0.ts); }
+    if (!full) return;   // 訪客：只有上半部
     function draw() {
       const { stats, vs0050Cards, tradeCards, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.h === h && s.g === g), x = stats(T.nav), Sx = stats(B.b0050);
@@ -346,18 +352,18 @@
   }
 
   async function revTurn(el, ctx, S) {
-    const B = await load(el, ctx, 'rev_turn');
+    const [B, full] = await load(el, ctx, 'rev_turn');
     if (!B) return;
     const HS = [...new Set(B.strats.map(s => s.h))];
     let h = '20日', g = '由負轉正';
     const HN = { '5日': '5 日(T5 收盤賣)', '10日': '10 日(T10 收盤賣)', '20日': '20 日(T20 收盤賣)' };
     const gs = hh => B.strats.filter(s => s.h === hh).map(s => s.g);
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', stats: 'twrBriefStats', items: [
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', stats: 'twrBriefStats', items: [
         ['邏輯', '營收年增率由衰退轉為成長，可能代表景氣或營運開始好轉，公告後跟著買進。'],
-        ['進出場', '營收年增率上個月 < 0、這個月 > 0 公告後，下一個交易日開盤買進，持有期滿收盤賣出。'],
-        ['停利停損', NO_STOP], ['持有期間', '5、10 或 20 個交易日(主要看 20 日)。']] })}
-      <div class="panel">
+        ['進出場', '營收年增率由衰退轉為成長的公告後，下一個交易日開盤買進，持有期滿收盤賣出。'],
+        ['停利停損', NO_STOP], ['持有期間', '短線持有(比較幾種持有期間)。']] })}
+      ${!full ? LT.reportLock() : `<div class="panel">
         <h3>${esc(S.name)} ${tag(S.series)}</h3>
         <div class="doc">
           <p><b>事件</b>：月營收年增率上個月 < 0、這個月 > 0 的公告(月底後 15 天內的首次公告)，事前 10 日平均成交金額 ≥ 1 千萬；公告後第一個交易日(T1)開盤買進，持有 5、10 或 20 個交易日(T1 算第 1 天)後收盤賣出。另測轉正前連續負成長的月數、本月年增率的門檻，並以「持續成長」(上月、本月都 > 0)當對照組。</p>
@@ -378,9 +384,10 @@
           ${B.groups.map(r => `<tr class="${r.g === '由負轉正' ? 'allrow' : ''}"><td>${esc(r.g)}</td><td>${r.n.toLocaleString()}</td>${['T+1', '5日', '10日', '20日'].map(x => `<td class="${W().cls(r[x].mean)}">${W().pct(r[x].mean, 2)} / ${(r[x].win * 100).toFixed(0)}%</td>`).join('')}</tr>`).join('')}
         </tbody></table></div>
       </div>
-      ${reportPanel(S, B.report)}`;
+      ${reportPanel(S, B.report)}`}`;
     const $ = s => el.querySelector(s);
     { const T0 = B.strats.find(x => x.h === '20日' && x.g === '由負轉正') || B.strats[0]; briefChart(el, B.d, T0.nav, B.b0050, '20 日｜由負轉正', SERIES[S.series].color, T0.ts); }
+    if (!full) return;   // 訪客：只有上半部
     const fillG = () => {
       $('#twrG').innerHTML = gs(h).map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join('');
       if (!gs(h).includes(g)) g = gs(h)[0];
@@ -431,19 +438,19 @@
   const DISP = {
     disp: { name: '處置股策略', items: B => [
       ['邏輯', '處置前融資使用率高、投信也在加碼的處置股，被處置後關注度仍高，處置期間的漲勢較能延續。'],
-      ['進出場', `處置前一天融資使用率 ≥ ${B.util}%、投信持股比率近 ${B.ihN || 20} 日增加的處置股，處置第一天收盤買進，處置結束後第一個交易日開盤賣出。`]],
+      ['進出場', '處置前融資使用率高、投信持股比率增加的處置股，處置第一天收盤買進，處置結束後第一個交易日開盤賣出。']],
       fmt: [v => v.toFixed(1) + '%', v => (v > 0 ? '+' : '') + v.toFixed(2) + ' 個百分點'] },
   };
   async function disp(el, ctx, key = 'disp') {
     const cfg = DISP[key], S = { name: cfg.name, series: 'disp' };
-    const B = await load(el, ctx, key);
+    const [B, full] = await load(el, ctx, key);
     if (!B) return;
     const feat = v => [].concat(v).map((x, i) => `<td>${x == null ? '—' : cfg.fmt[i](x)}</td>`).join('');
     const T = B.strat;
     el.innerHTML = `
-      ${LT.brief({ updated: 'tw_research', chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
-        ...cfg.items(B), ['停利停損', NO_STOP], ['持有期間', '處置期間(新制約 5 ～ 7 個交易日)。']] })}
-      ${reportPanel(S, B.report)}`;
+      ${LT.brief({ hero: heroOf(B, full), updated: 'tw_research', chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
+        ...cfg.items(B), ['停利停損', NO_STOP], ['持有期間', '處置期間。']] })}
+      ${full ? reportPanel(S, B.report) : LT.reportLock()}`;
     const $ = s => el.querySelector(s);
     briefChart(el, B.d, T.nav, B.b0050, cfg.name, SERIES[S.series].color);
     const t = T.ts;
@@ -475,7 +482,7 @@
   /* ---------- 處置期間的 K 棒(disp_kbar.json)：五個時點收紅 K / 黑 K 的比例，新舊制、有沒有當沖條件分開看；不是回測，沒有淨值 ---------- */
   async function dispKbar(el, ctx) {
     const S = { name: '處置期間的 K 棒', series: 'disp' };
-    const B = await load(el, ctx, 'disp_kbar');
+    const [B, full] = await load(el, ctx, 'disp_kbar');
     if (!B) return;
     const P = B.points, row = (rule, g, p) => B.rows.find(r => r.rule === rule && r.g === g && r.p === p) || {};
     const cnt = (rule, g = '全部') => (B.info.find(x => x.rule === rule && x.g === g) || {}).n || 0;
@@ -496,12 +503,12 @@
     };
     // 研究(不是策略)：精簡版不放績效卡片，改放新制前後(不分組)的圖與表
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', items: [
-        ['怎麼比較', '把 2016 年起的每次處置，在處置前一天、處置第一天、第二天、最後一天、出關後第一天收紅 K 還是黑 K 統計出來，2026/8/10 上路的新制和舊制分開看。'],
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', items: [
+        ['怎麼比較', '把歷年的每次處置，在處置前一天、處置第一天、第二天、最後一天、出關後第一天收紅 K 還是黑 K 統計出來，新制和舊制分開看。'],
         ['分組', '進處置時有沒有同時達到當沖標準(有的話處置期間比較長)。'],
-        ['資料', `上市櫃普通股，含已下市櫃；舊制 ${cnt('舊制').toLocaleString()} 檔、新制 ${cnt('新制').toLocaleString()} 檔。`],
-        ['期間', `2016 年 ～ ${B.asof.replace(/-/g, '/')}。`]] })}
-      ${reportPanel(S, B.report)}`;
+        ['資料', '上市櫃普通股，含已下市櫃。'],
+        ['期間', '從處置資料開始到最新交易日。']] })}
+      ${full ? reportPanel(S, B.report) : LT.reportLock()}`;
     const $ = s => el.querySelector(s);
     // 新制前後：時點當列，舊制、新制各兩欄(紅 K / 黑 K、當天漲跌中位數)，檔數用處置第一天有成交的檔數
     $('#twrBriefLegend').insertAdjacentHTML('afterend', `
@@ -517,7 +524,7 @@
   }
   /* ---------- 跳空與隔夜報酬(資料集 tw_gap 的 gap.json)：依跳空倍數(跳空 ÷ 20 日日報酬標準差)分組的統計；不是回測，沒有淨值 ---------- */
   async function gap(el, ctx, S) {
-    const B = await load(el, ctx, 'gap', 'tw_gap');
+    const [B, full] = await load(el, ctx, 'gap', 'tw_gap');
     if (!B) return;
     const C = SERIES.gap.color, CP = '#F06FB0';
     const ks = [...B.down, ...B.up];   // 回補與成交量的圖沒有「沒跳空」那一組：左半往下跳、右半往上跳
@@ -541,16 +548,17 @@
     const VOLS = ['量縮', '中等', '爆量'], VC = { 量縮: C, 中等: CEW, 爆量: CP };
     const F = B.fillOv;
     el.innerHTML = `
-      ${LT.brief({ chart: 'twrBrief', items: [
-        ['怎麼比較', '把每檔股票每天的開盤跳空，除以它過去 20 天的波動(標準差)分組，看跳空當天收盤買、隔天開盤賣的隔夜報酬，和沒跳空的日子比較。'],
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', items: [
+        ['怎麼比較', '把每檔股票每天的開盤跳空，除以它近期的波動(標準差)分組，看跳空當天收盤買、隔天開盤賣的隔夜報酬，和沒跳空的日子比較。'],
         ['分組', '跳空當天有沒有收在漲跌停、開在前一天 K 棒外還是 K 棒內、跳空當天的成交量。'],
-        ['資料', `上市櫃普通股，含已下市櫃；20 日均量超過 500 張，排除處置股、連續漲跌停與大盤極端的日子，共 ${B.n.toLocaleString()} 個股票日。`],
-        ['期間', `${B.start.replace(/-/g, '/')} ～ ${B.asof.replace(/-/g, '/')}。`]] })}
-      ${reportPanel(S, B.report)}`;
+        ['資料', '上市櫃普通股，含已下市櫃；只看成交量夠大的股票，排除處置股、連續漲跌停與大盤極端的日子。'],
+        ['期間', '從資料開始到最新交易日。']] })}
+      ${full ? reportPanel(S, B.report) : LT.reportLock()}`;
     const $ = s => el.querySelector(s);
     bars($('#twrBrief'), B.bins, ov, { label: '隔夜平均報酬', legend: false });
     $('#twrBriefLegend').innerHTML = LTChart.legend(ov);
     $('#twrBriefLegend').insertAdjacentHTML('afterend', '<p class="note">隔夜 = 隔天開盤 ÷ 跳空當天收盤 − 1(還原價、未扣成本)。橫軸是跳空倍數 = 跳空 ÷ 20 日日報酬標準差，負的是往下跳，-0.1～0.1 是沒跳空。</p>');
+    if (!full) return;   // 訪客：只有上半部
     drawFigs(el, {
       'ov.png': div => bars(div, B.bins, ov, { label: '隔夜平均報酬' }),
       'intra.png': div => bars(div, B.bins, [{ ...ov[0], y: B.all.intra }, { ...ov[1], y: B.nl.intra }], { label: '當天盤中平均報酬' }),
