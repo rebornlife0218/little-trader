@@ -22,11 +22,10 @@ export const ACCESS = access as {
   memberSections: string[]; memberScripts: string[]; memberDatasets: string[]; adminScripts: string[];
 };
 
-// 股票查詢的權限：訪客最近 31 天、每天 30 次；會員不限期間(資料從 2016 年開始)、每天 1000 次
-// (股票查詢頁只開放會員，訪客的限制是 API 的保險)
+// 股票查詢的權限：訪客、會員都不限期間(資料從 2016 年開始)；訪客每天 10 次、會員每天 500 次
 export const POLICY = {
-  guest:  { maxDays: 31,    dailyQuota: 30 },
-  member: { maxDays: 36500, dailyQuota: 1000 },
+  guest:  { maxDays: 36500, dailyQuota: 10 },
+  member: { maxDays: 36500, dailyQuota: 500 },
 } as const;
 
 export const taipeiDate = (offsetDays = 0) =>

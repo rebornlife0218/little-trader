@@ -1,5 +1,5 @@
 /* 股票 · 台股 · 股票查詢：上市櫃股票與 ETF 的價量、法人、融資券、借券與重要事件(2016 年起，含已下市櫃)
-   資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢；訪客也能用，但後端只給最近 31 天(登入 Google 不限期間，functions/_lib/types.ts 的 POLICY)
+   資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢；訪客也能用(期間不限，每天的次數比登入 Google 少，functions/_lib/types.ts 的 POLICY)；剩下的次數只在會員今天查超過 400 次後才顯示
    api/prices 回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價, v 成交量, f 外資買賣超, t 投信買賣超,
    m 融資餘額, s 融券餘額, b 借券賣出餘額}(單位都是張)與 events = [[日期, 種類, 說明, 結束日期]]
    K 線圖：左上角切換原始價、還原價(開高低乘上當天的還原比例 a ÷ c)；點一下出現十字線，滾輪縮放、拖曳平移、← → 移動 */
@@ -301,7 +301,10 @@
           j = await r.json();
         } catch (e) { j = { error: `連線失敗(${e.message})` }; }
         if (!ctx.alive()) return;
-        if (!r || !r.ok) { $('#pqOut').innerHTML = `<div class="panel"><p class="mute">${esc(ERRORS[j.error] || j.error || `HTTP ${r.status}`)}</p></div>`; return; }
+        if (!r || !r.ok) {
+          const msg = j.error === 'quota_exceeded' && j.kind === 'guest' ? '今天的查詢次數已用完，登入 Google 可以繼續查詢' : ERRORS[j.error] || j.error || `HTTP ${r.status}`;
+          $('#pqOut').innerHTML = `<div class="panel"><p class="mute">${esc(msg)}</p></div>`; return;
+        }
         j.view_from = from;
         render(j);
       }
@@ -320,7 +323,7 @@
         $('#pqOut').innerHTML = `
           <div class="panel">
             <h3 class="pq-title">${title}</h3>
-            <p class="mute" style="margin-top:-4px;">${R.d[i0]} ～ ${R.d[last]}，${(n - i0).toLocaleString()} 個交易日${j.truncated ? '(訪客只能查最近 1 個月，登入 Google 就能看 2016 年起的完整資料)' : ''}</p>
+            <p class="mute" style="margin-top:-4px;">${R.d[i0]} ～ ${R.d[last]}，${(n - i0).toLocaleString()} 個交易日${j.truncated ? '(超出可查詢的期間，已從可查詢的第一天開始)' : ''}</p>
             <div class="statgrid" style="margin:12px 0;">
               ${card(num(R.c[last]), `最新收盤(${R.d[last].slice(5).replace('-', '/')})`)}
               ${card(pct(a1 / a0 - 1), '含息報酬(還原股價)', cls(a1 / a0 - 1))}
@@ -339,7 +342,7 @@
             <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移；上方按鈕可隱藏或顯示下方的小圖。
               還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
               「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。
-              今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。</p>
+              ${j.kind === 'member' && j.limit - j.remaining >= 400 ? `今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。` : ''}</p>
           </div>`;
 
         const info = $('#pqInfo');

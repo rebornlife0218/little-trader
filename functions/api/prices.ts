@@ -2,7 +2,7 @@
    股價依「股票 × 年度」存成一筆 gzip 的 JSON(price_chunks，pipeline/price_query/sync.py)：查 10 年只讀約 11 列。
    回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價, v 成交量, f 外資, t 投信, m 融資餘額, s 融券餘額, b 借券賣出餘額}
    (單位都是張)與 events = [[日期, 種類, 說明, 結束日期]]；另附股票名稱、市場、股本(億元)。
-   資料一律在後端篩選：訪客的期間先截成最近 31 天，只讀那幾年的區塊、逐日篩掉範圍外的資料才回傳 */
+   資料一律在後端篩選：期間先截到 POLICY 允許的範圍，只讀那幾年的區塊、逐日篩掉範圍外的資料才回傳 */
 import { POLICY, json, taipeiDate, type Env, type Data } from '../_lib/types';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

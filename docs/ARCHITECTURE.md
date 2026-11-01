@@ -137,7 +137,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 身分 | 看得到 |
 |---|---|
-| 訪客 | 所有區塊；研究與策略只看得到上半部(精簡版：先講結論、策略說明、績效卡片、累積報酬圖；近期明細要登入)，下半部是「登入 Google 看完整報告」；股票查詢只有最近 31 天；上鎖的策略(融資都沒退、處置股策略)要密碼 |
+| 訪客 | 所有區塊；研究與策略只看得到上半部(精簡版：先講結論、策略說明、績效卡片、累積報酬圖；近期明細要登入)，下半部是「登入 Google 看完整報告」；股票查詢不限期間、每天 10 次；上鎖的策略(融資都沒退、處置股策略)要密碼 |
 | 登入 Google(程式裡稱 member) | 全部，含研究與策略的完整報告；設有密碼的策略仍要另外輸入密碼(JSON 整份加密，不受登入影響) |
 | 管理員(`users.role = 'admin'`) | 另外有後台 `other/admin`；後台統計(含分享紀錄)不計入管理員與測試帳號(`functions/_lib/exclude.ts`：管理員，以及列在裡面的 email；repo 公開，只放 email 小寫的 SHA-256)，連同這些帳號登入前在同一個瀏覽器用訪客身分的紀錄(登入的人開網頁時把瀏覽器的訪客代號記到 `guest_links`)；這些帳號點開分享連結也不算點開次數 |
 
@@ -165,7 +165,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
   - **每分鐘次數限制**：訪客每個 IP 10 次、會員每個帳號 60 次(`PER_MINUTE`)，超過回 429 與 `Retry-After`；`api/me`、`api/logout` 不計。用 D1 的 `rate_minute` 原子計數(Workers 的記憶體不共用、KV 不即時，都算不準；Pages Functions 不能直接用 Durable Objects)。另外股票查詢還有每日額度(`POLICY`)。
   - **需要登入的資料檔也限流**：`data/<需要登入的資料集>/` 每個帳號每分鐘最多 100 個檔(`PER_MINUTE_DATA`，`functions/data/_middleware.ts`)，防止登入後用程式整批下載；頁面程式(`modules/`)與 `meta.json` 不計。公開區塊的檔案(指數、選擇權資料等)沒有限流，由 Cloudflare CDN 提供。
   - **驗證**：`Authorization: Bearer <Firebase ID token>` 或網頁登入後的 session cookie 都算會員；token 不合法回 401，不降級成訪客。
-  - **資料在後端過濾**：訪客的查詢期間在後端截成最近 31 天，只讀那幾年的資料區塊、逐日篩選後才回傳，訪客拿不到更早的資料。
+  - **資料在後端過濾**：查詢期間在後端截到 `POLICY` 允許的範圍(目前訪客、會員都不限期間)，只讀那幾年的資料區塊、逐日篩選後才回傳。
   - **安全標頭**：API 回應加上 `X-Content-Type-Options: nosniff`、`X-Frame-Options: DENY`、`Content-Security-Policy: default-src 'none'`、`Referrer-Policy: no-referrer`、`Cache-Control: private, no-store`；靜態檔的安全標頭在 `web/_headers`(只有 Cloudflare 會套用)。
 - Functions 用量：免費方案每天 10 萬次請求；`_routes.json` 讓只有 `/api/*` 與會員限定的檔案(研究與策略的完整資料)經過 functions，精簡版與其他靜態檔不計。
 
@@ -191,7 +191,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 ## 股票查詢
 
-- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `stock/query/<代號>`(`modules/stock/query.js`，訪客也能用，但只看得到最近 31 天；不列在側欄)。查詢頁也可以改代號、選期間：
+- 網頁：左側 LOGO 下方的搜尋框(`app.js` 的 `initSearch`，輸入代號或名稱，Enter 或選建議清單)跳到 `stock/query/<代號>`(`modules/stock/query.js`，訪客也能用，期間不限、每天 10 次；不列在側欄)。查詢頁也可以改代號、選期間：
   - 標題列：代號、名稱、上市／上櫃／創新板、股本(億元，實收資本額；ETF 沒有股本)。
   - K 線圖(canvas)：左上角切換原始價、還原價(開高低乘上當天的還原收盤價 ÷ 收盤價)；5、20、60MA；點一下出現十字線(左側價格軸標收盤價)，資訊列列出開高低收、各 MA(後面 ↑↓ 是當天斜率)、成交量、外資與投信買賣超、融資券餘額、借券賣出餘額、當天的事件；滾輪縮放、拖曳平移、← → 移動。為了讓 60MA 從第一天就有值，查詢時多抓前 120 個日曆天(圖一開始只顯示查詢期間)。
   - 事件：月營收在公告日的 K 棒上方畫小菱形(紅色 = 單月營收年成長、綠色 = 年衰退，點 K 棒在資訊列看年成長 %)；「息」除權息、「分割」分割或減資、「停」暫停交易標在 K 棒下方；處置期間畫淡色底。
@@ -201,7 +201,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - 資料：`cm.tw_daily` 2016 年起所有有成交的日子(上市櫃股票與 ETF，含已下市櫃)：開高低收(原始價格)、還原收盤價、成交量、外資與投信買賣超、融資(`資餘`)與融券(`券餘`)餘額、借券賣出餘額，單位都已用 2330 核對(都是張)。事件來自 `cm.tw_monthly_revenue`(公告日、單月合併營收年成長，沒有合併數字時用單月營收)、`cm.tw_trading_halt`、`cm.tw_disposition`；除權息、分割或減資沒有現成欄位，由「還原收盤價 ÷ 收盤價」的跳動推算(超過四捨五入誤差才算；跳動超過 25% 視為分割或減資)，日期對到該股票的交易日(公告日沒交易就放在下一個交易日)。名稱、市場、股本來自 `cm.tw_company_info`(上市上櫃代碼：1 上市、2 上櫃、7 創新板)；資料庫沒有 ETF，改用證交所(上市)、櫃買中心(上櫃)當天的收盤行情補名稱與市場(累積在 `~/.cache/little-trader/etf_names.json`)。
 - 儲存：D1 的 `price_chunks` 每檔每年一筆(gzip 的 JSON，欄位與事件都在裡面)，全部約 2.2 萬筆、92 MB；查 10 年只讀約 11 列。
 - 同步：`pipeline/price_query/sync.py` 每次在本機重算全部，只上傳內容有變的區塊(新的交易日、除權息後整段還原股價改變、資料修正)；已上傳的內容記在 `~/.cache/little-trader/d1_prices.json`，刪掉就會全部重傳(約 4 分鐘)。`run_local.py` 每天在 cm 同步後執行。
-- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：登入 Google 不限期間、每天 1000 次；訪客最近 31 天、每天 30 次(查詢頁會提示訪客登入看完整期間)。額度以台北日期計，登入的人依帳號、訪客依 IP；另有每分鐘上限(見「會員與權限」)。
+- 權限與額度(`functions/_lib/types.ts` 的 `POLICY`)：訪客、會員都不限期間；訪客每天 10 次、會員每天 500 次。網頁不顯示剩下的次數，只有會員當天查到 400 次以後，查詢結果下方才顯示「今天還可以查詢 N 次(每天 500 次)」；訪客用完時提示登入 Google 繼續查詢。額度以台北日期計，登入的人依帳號、訪客依 IP；另有每分鐘上限(見「會員與權限」)。
 
 ## 資料集
 
