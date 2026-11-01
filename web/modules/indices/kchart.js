@@ -116,6 +116,23 @@ function drawChart(key){
     });
   }
 
+  // 畫面中的最高點、最低點：標在K棒的最高價上方、最低價下方(只有收盤價的指數用收盤價)；靠右邊時文字往左放
+  {
+    const hiOf = d=> meta.hasOHLC ? d.high : d.close, loOf = d=> meta.hasOHLC ? d.low : d.close;
+    let hi=0, lo=0;
+    slice.forEach((d,i)=>{ if (hiOf(d)>hiOf(slice[hi])) hi=i; if (loOf(d)<loOf(slice[lo])) lo=i; });
+    pctx.save(); pctx.font='600 11px IBM Plex Mono'; pctx.fillStyle=C.text; pctx.strokeStyle=C.text; pctx.lineWidth=1;
+    const mark=(i,v,above)=>{
+      const x=xAt(i), y=yAt(v), label=fmtNum(v,v>1000?0:2), tw=pctx.measureText(label).width;
+      const right = x+tw+14 <= wrapW-padR;
+      pctx.beginPath(); pctx.moveTo(x,y); pctx.lineTo(right ? x+8 : x-8, y); pctx.stroke();
+      pctx.fillText(label, right ? x+10 : x-10-tw, above ? y-2 : y+11);
+    };
+    mark(hi, hiOf(slice[hi]), true);
+    mark(lo, loOf(slice[lo]), false);
+    pctx.restore();
+  }
+
   if (vctx){
     const vma = maSet && maSet.vol5;
     let vmax=0; slice.forEach((d,i)=>{ vmax=Math.max(vmax,d.volume||0); if (vma && !Number.isNaN(vma[s+i])) vmax=Math.max(vmax,vma[s+i]); });
