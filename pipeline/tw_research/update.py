@@ -47,9 +47,9 @@ try:   # 融資使用率(mutil)的欄位名稱放在不進版控的 private_stra
     EXTRA.update(RESEARCH_COLS)
 except ImportError:
     pass
-# 要加密的研究(網頁輸入密碼才看得到)：密碼放在不進版控的 private_strategies.py(RESEARCH_PASSWORDS)；
-# 沒有密碼時不輸出明文，直接停下來，避免把上鎖的研究公開
-LOCKED = {'disp'}
+# 上鎖的研究：精簡版(上半部)不用密碼，完整報告(下半部)要密碼。輸出時只留精簡版與近期明細用的欄位(LOCKED 列的)與先講結論(hero)，
+# 完整資料整份加密放在 full_enc；密碼放在不進版控的 private_strategies.py(RESEARCH_PASSWORDS)，沒有密碼時直接停下來，不輸出明文
+LOCKED = {'disp': {'keys': ['d', 'asof', 'b0050', 'cols', 'upcoming'], 'strat': ['nav', 'ts', 'trades']}}
 try:
     from private_strategies import RESEARCH_PASSWORDS
 except ImportError:
@@ -1178,7 +1178,10 @@ def main(keys=None, data=None, write=True):
             if key in LOCKED:
                 if not RESEARCH_PASSWORDS.get(key):
                     raise RuntimeError(f'{key} 要加密，但 private_strategies.py 沒有它的密碼(RESEARCH_PASSWORDS)')
-                obj = E.encrypt(obj, RESEARCH_PASSWORDS[key])
+                L = LOCKED[key]
+                hero = re.match(r'\s*((?:>.*(?:\n|$))+)', obj['report'])
+                obj = {**{k: obj[k] for k in L['keys']}, 'strat': {k: obj['strat'][k] for k in L['strat']},
+                       'hero': hero.group(1).strip() if hero else '', 'full_enc': E.encrypt(obj, RESEARCH_PASSWORDS[key])['enc']}
             write_json(out / f'{key}.json', obj)
             print(f'{key}.json：{(out / f"{key}.json").stat().st_size / 1024:.0f} KB')
     if write:

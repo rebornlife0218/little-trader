@@ -30,7 +30,7 @@ export const BRIEFS = {
   sp500: (f, j) => f === 'backtest.json' ? { ...pick(j, ['asof', 'd', 'nav']), q: j.q.map(({ picks, ...q }) => q) } : null,   // 每季持股(近期明細)要登入
   // 台股其他研究、處置股策略與處置期間的 K 棒(stock/tw-research.js)：只帶精簡版那一個版本
   tw_research: (f, j) => {
-    if (j.enc) return j;   // 上鎖的研究(處置股策略)：整份加密，要密碼才能解開
+    if (j.enc) return j;   // 舊格式：整份加密
     const base = withHero(pick(j, ['asof', 'd', 'b0050']), j);
     const one = (T, keys) => T && pick(T, keys);
     switch (f) {
@@ -41,7 +41,8 @@ export const BRIEFS = {
       case 'rev_drop.json': return { ...base, strats: [one(j.strats[0], ['key', 'name', 'nav', 'ts'])] };
       case 'rev_growth.json': return { ...base, strats: [one(j.strats.find(x => x.h === '5日' && x.g === '分數 = 3') || j.strats[0], ['h', 'g', 'nav', 'ts'])] };
       case 'rev_turn.json': return { ...base, strats: [one(j.strats.find(x => x.h === '20日' && x.g === '由負轉正') || j.strats[0], ['h', 'g', 'nav', 'ts'])] };
-      case 'disp.json': return { ...base, strat: one(j.strat, ['name', 'nav', 'ts']) };   // 近期明細(交易、即將進場)要登入
+      // 處置股策略(上鎖)：精簡版不用密碼；近期明細(交易、即將進場)要登入，完整報告(full_enc)要登入再輸入密碼
+      case 'disp.json': return { ...base, hero: j.hero || base.hero, strat: one(j.strat, ['name', 'nav', 'ts']) };
       case 'disp_kbar.json': return withHero({ ...pick(j, ['asof', 'points']), rows: j.rows.filter(r => r.g === '全部'), info: j.info.filter(r => r.g === '全部') }, j);
       default: return null;
     }

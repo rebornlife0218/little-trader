@@ -405,7 +405,7 @@
   }
   // 解鎖畫面：密碼記在 sessionStorage(關掉分頁就要重新輸入)；回傳解密後的資料，切換到別的策略時回傳 null
   const PW_KEY = 'lt.twPw.';
-  async function unlock(el, ctx, key, E) {
+  async function unlock(el, ctx, key, E, prompt = '這個策略不公開，請輸入 6 位數密碼。') {
     let saved = null;
     try { saved = sessionStorage.getItem(PW_KEY + key); } catch (e) { /* 無法使用 sessionStorage */ }
     const B = saved && await decrypt(E, saved);
@@ -413,7 +413,7 @@
     el.innerHTML = `
       <div class="panel">
         <h3>需要密碼</h3>
-        <p>這個策略不公開，請輸入 6 位數密碼。</p>
+        <p>${prompt}</p>
         <form class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end;">
           <div class="paramitem"><label for="evPw">密碼</label><input id="evPw" type="password" inputmode="numeric" autocomplete="off"></div>
           <div class="paramitem"><button type="submit">解鎖</button></div>
@@ -421,7 +421,7 @@
         <p class="note" id="evPwMsg"></p>
       </div>`;
     const input = el.querySelector('#evPw'), msg = el.querySelector('#evPwMsg'), btn = el.querySelector('button[type=submit]');
-    input.focus();
+    input.focus({ preventScroll: true });   // 處置股策略的密碼欄在頁面下半部，不要一打開就捲下去
     return new Promise(resolve => {
       el.querySelector('form').onsubmit = async e => {
         e.preventDefault();

@@ -92,7 +92,10 @@ test('精簡版的先講結論：只取報告開頭的 > 引言', async () => {
   assert.ok(!('picks' in BRIEFS.tw_strategy('backtest.json', { d: [], picks: { lv10p: [['2330']] } })));
   assert.ok(!('picks' in BRIEFS.sp500('backtest.json', { d: [], nav: {}, q: [{ q: '2026Q1', picks: { s1: [['AAPL']] } }] }).q[0]));
   const enc = { enc: { iter: 1, salt: 'a', iv: 'b', ct: 'c' } };
-  assert.deepEqual(BRIEFS.tw_research('disp.json', enc), enc, '上鎖的研究：精簡版就是整份加密檔');
+  assert.deepEqual(BRIEFS.tw_research('disp.json', enc), enc, '舊格式(整份加密)：精簡版就是整份加密檔');
+  const d = BRIEFS.tw_research('disp.json', { d: [], asof: 'x', b0050: [], hero: '> 結論', cols: ['c'], upcoming: [['2330']], strat: { nav: [], ts: {}, trades: [['2330']] }, full_enc: enc.enc });
+  assert.equal(d.hero, '> 結論');
+  assert.ok(!('full_enc' in d) && !('upcoming' in d) && !('trades' in d.strat), '上鎖的研究：精簡版不能有加密的完整報告與近期明細');
 });
 
 test('訪客載入的程式(index.html)只註冊訪客能看的區塊', () => {

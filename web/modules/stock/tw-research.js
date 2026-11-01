@@ -450,13 +450,14 @@
     const cfg = DISP[key], S = { name: cfg.name, series: 'disp' };
     let [B, full] = await load(el, ctx, key);
     if (!B) return;
-    if (B.enc && !(B = await W().unlock(el, ctx, key, B.enc))) return;   // 上鎖的策略：輸入密碼後才解得開(同台股策略頁)
+    if (B.enc && !(B = await W().unlock(el, ctx, key, B.enc))) return;   // 舊格式(整份加密)：先輸入密碼
+    // 上鎖的策略：精簡版(上半部)直接看；完整報告加密在 full_enc，往下滑在下半部輸入密碼才解開
     const feat = v => [].concat(v).map((x, i) => `<td>${x == null ? '—' : cfg.fmt[i](x)}</td>`).join('');
     const T = B.strat;
     el.innerHTML = `
-      ${LT.brief({ hero: heroOf(B, full), updated: 'tw_research', chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
+      ${LT.brief({ hero: B.full_enc ? md(B.hero || '') : heroOf(B, full), updated: 'tw_research', chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
         ...cfg.items(B), ['停利停損', NO_STOP], ['持有期間', '處置期間。']] })}
-      ${full ? reportPanel(S, B.report) : LT.reportLock()}`;
+      ${!full ? LT.reportLock() : B.full_enc ? '<div id="twrLocked"></div>' : reportPanel(S, B.report)}`;
     const $ = s => el.querySelector(s);
     briefChart(el, B.d, T.nav, B.b0050, cfg.name, SERIES[S.series].color);
     const t = T.ts;
@@ -474,16 +475,21 @@
     if (!full) return;   // 訪客：只有上半部(近期明細也要登入)
     // 近期明細：主策略的交易，最新的在前，先顯示 20 筆
     // 框起來排最前面：已公告、還沒開始的處置(處置第一天收盤買進)；持有中、處置已經結束的(下個交易日開盤賣出)
-    const tag = t => `<span class="next-tag">${t}</span>`, md = d => d.slice(5).replace('-', '/');
+    const tag = t => `<span class="next-tag">${t}</span>`, mdate = d => d.slice(5).replace('-', '/');
     const up = B.upcoming || [], ended = r => !r[6] && r[2].split('～')[1] <= B.asof;
     const row = (r, cls = '', note = '') => `<tr${cls}><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}${note}</td><td>${esc(r[2].replace(/-/g, '/'))}</td><td>${esc(r[3])}</td>${feat(r[4])}<td>${r[5]}</td>
         <td>${r[6] || '<small class="mute">持有中</small>'}</td><td class="${W().cls(r[7])}">${W().pct(r[7], 2)}</td></tr>`;
     const all = T.trades.slice().reverse();
     $('#twrRecentNote').textContent = `最新進場的在最前面；持有中的報酬以 ${B.asof} 收盤計。${up.length || all.some(ended) ? '框起來的是接下來要買進(處置第一天收盤)或下個交易日開盤要賣出的股票。' : ''}`;
     LT.moreTable($('#twrRecent'), ['代號', '名稱', '處置期間', '處置措施', ...(B.cols || ['融資使用率']), '買進(收盤)', '賣出(開盤)', '報酬'], [
-      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${tag(md(u[2]) + ' 收盤買進')}</td><td>${esc((u[2] + '～' + u[3]).replace(/-/g, '/'))}</td><td>${esc(u[4])}</td>${feat(u[5])}<td>—</td><td>—</td><td>—</td></tr>`),
+      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${tag(mdate(u[2]) + ' 收盤買進')}</td><td>${esc((u[2] + '～' + u[3]).replace(/-/g, '/'))}</td><td>${esc(u[4])}</td>${feat(u[5])}<td>—</td><td>—</td><td>—</td></tr>`),
       ...all.filter(ended).map(r => row(r, ' class="next-act"', tag('下個交易日開盤賣出'))),
       ...all.filter(r => !ended(r)).map(r => row(r))]);
+    if (B.full_enc) {   // 下半部：輸入密碼後才顯示完整報告(先講結論已在上方，報告開頭的引言拿掉)
+      const box = $('#twrLocked'), F = await W().unlock(box, ctx, key, B.full_enc, '完整報告需要密碼，請輸入 6 位數密碼。');
+      if (!F || !ctx.alive()) return;
+      box.innerHTML = reportPanel(S, F.report.replace(/^\s*(?:>.*(?:\r?\n|$))+/, ''));
+    }
     drawFigs(el, { 'cum_return.png': div => navLines(div, B.d, [{ name: cfg.name, nav: T.nav, color: CS[0], width: 2.2 }, { name: '0050 買進持有', nav: B.b0050, color: C0050 }]) });
   }
   /* ---------- 處置期間的 K 棒(disp_kbar.json)：五個時點收紅 K / 黑 K 的比例，新舊制、有沒有當沖條件分開看；不是回測，沒有淨值 ---------- */
