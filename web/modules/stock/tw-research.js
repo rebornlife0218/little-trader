@@ -486,7 +486,7 @@
       ...all.filter(ended).map(r => row(r, ' class="next-act"', tag('下個交易日開盤賣出'))),
       ...all.filter(r => !ended(r)).map(r => row(r))]);
     if (B.full_enc) {   // 下半部：輸入密碼後才顯示完整報告(先講結論已在上方，報告開頭的引言拿掉)
-      const box = $('#twrLocked'), F = await W().unlock(box, ctx, key, B.full_enc, '完整報告需要密碼，請輸入 6 位數密碼。');
+      const box = $('#twrLocked'), F = await W().unlockLater(box, ctx, key, B.full_enc, '完整報告需要密碼，請輸入 6 位數密碼。');
       if (!F || !ctx.alive()) return;
       box.innerHTML = reportPanel(S, F.report.replace(/^\s*(?:>.*(?:\r?\n|$))+/, ''));
     }

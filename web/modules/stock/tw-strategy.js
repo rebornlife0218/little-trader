@@ -107,7 +107,7 @@
         topics: ['總覽比較', ...STRATS.map(s => s.name)] },   // 後台熱門主題列出的子項目(同策略頁裡的分頁)
       { key: 'rev20', name: '月營收年增率長期以來第一次破20%', desc: '營收年增率長期以來第一次大幅成長，買進分點少、少數分點集中買超時，隔天開盤買進，設有停損、短線持有', summary: '營收剛轉強、少數分點集中買進的公司短線做多，總報酬贏過 0050，但交易少、持股集中', run: eventStrat('rev20') },
       { key: 'boss', name: '老闆回頭發動了', desc: '外資連賣後轉買、賣出的券商分點比買進的多，融資與融券同時增加時，隔天開盤買進，設有停利停損、短線持有', summary: '外資回頭、籌碼集中的股票短線做多，總報酬贏過 0050，但回測從 2020 年才開始', run: eventStrat('boss') },
-      { key: 'margin', name: '融資都沒退，算我輸嗎', desc: '不公開，輸入密碼後查看', summary: '不公開，輸入密碼後查看', run: eventStrat('margin') },
+      { key: 'margin', name: '融資都沒退，算我輸嗎', desc: '條件不公開的短線做多策略，和 0050 比較報酬與風險', summary: '條件不公開的短線做多策略', locked: true, run: eventStrat('margin') },
     ] },
     { key: 'short', name: '做空', desc: '放空股票，賺下跌的錢', strats: [
       { key: 'against', name: '大盤跌個股逆勢漲就是欠踹', desc: '大盤大跌時逆勢大漲、借券賣出創新高的股票，隔天開盤放空、當天收盤回補', summary: '隔天放空、當天回補能賺到錢，但總報酬遠輸 0050', run: eventStrat('against') },
@@ -119,7 +119,7 @@
     section: 'stock', group: '台股', key: 'tw-strategy', name: '策略', title: '台股策略',
     desc: '依做多、做空分組的策略，一律與買進持有 0050 比較報酬與風險', report: true,
     groups: SIDES.map(sd => ({ name: sd.name, desc: sd.desc, items: sd.strats.map(f => ({
-      key: f.key, name: f.name, desc: f.desc, summary: f.summary, tags: f.key === 'margin' ? '🔒 需要密碼' : '', run: f.run, topics: f.topics,
+      key: f.key, name: f.name, desc: f.desc, summary: f.summary, locked: f.locked, run: f.run, topics: f.topics,
     })) })),
   });
 
@@ -436,13 +436,52 @@
     });
   }
 
+  /* 不公開的策略(locked)：精簡版不用密碼，只有先講結論、績效卡片與累積報酬圖(條件與近期明細不公開)；
+     登入的人在下半部輸入密碼，解開後(回傳完整資料)整頁換成完整版；訪客的下半部是登入提示(回傳 null) */
+  async function lockedBrief(el, ctx, key, B, full) {
+    const name = (SIDES.flatMap(s => s.strats).find(s => s.key === key) || {}).name || key;
+    const long = B.side === 'long', fee = long ? 0 : 0.001, DAY = 864e5;   // 借券費用預設 0.1%(調整欄在完整報告裡)
+    const navs = { s: [1], b0050: B.nav.b0050 };
+    for (let i = 1; i < B.d.length; i++)
+      navs.s.push(navs.s[i - 1] * (B.nav.s[i] / B.nav.s[i - 1] - (long ? 0 : fee * B.expo[i - 1] * (Date.parse(B.d[i]) - Date.parse(B.d[i - 1])) / DAY / 365)));
+    const done = B.trades.filter(t => t[5] !== 'open');
+    const ts = tradeStats(done.map(t => t[4] - fee * t[9] / 365), done.map(t => t[6]), B.npos.slice(1));
+    const x = stats(navs.s), S = stats(navs.b0050), rows = yearTable(B.d, 0, navs.s, navs.b0050), yWin = rows.filter(r => r.r > r.b).length;
+    el.innerHTML = `
+      ${LT.brief({ updated: 'tw_strategy', stats: 'evStats', chart: 'evChart',
+        hero: `<blockquote><p><b>先講結論</b>：${esc(name)}${long ? '' : '(放空)'}的總報酬 ${totalRet(x)}、夏普值 ${x.sharpe.toFixed(2)}，${x.mult > S.mult ? '贏過' : '輸給'}同期 0050 的 ${totalRet(S)}(夏普值 ${S.sharpe.toFixed(2)})；${rows.length} 年中有 ${yWin} 年贏 0050。</p></blockquote>`,
+        items: [['邏輯', '不公開；選股條件與出場規則在完整報告裡，輸入密碼後查看。'], ['進出場', `每天收盤後選股，隔天開盤${long ? '買進' : '放空'}。`]] })}
+      ${full ? '<div id="evLocked"></div>' : LT.reportLock()}`;
+    el.querySelector('#evStats').innerHTML = vs0050Cards(x, S, ts) + tradeCards(ts);
+    navCharts({ d: B.d, i0: 0, navs, meta: { s: { name, color: NAV_COLOR.s }, b0050: { name: '0050 買進持有', color: NAV_COLOR.b0050 } },
+      main: 's', chart: el.querySelector('#evChart'), legend: el.querySelector('#evChartLegend') });
+    if (!full) return null;
+    const R = await unlockLater(el.querySelector('#evLocked'), ctx, key, B.full_enc, '完整報告與近期明細需要密碼，請輸入 6 位數密碼。');
+    if (R) { const y = window.scrollY; requestAnimationFrame(() => window.scrollTo(0, y)); }   // 換成完整版時停在原來的位置
+    return R;
+  }
+
+  // 下半部先放「看完整報告」按鈕，使用者按了才出現密碼欄(同一個分頁輸入過密碼就直接解開)
+  async function unlockLater(box, ctx, key, E, prompt) {
+    let saved = null;
+    try { saved = sessionStorage.getItem(PW_KEY + key); } catch (e) { /* 無法使用 sessionStorage */ }
+    const R = saved && await decrypt(E, saved);
+    if (R || !ctx.alive()) return R || null;
+    box.innerHTML = `<div class="panel lock-panel"><h2>完整報告</h2>
+      <p class="mute">研究目的、資料處理、研究方法、完整的實證結果、結論與近期明細。</p>
+      <button type="button" class="login-btn">看完整報告</button></div>`;
+    await new Promise(res => { box.querySelector('button').onclick = res; });
+    return ctx.alive() ? unlock(box, ctx, key, E, prompt) : null;
+  }
+
   function eventStrat(key) { return async (el, ctx) => {
     el.innerHTML = `<div class="panel"><div class="page-loading"><span class="spinner"></span>載入中…</div></div>`;
     let B, full;
     try { ({ data: B, full } = await LT.loadReport('tw_strategy', key + '.json')); }
     catch (e) { if (ctx.alive()) el.innerHTML = `<div class="panel"><p class="mute">回測資料尚未產生：${esc(e.message)}</p></div>`; return; }
     if (!ctx.alive()) return;
-    if (B.enc && !(B = await unlock(el, ctx, key, B.enc))) return;
+    if (B.locked && !(B = await lockedBrief(el, ctx, key, B, full))) return;   // 不公開的策略：精簡版直接看，下半部輸入密碼
+    if (B.enc && !(B = await unlock(el, ctx, key, B.enc))) return;   // 舊格式(整份加密)：先輸入密碼
     const cfg = B.info || EVENTS[key];
     const P = B.params, T0 = SIDE_TXT[B.side], long = B.side === 'long';
     const exitTxt = P.exit === 'open' ? `第 ${P.hold + 1} 個交易日開盤${T0.out}` : P.hold === 1 ? `當天收盤${T0.out}` : `第 ${P.hold} 個交易日收盤${T0.out}`;
@@ -585,5 +624,5 @@
   }; }
 
   // 共用給其他台股頁面(tw-research.js)：績效統計與圖表的算法和這頁一致
-  window.LTTW = { unlock, stats, card, winCard, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
+  window.LTTW = { unlock, unlockLater, stats, card, winCard, vs0050Cards, tradeCards, vs0050Txt, navCharts, yearTable, heat, pct, cls, beat, totalRet, STAT_NOTE, COST_NOTE };
 })();

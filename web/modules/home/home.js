@@ -75,7 +75,7 @@
     const items = [];
     LT.listPages().filter(p => p.catalog).forEach(p => p.catalog.groups.forEach(g => g.items.forEach(it => {
       // 不公開(要密碼)的策略不列
-      if (it.summary && !it.soon && !/需要密碼/.test(it.tags || '')) items.push({ ...it, href: `${p.section}/${p.key}/${encodeURIComponent(it.key)}`, sec: p.section, page: p.name });
+      if (it.summary && !it.soon && !it.locked) items.push({ ...it, href: `${p.section}/${p.key}/${encodeURIComponent(it.key)}`, sec: p.section, page: p.name });
     })));
     return items;
   }

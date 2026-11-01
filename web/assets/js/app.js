@@ -215,6 +215,7 @@ const LT = (() => {
   /* ---------- 目錄頁：側欄頁面 › 分組的卡片列表 › 單一內容(研究、策略) ----------
      LT.catalog({ section, group, key, name, desc, report, groups: [{ name, desc, items: [{ key, name, desc, summary, tags, soon, report, run(el, ctx) }] }] })
        report(選填)：研究、策略(上半部公開、完整報告要登入，見 LT.loadReport)；可以整個目錄頁設，或個別項目設
+       locked(選填)：上鎖的策略(完整報告要密碼；清單與頁首不標示，看完整報告時才要密碼)，不能分享、首頁研究重點不列
        redirect(選填)：redirect(項目代碼) 回傳網址時轉過去(舊網址)，回傳空字串就回到列表
        summary(選填)：研究的先講結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
        - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
@@ -247,7 +248,7 @@ const LT = (() => {
         }
         document.title = `${it.name} · Little Trader`;
         crumbs(it.name);
-        const canShare = auth.kind === 'member' && auth.api && !/需要密碼/.test(it.tags || '');
+        const canShare = auth.kind === 'member' && auth.api && !it.locked;   // 上鎖的策略(完整報告要密碼)不能分享
         el.innerHTML = `<header class="top"><div><h1>${esc(it.name)}</h1><p>${it.groupName ? `<span class="cat-crumb">${esc(it.groupName)}</span>` : ''}${esc(it.desc || '')}${it.tags ? ` ${it.tags}` : ''}</p></div>
             ${canShare ? `<div class="share-box"><button type="button" class="share-btn">${SHARE_ICON}分享</button><span class="share-msg" role="status"></span></div>` : ''}</header>
           <div class="cat-body"></div>`;

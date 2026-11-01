@@ -22,7 +22,8 @@ const withHero = (o, j) => ({ ...o, hero: heroOf(j.report) });
 export const BRIEFS = {
   // 台股策略(stock/tw-strategy.js)：低波動選股的精簡版要用到每月換股紀錄；近期明細要登入，所以不放持股、選股與股票代號
   //   事件型策略的績效卡片要用每筆交易的報酬與天數：交易只留報酬、出場原因、天數、出場年度與借券天數，拿掉代號、名稱與日期
-  tw_strategy: (f, j) => j.enc ? j   // 不公開的策略：整份加密，要密碼才能解開
+  tw_strategy: (f, j) => j.enc ? j   // 舊格式：整份加密
+    : j.locked ? (({ full_enc, ...plain }) => plain)(j)   // 不公開的策略：pipeline 已經只留精簡版的欄位(events.py 的 locked)，拿掉加密的完整資料
     : f === 'backtest.json' ? pick(j, ['asof', 'd', 'nav', 'npos', 'tstat', 'm'])
     : { ...pick(j, ['key', 'side', 'asof', 'd', 'nav', 'npos', 'expo', 'params', 'info']),
         trades: (j.trades || []).map(t => ['', '', '', t[3] ? String(t[3]).slice(0, 4) : t[3], t[4], t[5], t[6], 0, 0, t[9]]) },

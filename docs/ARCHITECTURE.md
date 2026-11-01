@@ -148,7 +148,9 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - 真正的權限在後端：`functions/data/_middleware.ts`、`functions/modules/_middleware.ts` 擋訪客下載會員限定的資料與程式(回 401)，畫面上的鎖只是提示。
 - **研究與策略的完整報告**：`memberDatasets`(etf_research、sp500、tw_strategy、tw_research、tw_gap)的檔案要登入；部署時 `scripts/build-site.mjs` 用 `scripts/briefs.mjs` 從每個檔拆出精簡版 `data/<資料集>/brief/<檔名>`，只放頁面上半部用到的欄位(白名單，新欄位預設不公開；研究報告只帶開頭的 `> **先講結論**`，存成 `hero`)，精簡版公開、不經過 functions(`_routes.json` 的 exclude)。
   - 頁面用 `LT.loadReport(資料集, 檔名)` 載入：登入的人拿完整版、訪客拿精簡版，回傳 `{ meta, data, full }`；`full = false` 時只畫上半部，下半部放 `LT.reportLock()`(登入提示)。近期明細也要登入：`LT.brief` 對訪客直接顯示登入提示(沒有 recent 的容器)，頁面在 `full` 時才填；精簡版也不放近期明細用的資料(持股、選股、交易的代號名稱與日期)。完整報告用到的調整欄(例如借券費、回測起點)在下半部，訪客用預設值算上半部。
-  - 上鎖的策略：整份 JSON 加密(PBKDF2-SHA256 + AES-GCM)，精簡版就是整份加密檔；網頁用 `LTTW.unlock`(tw-strategy.js)輸入密碼解開，提示一律寫「6 位數密碼」。融資都沒退(`tw_strategy/margin.json`，events.py；打開就要密碼)與處置股策略(`tw_research/disp.json`，tw_research/update.py 的 `LOCKED`，密碼在 `private_strategies.py` 的 `RESEARCH_PASSWORDS`；檔案裡精簡版與近期明細的欄位是明文、先講結論在 `hero`，完整資料加密在 `full_enc`，打開直接看到上半部，下半部輸入密碼後才顯示完整報告)；兩者都不能分享(`functions/api/share.ts` 的 `PRIVATE`)，首頁研究重點不列。
+  - 上鎖的策略：打開直接看得到精簡版(上半部)，完整報告的資料整份加密(PBKDF2-SHA256 + AES-GCM)放在 `full_enc`。下半部對訪客是登入提示；登入的人先看到「看完整報告」按鈕，按了才出現密碼欄(`LTTW.unlockLater`，tw-strategy.js；提示一律寫「6 位數密碼」，同一個分頁輸入過就直接解開)。目錄頁卡片與頁首不標示要密碼(項目設 `locked: true`)，不能分享(`functions/api/share.ts` 的 `PRIVATE`)，首頁研究重點不列。
+    - 融資都沒退(`tw_strategy/margin.json`，events.py 的 `locked()`)：條件不公開，明文只有淨值、持有檔數與拿掉代號名稱日期的交易(績效卡片用)，策略說明寫「不公開」；近期明細也在加密資料裡，解開後整頁換成完整版。
+    - 處置股策略(`tw_research/disp.json`，tw_research/update.py 的 `LOCKED`，密碼在 `private_strategies.py` 的 `RESEARCH_PASSWORDS`)：精簡版與近期明細的欄位是明文、先講結論在 `hero`，解開後在下半部畫完整報告。
   - 直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)沒有需要保護的資料，用 `LT.isMember()` 判斷，訪客一樣只畫上半部(報告文字在公開的頁面程式裡，只是畫面上不顯示)。策略的完整報告大多是用上半部同一份資料(淨值、交易)算出來的，後端保護的是只有下半部用到的欄位(參數、敏感度、報告文字)。
   - 目錄頁(`LT.catalog`)設 `report: true`(整個目錄頁或個別項目)：訪客打開時，瀏覽紀錄記為 locked，後台顯示「訪客看到登入提示」的次數。
   - 新增研究或策略：資料集加到 `memberDatasets`，`scripts/briefs.mjs` 加這個檔的精簡版規則(上半部改用到新欄位時也要一起改)；`tests/site.test.mjs` 檢查需要登入的資料集都用 `LT.loadReport` 載入、都有精簡版規則。

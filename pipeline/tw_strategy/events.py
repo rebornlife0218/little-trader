@@ -575,6 +575,14 @@ def build(W, names, st):
     return out
 
 
+def locked(res, st):
+    """不公開的策略：精簡版(上半部)只放淨值與績效統計要用的欄位(交易拿掉代號、名稱與日期，只留報酬、出場原因、天數、出場年度)，
+    其餘(條件說明 info、參數、完整交易、近期選股)整份加密放在 full_enc；網頁輸入密碼後才解得開"""
+    anon = [['', '', '', str(t[3])[:4] if t[3] else t[3], t[4], t[5], t[6], 0, 0, t[9]] for t in res['trades']]
+    plain = {k: res[k] for k in ('key', 'side', 'asof', 'd', 'nav', 'npos', 'expo') if k in res}
+    return {**plain, 'locked': True, 'trades': anon, 'full_enc':encrypt({**res, 'info': st['info']}, st['password'])['enc']}
+
+
 def main(keys=None, data=None, out=None):
     """data = load() 的結果(update.py 已經讀過就直接傳進來)；out = 只回傳結果、不寫檔(比較新舊版本用)"""
     W, names = data or load()
@@ -586,7 +594,7 @@ def main(keys=None, data=None, out=None):
         res = build(W, names, st)
         results[st['key']] = res
         if out is None:
-            write_json(out_dir / f"{st['key']}.json", encrypt({**res, 'info': st['info']}, st['password']) if st.get('password') else res)
+            write_json(out_dir / f"{st['key']}.json", locked(res, st) if st.get('password') else res)
         T = [t for t in res['trades'] if t[5] != 'open']
         r = np.array([t[4] for t in T])
         sk = pd.Series([b[3] for b in res['skipped']]).value_counts().to_dict()
