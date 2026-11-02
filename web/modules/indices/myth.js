@@ -2,7 +2,7 @@
 /* ============================== 常見迷思：均線的支撐與壓力、520 行情 ==============================
    跌破：前一日收盤在均線上、當日收盤在均線下；突破反之。
    初次跌破(突破)：之前已連續「均線天數 × settlePct%」日以上站在均線上(下)(預設一半：月線 10、季線 30、半年線 60、年線 120 日)；否則為後續(反覆)跌破(突破)。
-   有支撐：跌破後 confirmDays 日內收盤又站回均線(假跌破)；有壓力：突破後 confirmDays 日內又跌回均線(假突破)。 */
+   有支撐：跌破後 confirmDays 日內收盤又站回均線(假跌破)；有壓力：突破後 confirmDays 日內又跌回均線(假突破)。表格另外固定列 1 日內(滑桿設 1 日時不重複)。 */
 const MYTH_LINES = [{p:20, name:'月線'}, {p:60, name:'季線'}, {p:120, name:'半年線'}, {p:240, name:'年線'}];
 const MYTH_FEW = 20;   // 次數少於此數，標示樣本少
 const settleOf = (p, prm)=> Math.max(1, Math.round(p*prm.settlePct/100));
@@ -30,7 +30,7 @@ function computeMyth(rows, ma, prm){
           };
           let extreme = prevAbove ? Infinity : -Infinity;
           for (let k=i+1;k<=ext20;k++) extreme = prevAbove ? Math.min(extreme, rows[k].low) : Math.max(extreme, rows[k].high);
-          const ev = { idx:i, date:rows[i].date, back: backIn(prm.confirmDays),
+          const ev = { idx:i, date:rows[i].date, back: backIn(prm.confirmDays), back1: backIn(1),
             candle: rows[i].close>rows[i].open ? 'red' : rows[i].close<rows[i].open ? 'black' : 'flat',
             ext: ext20>i ? extreme/closes[i]-1 : NaN,
             ret5:fwd(i,5), ret20:fwd(i,20), ret60:fwd(i,60) };
@@ -49,7 +49,7 @@ function mythSummary(list){
   const avg = f=>{ const v=list.map(e=>e[f]).filter(x=>!Number.isNaN(x)); return v.length? v.reduce((a,b)=>a+b,0)/v.length : NaN; };
   const win = f=>{ const v=list.map(e=>e[f]).filter(x=>!Number.isNaN(x)); return v.length? v.filter(x=>x>0).length/v.length : NaN; };
   const rateOf = f=>{ const done = list.filter(e=>e[f]!==null); return done.length? done.filter(e=>e[f]).length/done.length : NaN; };
-  return { count:list.length, backRate:rateOf('back'), ext:avg('ext'),
+  return { count:list.length, backRate:rateOf('back'), back1Rate:rateOf('back1'), ext:avg('ext'),
     win5:win('ret5'), win20:win('ret20'), win60:win('ret60'),
     avg5:avg('ret5'), avg20:avg('ret20'), avg60:avg('ret60'),
     last: list.length ? list[list.length-1].date : null };
@@ -154,21 +154,25 @@ function renderMyth(){
   const pct = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v)}</td>`;
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
   const rate = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td><b>${(v*100).toFixed(0)}%</b></td>`;
+  // 另外固定列出 1日內站回(跌回)均線；滑桿設成 1 日時兩欄相同，只留一欄
+  const show1 = prm.confirmDays!==1;
   const backHead = isDown=> `${prm.confirmDays}日內${isDown?'站回<br>(有支撐)':'跌回<br>(有壓力)'}`;
+  const backThs = (isDown, attr='')=> (show1 ? `<th${attr}>1日內${isDown?'站回':'跌回'}</th>` : '') + `<th${attr}>${backHead(isDown)}</th>`;
+  const backCells = s=> (show1 ? rate(s.back1Rate) : '') + rate(s.backRate);
   const extHead = isDown=> `20日內最大<br>${isDown?'續跌':'續漲'}`;
   const lineCell = g=> `<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`;
   const table = (groups, isDown)=>`
     <div class="tablewrap"><table class="stattable myth">
       <thead>
         <tr><th rowspan="2">均線</th><th rowspan="2">類型</th><th rowspan="2">次數</th>
-          <th rowspan="2">${backHead(isDown)}</th><th rowspan="2">${extHead(isDown)}</th>
+          ${backThs(isDown, ' rowspan="2"')}<th rowspan="2">${extHead(isDown)}</th>
           <th colspan="3">上漲機率</th><th colspan="3">平均報酬</th></tr>
         <tr><th>+5日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+20日</th><th>+60日</th></tr>
       </thead>
       <tbody>${groups.map(g=>[['first','初次'], ['later','後續']].map(([t,label],j)=>{
         const s = mythSummary(g[t]);
         return `<tr class="${j===0?'allrow':''}">${j===0?lineCell(g):''}
-          <td class="kind">${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}
+          <td class="kind">${label}</td><td>${s.count}</td>${backCells(s)}${pct(s.ext)}
           ${win(s.win5)}${win(s.win20)}${win(s.win60)}${pct(s.avg5)}${pct(s.avg20)}${pct(s.avg60)}</tr>`;
       }).join('')).join('')}</tbody>
     </table></div>`;
@@ -177,14 +181,14 @@ function renderMyth(){
     <h4 class="subhead">${isDown?'跌破當天收紅K還是黑K，比較容易有撐？':'突破當天收紅K還是黑K，比較容易遇到壓力？'}</h4>
     <div class="tablewrap"><table class="stattable myth">
       <thead>
-        <tr><th>均線</th><th>當天K棒</th><th>次數</th><th>${backHead(isDown)}</th><th>${extHead(isDown)}</th><th>+20日<br>上漲機率</th><th>+20日<br>平均報酬</th></tr>
+        <tr><th>均線</th><th>當天K棒</th><th>次數</th>${backThs(isDown)}<th>${extHead(isDown)}</th><th>+20日<br>上漲機率</th><th>+20日<br>平均報酬</th></tr>
       </thead>
       <tbody>${groups.map(g=>{
         const all = g.first.concat(g.later);
         return [['red','紅K','var(--candle-up)'],['black','黑K','var(--candle-down)']].map(([c,label,color],j)=>{
           const s = mythSummary(all.filter(e=>e.candle===c));
           return `<tr class="${j===0?'allrow':''}">${j===0?lineCell(g):''}
-            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}${win(s.win20)}${pct(s.avg20)}</tr>`;
+            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${backCells(s)}${pct(s.ext)}${win(s.win20)}${pct(s.avg20)}</tr>`;
         }).join('');
       }).join('')}</tbody>
     </table></div>`;
@@ -223,7 +227,7 @@ function renderMyth(){
             onchange="setMythParam('confirmDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
         </div>
       </div>
-      <div class="note">跌破＝收盤從均線之上跌到之下，突破反之。穿越前已連續在均線同一側 ${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')} 以上算「初次」，否則算「後續」。穿越後 ${prm.confirmDays} 日內收盤回到均線另一側＝假跌破(有支撐)／假突破(有壓力)。報酬以穿越當天收盤為基準。</div>
+      <div class="note">跌破＝收盤從均線之上跌到之下，突破反之。穿越前已連續在均線同一側 ${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')} 以上算「初次」，否則算「後續」。穿越後 ${prm.confirmDays} 日內收盤回到均線另一側＝假跌破(有支撐)／假突破(有壓力)。表格另列 1 日內就回到均線的比例。報酬以穿越當天收盤為基準。</div>
     </div>
 
     <div class="panel">
