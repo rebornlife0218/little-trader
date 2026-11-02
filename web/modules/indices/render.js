@@ -155,7 +155,6 @@ function render(){
   const params = state.active ? state.params[state.active] : null;
   const events = state.active ? (state.events[state.active]||[]) : [];
   const dm = state.dataMeta;
-  const avail = (dm && dm.indices) || {};
   const updatedLine = dm ? LT.sourceLine(dm)
     : (state.dataStatus==='error' ? `<div class="updated">無法載入資料(${state.dataError||''})</div>` : '');
   const rd = regimeDef();
@@ -164,14 +163,14 @@ function render(){
     <header class="top">
       <div>
         <h1>${themeName}</h1>
-        <p>${state.theme==='crash' ? '全球主要指數 · 1990 年起 · 跌深反彈與均線支撐壓力研究' : '全球主要指數 · K棒型態統計研究'}</p>
+        <p>${state.theme==='crash' ? '全球主要指數 · 1990 年起 · 跌深反彈與均線支撐壓力研究' : '全球主要指數 · 1990 年起 · K棒型態統計研究'}</p>
         ${updatedLine}
       </div>
       <div class="pickers">
         <div class="pickrow">
           <label for="indexPick">指數</label>
           <select id="indexPick" class="indexpick" onchange="switchTab(this.value)" onfocus="prefetchIndices()" onpointerenter="prefetchIndices()" ${isTwus()?'disabled':''}>
-            ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${state.theme==='crash' ? (state.data[c.key]?' · '+state.data[c.key].length+'筆':'') : (avail[c.key]?' · '+avail[c.key].rows+'筆':'')}</option>`).join('')}
+            ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${state.data[c.key]?' · '+state.data[c.key].length+'筆':''}</option>`).join('')}
           </select>
         </div>
         <div class="pickrow">
@@ -382,7 +381,7 @@ window.addEventListener('resize', ()=>{ if(document.getElementById('app') && sta
 let _indicesBooted = false;
 function mountIndices(container, theme){
   container.innerHTML = '<div id="app"></div>';
-  applyTheme(theme);
+  state.theme = theme;
   // 網址帶模式時直接切到該模式(例如首頁近期更新連到 index/crash/myth)
   const m = LT.path()[2];
   if (theme==='crash' && MODES.some(x=>x.key===m)) state.mode = m;
