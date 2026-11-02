@@ -2,6 +2,7 @@
    資料集：data/indices/(pipeline/indices/update.py，排程見 .github/workflows/data-indices.yml)
    多個檔案共用同一組全域變數與函式(一般 <script>，不是 module)，載入順序見 index.html */
 const INDICES_DATASET = 'indices';
+const CRASH_START = '1990-01-01';   // 大盤漲跌分析的資料從這天開始；K棒型態分析用全部資料
 /* ============================== 常數與設定 ============================== */
 // 指數代碼與中文名稱(下拉選單依此順序排列)
 const INDICES = [
@@ -27,7 +28,8 @@ let state = {
   theme: 'crash',  // 'crash' | 'candle'
   regimeDef: 'ma_pos', // 多頭/盤整/空頭的定義，見 REGIME_DEFS
   indexList: [],  // [{key,name}] 下拉選單
-  data: {},       // key -> array of {date, open,high,low,close,volume}
+  allRows: {},    // key -> 資料檔的全部日資料
+  data: {},       // key -> 目前頁面用的日資料 array of {date, open,high,low,close,volume}
   loading: {},    // key -> Promise(下載中)
   meta: {},       // key -> {name, hasOHLC, hasVolume}
   ma: {},         // key -> {5:[],20:[],60:[],240:[]}

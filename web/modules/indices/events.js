@@ -123,6 +123,23 @@ async function init(){
   render();
 }
 // 使用者準備切換指數時(滑過/點開選單)才預先下載其他指數，節省流量又能快速切換
+function rowsForTheme(rows){
+  if (state.theme!=='crash') return rows;
+  const i = rows.findIndex(r=>r.date>=CRASH_START);
+  return i>0 ? rows.slice(i) : rows;
+}
+// 切換大盤漲跌分析 / K棒型態分析：兩頁的資料範圍不同，算過的結果都要重算
+function applyTheme(theme){
+  if (state.theme===theme) return;
+  state.theme = theme;
+  state.twus = null;
+  Object.keys(state.allRows).forEach(k=>{
+    state.data[k] = rowsForTheme(state.allRows[k]);
+    state.view[k] = {start:0, end:state.data[k].length-1};
+    state.events[k] = state.candlePatterns[k] = state.myth[k] = state.cycle[k] = null;
+    delete state.ma[k]; delete state.regimes[k]; delete state.cursor[k];
+  });
+}
 function prefetchIndices(){ state.indexList.forEach(c=>loadIndex(c.key).catch(()=>{})); }
 function loadIndex(key){
   if (state.data[key]) return Promise.resolve();
@@ -131,9 +148,10 @@ function loadIndex(key){
     if (!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
   }).then(j=>{
-    const rows = new Array(j.d.length);
-    for (let i=0;i<j.d.length;i++) rows[i] = {date:j.d[i], open:j.o[i], high:j.h[i], low:j.l[i], close:j.c[i], volume:j.v[i]||0};
-    state.data[key] = rows;
+    const all = new Array(j.d.length);
+    for (let i=0;i<j.d.length;i++) all[i] = {date:j.d[i], open:j.o[i], high:j.h[i], low:j.l[i], close:j.c[i], volume:j.v[i]||0};
+    state.allRows[key] = all;
+    const rows = state.data[key] = rowsForTheme(all);
     state.meta[key] = {name:TICKER_NAMES[key]||key, hasOHLC:true, hasVolume:rows.some(r=>r.volume>0)};
     state.params[key] = state.params[key] || {...DEFAULT_PARAMS};
     state.candleParams[key] = state.candleParams[key] || {...DEFAULT_CANDLE_PARAMS};

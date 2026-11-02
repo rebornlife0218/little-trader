@@ -21,6 +21,7 @@ web/                                網站(部署時整個資料夾就是網站�
     indices/core.js … render.js     指數：大盤漲跌分析、K棒型態分析，拆成 7 個檔、共用全域變數(順序不能換，見 index.html)：
                                     core(常數、state、均線、多空定義)、patterns(K棒型態偵測)、events(急跌反彈偵測、資料載入)、
                                     kchart(K 線圖，標出畫面中的最高、最低點)、myth(常見迷思)、cycle(週期性分析)、twus(台美股關係；颱風假日期手動維護在 TW_TYPHOON)、render(畫面與註冊)
+                                    大盤漲跌分析只用 1990 年以後的資料(core 的 CRASH_START)，K棒型態分析用全部資料
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
     etf/lib.js                      ETF 共用(window.LTETF)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料(etf_compare)
     etf/pack.js                     ETF：ETF大禮包(目錄頁：ETF介紹、怎麼存ETF、即將發行ETF 三個子主題，網址 etf/pack/<子主題>；舊網址 etf/intro、etf/save、etf/upcoming 轉過來，更早的 etf/pack/<研究> 轉到 ETF研究)
