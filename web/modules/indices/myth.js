@@ -214,7 +214,7 @@ function renderMyth(){
             onchange="setMythParam('confirmDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
         </div>
       </div>
-      <div class="note">跌破＝收盤從均線之上跌到之下，突破反之。穿越前已連續在均線同一側 ${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')} 以上算「初次」，否則算「後續」。穿越後 ${prm.confirmDays} 日內收盤回到均線另一側＝假跌破(有支撐)／假突破(有壓力)。報酬以穿越當天收盤為基準；次數少於 ${MYTH_FEW} 次，結論會註明樣本少。</div>
+      <div class="note">跌破＝收盤從均線之上跌到之下，突破反之。穿越前已連續在均線同一側 ${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')} 以上算「初次」，否則算「後續」。穿越後 ${prm.confirmDays} 日內收盤回到均線另一側＝假跌破(有支撐)／假突破(有壓力)。報酬以穿越當天收盤為基準。</div>
     </div>
 
     <div class="panel">
