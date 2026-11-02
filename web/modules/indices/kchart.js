@@ -239,8 +239,8 @@ function fmtVol(v){
   if (v>=1e4) return (v/1e4).toFixed(0)+'萬';
   return fmtNum(v,0);
 }
-// 台灣加權的成交量單位是張
-function volLabel(key){ return key==='TAIEX' ? '量(張)' : '量'; }
+// 台灣加權的成交量是證交所成交金額(元)
+function volLabel(key){ return key==='TAIEX' ? '成交值' : '量'; }
 function updateOhlcInfo(){
   const el = document.getElementById('ohlcInfo'); if (!el) return;
   const key = state.active, rows = state.data[key], i = state.cursor[key];
@@ -259,7 +259,7 @@ function updateOhlcInfo(){
   el.innerHTML = `<b>${d.date}</b>
     <span>開 <em>${f(d.open)}</em></span><span>高 <em>${f(d.high)}</em></span><span>低 <em>${f(d.low)}</em></span>
     <span>收 <em class="${cls}">${f(d.close)}</em></span><span class="${cls}">${fmtPct(chg,2)}</span>
-    <span>${volLabel(key)} <em>${fmtVol(d.volume)}</em></span>${(()=>{ const v=state.ma[key]&&state.ma[key].vol5[i]; return v>0 ? `<span>${VOL_MA}日均${volLabel(key)} <em>${fmtVol(v)}</em></span>` : ''; })()}${mas}
+    <span>${volLabel(key)} <em>${fmtVol(d.volume)}</em></span>${(()=>{ const v=state.ma[key]&&state.ma[key].vol5[i]; return v>0 ? `<span>${VOL_MA}日均${volLabel(key)==='量'?'量':'值'} <em>${fmtVol(v)}</em></span>` : ''; })()}${mas}
     <span class="mute">← → 移動 · Esc 取消</span>`;
 }
 document.addEventListener('keydown', (ev)=>{

@@ -2,7 +2,7 @@
 資料集 indices：全球 10 大指數 OHLCV，每個指數輸出一個 JSON → web/data/indices/
 來源是私有 repo rebornlife0218/Seeking_Alpha 的 CM/國際指數(本機排程每天從 CM「重要國際指數」上傳：年度大表 + 每日檔)。
 GitHub Actions 用唯讀 token(secret SEEKING_ALPHA_TOKEN)取得；本機可用環境變數 CM_DIR 指向 Seeking_Alpha 的工作目錄。
-加權報酬指數 TAIEX_TR 另外來自證交所(見 twse.py)。
+台灣加權的成交值、加權報酬指數 TAIEX_TR 另外來自證交所(見 twse.py)。每個指數都從 CM 最早的資料開始。
 排程：.github/workflows/data-indices.yml；本機手動：python pipeline/indices/update.py
 """
 import base64
@@ -18,20 +18,18 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from common import dataset_dir, write_json, write_meta  # noqa: E402
-from twse import TR_FILE, load_taiex_tr  # noqa: E402
+from twse import TR_FILE, load_taiex_amount, load_taiex_tr  # noqa: E402
 
 DATASET = 'indices'
 REPO_URL = 'https://github.com/rebornlife0218/Seeking_Alpha'
 CM_FOLDER = 'CM/國際指數'
 SOURCE = '國際指數彙整資料'   # 網頁不顯示資料來源，meta.json 也不寫資料庫名稱
 
-START_DATE = '1991-01-01'
-START_BY_INDEX = {'TAIEX': '1996-01-01'}   # 台灣加權的統計從 1996 年開始
 MAX_STALE_DAYS = 7     # 最新資料超過這麼多天，代表本機上傳停了：中止更新，讓 workflow 失敗發通知
 
 tickers = {
     # 台灣
-    '#TWII': 'TAIEX',      # 成交量單位是張
+    '#TWII': 'TAIEX',      # 成交量用證交所的成交金額(元)，1990 年起
     # 美國
     '#GSPC': 'SP500',
     '#IXIC': 'NASDAQ',
@@ -94,8 +92,9 @@ def load_cm(root):
 def main():
     data = load_cm(checkout())
 
-    # 加權報酬指數要在清空輸出資料夾前讀回快取
+    # 證交所的資料以已發佈的檔案為快取，要在清空輸出資料夾前讀回
     taiex_tr = load_taiex_tr()
+    taiex_amount = load_taiex_amount()
 
     out_dir = dataset_dir(DATASET)
 
@@ -104,7 +103,8 @@ def main():
     for code, name in tickers.items():
         g = data[data['代號'] == code]
         df = g.rename(columns=COLS).set_index(g['日期'].dt.strftime('%Y-%m-%d'))[target_fields]
-        df = df[df.index >= START_BY_INDEX.get(name, START_DATE)]
+        if name == 'TAIEX':
+            df = df.assign(Volume=[taiex_amount.get(d, 0) for d in df.index])
         # 休市或缺值的日子(任一價格 <= 0 或缺值)直接剔除
         df = df[(df[['Open', 'High', 'Low', 'Close']] > 0).all(axis=1)]
         if len(df) < 250:
@@ -120,7 +120,7 @@ def main():
         write_json(out_dir / f'{name}.json', payload)
         index_meta[name] = {'rows': len(df), 'first': df.index[0], 'last': df.index[-1],
                             'has_volume': bool((df['Volume'] > 0).any()),
-                            'source': SOURCE, 'volume': '成交量(張)' if name == 'TAIEX' else '成交量'}
+                            'source': SOURCE, 'volume': '成交金額(元)' if name == 'TAIEX' else '成交量'}
 
     # 加權報酬指數(含股息)：不列入 indices(指數頁不顯示)，給 ETF大禮包的長期回測使用
     extra = {}

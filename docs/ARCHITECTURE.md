@@ -50,7 +50,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   common.py                         共用：輸出資料夾、write_json、write_meta、load_published(讀回上次發佈的檔案做增量更新)
   publish_data.sh                   把 web/data/<資料集>/ 發佈到 data 分支(只替換該資料夾)
   requirements.txt
-  indices/update.py、twse.py        全球指數與台灣加權(Seeking_Alpha 的 CM/國際指數，要 SEEKING_ALPHA_TOKEN)；加權報酬指數用證交所
+  indices/update.py、twse.py        全球指數與台灣加權(Seeking_Alpha 的 CM/國際指數，要 SEEKING_ALPHA_TOKEN，各從最早的資料開始)；台灣加權的成交值、加權報酬指數用證交所
   etf_upcoming/update.py            即將發行 ETF(MoneyDJ)
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
@@ -207,7 +207,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 資料集 | 來源 | 排程(台北) | 主要檔案 |
 |---|---|---|---|
-| indices | Seeking_Alpha 的 `CM/國際指數`(本機排程 `CM_INTL_Daily_Update` 上傳)；`TAIEX_TR` 用臺灣證券交易所 | 週二~六 11:00、週一~五 18:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給怎麼存ETF、ETF研究的長期回測) |
+| indices | Seeking_Alpha 的 `CM/國際指數`(本機排程 `CM_INTL_Daily_Update` 上傳)；台灣加權成交值、`TAIEX_TR` 用臺灣證券交易所 | 週二~六 11:00、週一~五 18:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給怎麼存ETF、ETF研究的長期回測) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
 | etf_compare | 勞動基金運用局；台股 ETF 股價：本機 PostgreSQL `cm.tw_daily`(2016 年起)，之前用 Yahoo Finance(0050、0056、006208，從上市日起)；ARKK：Yahoo Finance；臺灣證券交易所(除權除息計算結果表) | 週一~五 23:45、週二~六 12:15(本機排程) | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬，用下面每日資料的月底值)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；排除沒有成交的日子；台股 ETF 的還原股價用證交所除息資料自己算，Yahoo 的還原股價缺 2013 年以前的配息、2014 年的除息也算錯) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |

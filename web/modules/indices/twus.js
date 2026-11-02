@@ -2,6 +2,7 @@
    美股收盤時台灣已是隔天清晨，所以台股每個交易日對應「前一個台股交易日(含)到當天(不含)之間」的美股。
    平常日剛好一場；台股休市(過年、連假、颱風假)時美股可能有好幾場，用這段期間的累積漲跌，另外分組，不混進平常日的統計。
    這段期間美股一場都沒有(美股休市)的日子，台股沒有新的美股消息，不列；開盤價等於昨收的日子是資料缺漏，也不列。 */
+const TWUS_START = '1990-01-01';   // 台灣加權 1990 年以前的開盤價幾乎都等於昨收，不是真實開盤價，算不了跳空
 const TWUS_SPANS = [{key:0, name:'全部'}, {key:20, name:'近20年'}, {key:10, name:'近10年'}, {key:5, name:'近5年'}];
 // 那斯達克漲跌分組(單位 %)：跌的組含下緣(≤)，漲的組含下緣(≥)，和大漲大跌門檻的算法一致
 const TWUS_BINS = [
@@ -45,6 +46,7 @@ function computeTwus(tw, us){
   let usClosed = 0, bad = 0, j = 0;
   for (let i=1;i<tw.length;i++){
     const P = tw[i-1].date, T = tw[i].date;
+    if (T<TWUS_START) continue;
     while (j<us.length && us[j].date<P) j++;
     let k = j;
     while (k<us.length && us[k].date<T) k++;
@@ -158,7 +160,7 @@ function renderTwus(){
             onchange="setTwusParam('big',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
       </div>
-      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。</div>
+      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。台灣加權 1990 年以前沒有真實開盤價，從 1990 年算起。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。</div>
     </div>
 
     <div class="panel">
@@ -206,7 +208,7 @@ function renderTwus(){
         <thead><tr><th>開盤日</th><th>前一交易日</th><th>類型</th><th>美股場數</th><th>那斯達克累積</th><th>台股跳空</th><th>開盤到收盤</th><th>K棒</th><th>當天漲跌</th></tr></thead>
         <tbody>${closures.map(e=>`<tr class="click" onclick="focusTwus(${e.idx})"><td>${e.date}</td><td>${e.prev}</td><td>${kindName(e.kind)}</td><td>${e.sessions}</td>${pct(e.r/100)}${pct(e.gap)}${pct(e.intra)}${kCell(e)}${pct(e.day)}</tr>`).join('')}</tbody>
       </table></div>
-      <div class="note">台股休市期間，那斯達克的漲跌用累積計算(例如休 2 天就累積 2～3 場)。颱風假依台北市停班造成的全日休市日認定；颱風假和連假連在一起的算颱風假後。其他連假包含 1999 年 921 地震。</div>
+      <div class="note">台股休市期間，那斯達克的漲跌用累積計算(例如休 2 天就累積 2～3 場)。颱風假依台北市停班造成的全日休市日認定；颱風假和連假連在一起的算颱風假後。其他連假包含 1999 年 921 地震；1996 年以前的颱風假也算在其他連假。</div>
     </div>
 
     <div class="panel">
