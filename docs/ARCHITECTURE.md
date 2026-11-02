@@ -51,7 +51,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   common.py                         共用：輸出資料夾、write_json、write_meta、load_published(讀回上次發佈的檔案做增量更新)
   publish_data.sh                   把 web/data/<資料集>/ 發佈到 data 分支(只替換該資料夾)
   requirements.txt
-  indices/update.py、twse.py        全球指數與台灣加權(Seeking_Alpha 的 CM/國際指數，要 SEEKING_ALPHA_TOKEN，各從最早的資料開始)；台灣加權的成交值、加權報酬指數用證交所
+  indices/update.py、twse.py        全球指數與台灣加權(Seeking_Alpha 的 CM/國際指數，要 secret SEEKING_ALPHA_DEPLOY_KEY(Seeking_Alpha 的唯讀 Deploy key)，各從最早的資料開始)；台灣加權的成交值、加權報酬指數用證交所
   etf_upcoming/update.py            即將發行 ETF(MoneyDJ)
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構

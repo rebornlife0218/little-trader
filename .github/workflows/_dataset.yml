@@ -33,7 +33,7 @@ jobs:
         run: python pipeline/${{ inputs.dataset }}/update.py
         env:
           TIINGO_API_KEY: ${{ secrets.TIINGO_API_KEY }}   # 只有 sp500 用到
-          SEEKING_ALPHA_TOKEN: ${{ secrets.SEEKING_ALPHA_TOKEN }}   # 只有 indices 用到(Seeking_Alpha 的唯讀 token)
+          SEEKING_ALPHA_DEPLOY_KEY: ${{ secrets.SEEKING_ALPHA_DEPLOY_KEY }}   # 只有 indices 用到(Seeking_Alpha 的唯讀 Deploy key)
       - name: 發佈到 data 分支
         run: bash pipeline/publish_data.sh ${{ inputs.dataset }}
         env:

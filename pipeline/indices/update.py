@@ -1,11 +1,10 @@
 """
 資料集 indices：全球 10 大指數 OHLCV，每個指數輸出一個 JSON → web/data/indices/
 來源是私有 repo rebornlife0218/Seeking_Alpha 的 CM/國際指數(本機排程每天從 CM「重要國際指數」上傳：年度大表 + 每日檔)。
-GitHub Actions 用唯讀 token(secret SEEKING_ALPHA_TOKEN)取得；本機可用環境變數 CM_DIR 指向 Seeking_Alpha 的工作目錄。
+GitHub Actions 用 Seeking_Alpha 的唯讀 Deploy key(secret SEEKING_ALPHA_DEPLOY_KEY)取得；本機可用環境變數 CM_DIR 指向 Seeking_Alpha 的工作目錄。
 台灣加權的成交值、加權報酬指數 TAIEX_TR 另外來自證交所(見 twse.py)。每個指數都從 CM 最早的資料開始。
 排程：.github/workflows/data-indices.yml；本機手動：python pipeline/indices/update.py
 """
-import base64
 import glob
 import os
 import subprocess
@@ -21,7 +20,7 @@ from common import dataset_dir, write_json, write_meta  # noqa: E402
 from twse import TR_FILE, load_taiex_amount, load_taiex_tr  # noqa: E402
 
 DATASET = 'indices'
-REPO_URL = 'https://github.com/rebornlife0218/Seeking_Alpha'
+REPO_URL = 'ssh://git@ssh.github.com:443/rebornlife0218/Seeking_Alpha.git'   # 走 443 埠：有些網路會擋 SSH 的 22 埠
 CM_FOLDER = 'CM/國際指數'
 SOURCE = '國際指數彙整資料'   # 網頁不顯示資料來源，meta.json 也不寫資料庫名稱
 
@@ -48,21 +47,24 @@ target_fields = list(COLS.values())
 
 
 def checkout():
-    """回傳 Seeking_Alpha 工作目錄；只下載 CM/國際指數，token 放在環境變數裡，不會出現在指令或 log"""
+    """回傳 Seeking_Alpha 工作目錄；只下載 CM/國際指數。私鑰只暫存到下載完，不會出現在指令或 log"""
     if os.environ.get('CM_DIR'):
         return Path(os.environ['CM_DIR'])
-    token = os.environ.get('SEEKING_ALPHA_TOKEN')
-    if not token:
-        raise RuntimeError('沒有 SEEKING_ALPHA_TOKEN，讀不到 Seeking_Alpha(也可用 CM_DIR 指定本機目錄)')
-    auth = base64.b64encode(f'x-access-token:{token}'.encode()).decode()
-    env = dict(os.environ, GIT_TERMINAL_PROMPT='0', GIT_CONFIG_COUNT='1',
-               GIT_CONFIG_KEY_0='http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0=f'AUTHORIZATION: basic {auth}')
+    key = os.environ.get('SEEKING_ALPHA_DEPLOY_KEY')
+    if not key:
+        raise RuntimeError('沒有 SEEKING_ALPHA_DEPLOY_KEY，讀不到 Seeking_Alpha(也可用 CM_DIR 指定本機目錄)')
     root = tempfile.mkdtemp(prefix='seeking_alpha_')
-    for args in (['clone', '-q', '--depth=1', '--filter=blob:none', '--sparse', REPO_URL, root],
-                 ['-C', root, 'sparse-checkout', 'set', '--no-cone', f'/{CM_FOLDER}/']):
-        r = subprocess.run(['git', *args], env=env, capture_output=True, text=True, encoding='utf-8', errors='replace')
-        if r.returncode:
-            raise RuntimeError(f'git {args[0]} 失敗：{r.stderr.strip()}')
+    with tempfile.TemporaryDirectory(prefix='sa_key_') as d:
+        key_file = Path(d) / 'id'
+        key_file.write_text(key.strip() + '\n', encoding='ascii', newline='\n')
+        key_file.chmod(0o600)
+        env = dict(os.environ, GIT_TERMINAL_PROMPT='0',
+                   GIT_SSH_COMMAND=f'ssh -i "{key_file.as_posix()}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new')
+        for args in (['clone', '-q', '--depth=1', '--filter=blob:none', '--sparse', REPO_URL, root],
+                     ['-C', root, 'sparse-checkout', 'set', '--no-cone', f'/{CM_FOLDER}/']):
+            r = subprocess.run(['git', *args], env=env, capture_output=True, text=True, encoding='utf-8', errors='replace')
+            if r.returncode:
+                raise RuntimeError(f'git {args[0]} 失敗：{r.stderr.strip()}')
     return Path(root)
 
 
