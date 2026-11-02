@@ -10,6 +10,7 @@ const TWUS_BINS = [
 ];
 // 台北市停班、股市全日休市的颱風假。資料裡看不出休市原因，所以列日期；有新的颱風假要加在這裡
 const TW_TYPHOON = new Set([
+  '1996-07-31','1996-08-01','1997-08-18','1997-08-29','1998-10-16',
   '2000-08-23','2001-07-30','2001-09-17','2001-09-18','2002-09-06','2004-08-24','2004-08-25','2004-10-25',
   '2005-07-18','2005-08-05','2005-09-01','2007-09-18','2008-07-28','2008-09-29','2009-08-07','2012-08-02',
   '2013-08-21','2014-07-23','2015-07-10','2015-09-29','2016-07-08','2016-09-27','2016-09-28','2019-08-09',
@@ -19,6 +20,7 @@ const TWUS_KINDS = [
   {key:'normal', name:'平常日'},
   {key:'typhoon', name:'颱風假後'},
   {key:'lny', name:'過年後'},
+  {key:'qingming', name:'清明連假後'},
   {key:'holiday', name:'其他連假後'},
 ];
 // 前一個台股交易日 P 和當天 T 之間，台股休市的平日(週一~五)
@@ -34,7 +36,8 @@ function twusKind(closed, T){
   if (!closed.length) return 'normal';
   if (closed.some(d=>TW_TYPHOON.has(d))) return 'typhoon';
   const md = T.slice(5);
-  return closed.length>=3 && md>='01-15' && md<='02-28' ? 'lny' : 'holiday';
+  if (closed.length>=3 && md>='01-15' && md<='02-28') return 'lny';
+  return closed.some(d=>d.slice(5)>='04-02' && d.slice(5)<='04-07') ? 'qingming' : 'holiday';
 }
 function computeTwus(tw, us){
   const out = [], usIdx = {};
@@ -155,7 +158,7 @@ function renderTwus(){
             onchange="setTwusParam('big',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
       </div>
-      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。</div>
+      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。</div>
     </div>
 
     <div class="panel">
@@ -190,7 +193,7 @@ function renderTwus(){
     </div>
 
     <div class="panel">
-      <h3>過年、連假與颱風假</h3>
+      <h3>過年、清明、連假與颱風假</h3>
       <div class="tablewrap"><table class="stattable">
         <thead>
           <tr><th rowspan="2">休市後第一天</th><th rowspan="2">次數</th><th rowspan="2">美股平均場數</th><th colspan="2">累積漲跌 → 跳空</th><th rowspan="2">平均跳空</th><th rowspan="2">收紅K</th><th rowspan="2">收盤比昨收漲</th><th colspan="2">累積大跌 ${B}% 以上</th><th colspan="2">累積大漲 ${B}% 以上</th></tr>

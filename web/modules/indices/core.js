@@ -5,7 +5,7 @@ const INDICES_DATASET = 'indices';
 /* ============================== 常數與設定 ============================== */
 // 指數代碼與中文名稱(下拉選單依此順序排列)
 const INDICES = [
-  {key:'TAIEX',   name:'台灣加權'},  // 開高低收量來自證交所(成交量為成交金額)，其餘指數來自 Yahoo Finance
+  {key:'TAIEX',   name:'台灣加權'},  // 成交量單位是張
   {key:'SP500',   name:'標普500'},
   {key:'NASDAQ',  name:'那斯達克'},
   {key:'NK225',   name:'日經225'},

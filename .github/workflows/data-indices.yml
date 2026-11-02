@@ -1,11 +1,12 @@
 name: 資料 · 指數
 
-# 資料集 indices：pipeline/indices/update.py → data 分支的 indices/
+# 資料集 indices：pipeline/indices/update.py(讀 Seeking_Alpha 的 CM/國際指數) → data 分支的 indices/
+# 要排在本機上傳(CM_INTL_Daily_Update：週二~六 10:30、週一~五 18:00)之後
 on:
   schedule:
     # GitHub 排程使用 UTC 時間(台北 = UTC+8)
-    - cron: '30 7 * * 1-5'    # 台北 週一~週五 15:30
-    - cron: '30 21 * * 1-5'   # 台北 週二~週六 05:30(= UTC 前一日 21:30；美股、歐股週一~五收盤後)
+    - cron: '30 10 * * 1-5'   # 台北 週一~週五 18:30(當天亞股)
+    - cron: '0 3 * * 2-6'     # 台北 週二~週六 11:00(前一晚美股、歐股)
   workflow_dispatch:
 
 permissions:

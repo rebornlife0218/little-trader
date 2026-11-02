@@ -50,7 +50,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   common.py                         共用：輸出資料夾、write_json、write_meta、load_published(讀回上次發佈的檔案做增量更新)
   publish_data.sh                   把 web/data/<資料集>/ 發佈到 data 分支(只替換該資料夾)
   requirements.txt
-  indices/update.py、twse.py        全球指數(Yahoo Finance)；台灣加權改用證交所資料
+  indices/update.py、twse.py        全球指數與台灣加權(Seeking_Alpha 的 CM/國際指數，要 SEEKING_ALPHA_TOKEN)；加權報酬指數用證交所
   etf_upcoming/update.py            即將發行 ETF(MoneyDJ)
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
   options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
@@ -207,7 +207,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 
 | 資料集 | 來源 | 排程(台北) | 主要檔案 |
 |---|---|---|---|
-| indices | Yahoo Finance、臺灣證券交易所 | 週二~六 05:30、週一~五 15:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給怎麼存ETF、ETF研究的長期回測) |
+| indices | Seeking_Alpha 的 `CM/國際指數`(本機排程 `CM_INTL_Daily_Update` 上傳)；`TAIEX_TR` 用臺灣證券交易所 | 週二~六 11:00、週一~五 18:30 | 每個指數一個 JSON(`d/o/h/l/c/v` 陣列)；另有 `TAIEX_TR.json`(發行量加權股價報酬指數，含股息，2003 起，`d/c`；不列在指數頁，給怎麼存ETF、ETF研究的長期回測) |
 | etf_upcoming | MoneyDJ 新基金一覽表 | 週一~五 08:30、17:30 | `upcoming.json` |
 | etf_compare | 勞動基金運用局；台股 ETF 股價：本機 PostgreSQL `cm.tw_daily`(2016 年起)，之前用 Yahoo Finance(0050、0056、006208，從上市日起)；ARKK：Yahoo Finance；臺灣證券交易所(除權除息計算結果表) | 週一~五 23:45、週二~六 12:15(本機排程) | `compare.json`(每月：勞退基金報酬、0050 價格與總報酬，用下面每日資料的月底值)、`etfs.json`(常存 ETF 與 ARKK 的每日收盤、股利再投入還原股價、每股配息；排除沒有成交的日子；台股 ETF 的還原股價用證交所除息資料自己算，Yahoo 的還原股價缺 2013 年以前的配息、2014 年的除息也算錯) |
 | earnings | Nasdaq Earnings Calendar | 每天 07:30、20:00 | `earnings.json`(上週、本週、下週每天的公司、盤前/盤後、預估與實際 EPS、驚喜幅度) |
@@ -226,7 +226,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - 失敗通知：run_local.py 有資料集失敗時跳出 Windows 通知(睡眠中錯過的留在通知中心)；電腦沒開、排程根本沒跑時，由 GitHub 的「本機排程檢查」(`check-local.yml`，台北週二~六 14:00)發現：本機資料集的 `updated_at` 超過 20 小時沒更新，或股票查詢 D1 的 `meta.last_date` 比 tw_strategy 的 `asof` 舊，workflow 就失敗，GitHub 會寄信(帳號 Settings › Notifications › Actions 要開失敗通知)。Cloudflare 金鑰沒有 D1 讀取權限時，股票查詢那項只顯示警告、不算失敗。
 - 兩個排程都設定「喚醒電腦執行」與「錯過時間就補跑」(2026-10-17 實測)：插電睡眠時會在背景準時執行、螢幕不會亮，執行完自動回到睡眠；用電池時，從開始功能表選「睡眠」後排程不會執行，要等下次喚醒電腦才補跑(補跑正常)；但閒置自動關閉螢幕(Windows 記為「閒置逾時」進入新式待命)時，程式與排程都照常執行。所以本機的電源設定為：睡眠「永不」、閒置關閉螢幕(電池 5 分鐘、插電 10 分鐘)、電源鍵 =「關閉顯示器」、闔上螢幕 =「不執行任何動作」；離開時按電源鍵或放著讓螢幕自己關，不要選睡眠。建立排程時要取消「只在插電時才啟動」(`New-ScheduledTaskSettingsSet` 預設是勾選的)。
 - 連線(`common.pg_connect()`)用環境變數 PGHOST/PGPORT/PGUSER/PGDATABASE(有預設值)，密碼由 libpq 讀 `%APPDATA%\postgresql\pgpass.conf`，不進 repo；需要 `psycopg`(只有本機需要，不在 requirements.txt)。
-- 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(證交所資料，GitHub Actions 每天 15:30 更新)。
+- 處置股的加權指數讀 data 分支的 `indices/TAIEX.json`(GitHub Actions 週一~五 18:30 更新)。
 - 只發佈回測結果，不發佈原始股價。
 - etf_research(ETF研究)不在排程裡：研究在本機的研究資料夾計算(不在 repo 內)，研究改版後執行 `python pipeline/run_local.py etf_research`(轉檔、發佈到 data 分支並重新部署)。
 - tw_gap(台股其他研究「跳空與隔夜報酬」)不在排程裡：研究在本機的研究資料夾計算，研究改版後執行 `python pipeline/run_local.py tw_gap`。另外成一個資料集、不放進 tw_research，因為 tw_research 每天由排程整個資料夾發佈，放在裡面會被覆蓋。

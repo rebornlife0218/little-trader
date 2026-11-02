@@ -276,7 +276,7 @@
             <h3 class="md-h2">二、資料處理</h3>
             <ul>
               <li><b>國外研究</b>：引用 PWL Capital(Ben Felix，2020；Felix 與 Warwick，2021)與 Vanguard(2012)的研究結果。</li>
-              <li><b>台股驗證</b>：加權報酬指數(2003 起，含股息)、加權指數(1999 起，不含股息)與常存 ETF 的還原股價，都取月底資料；最後一個月還沒結束時只用完整月份。</li>
+              <li><b>台股驗證</b>：加權報酬指數(2003 起，含股息)、加權指數(1996 起，不含股息)與常存 ETF 的還原股價，都取月底資料；最後一個月還沒結束時只用完整月份。</li>
             </ul>
             <h3 class="md-h2">三、研究方法</h3>
             <ul>
@@ -302,7 +302,7 @@
           </div>
           <h4>2. 用台股自己驗證</h4>
           <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));">
-            <div class="paramitem"><label for="rsSeries">標的</label><select id="rsSeries">${E && E.taiex_tr ? '<option value="taiex_tr">加權報酬指數(2003 起，含股息)</option>' : ''}${E && E.taiex ? '<option value="taiex">加權指數(1999 起，不含股息)</option>' : ''}${twList.map(x => `<option value="${x.code}" ${x.code === '0050' && !(E && (E.taiex || E.taiex_tr)) ? 'selected' : ''}>${x.code} ${esc(x.name)}(含股息)</option>`).join('')}</select></div>
+            <div class="paramitem"><label for="rsSeries">標的</label><select id="rsSeries">${E && E.taiex_tr ? '<option value="taiex_tr">加權報酬指數(2003 起，含股息)</option>' : ''}${E && E.taiex ? '<option value="taiex">加權指數(1996 起，不含股息)</option>' : ''}${twList.map(x => `<option value="${x.code}" ${x.code === '0050' && !(E && (E.taiex || E.taiex_tr)) ? 'selected' : ''}>${x.code} ${esc(x.name)}(含股息)</option>`).join('')}</select></div>
             <div class="paramitem"><label for="rsH">持有期間</label><select id="rsH"><option value="5">5 年</option><option value="10" selected>10 年</option><option value="20">20 年</option><option value="0">至今(持有到最新)</option></select></div>
             <div class="paramitem"><label for="rsN">定期定額分幾個月</label><select id="rsN"><option value="6">6 個月</option><option value="12" selected>12 個月</option><option value="24">24 個月</option></select></div>
             <div class="paramitem"><label for="rsCash">現金年利率(%)</label><input id="rsCash" type="number" min="0" max="10" step="0.1" value="1.5"></div>
