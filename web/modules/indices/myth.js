@@ -209,12 +209,12 @@ function renderMyth(){
             onchange="setMythParam('settlePct',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
         <div class="paramitem">
-          <label>觀察天數(跌破或突破後) <b>${prm.confirmDays}日</b></label>
+          <label>假跌破／假突破：幾日內回到均線 <b>${prm.confirmDays}日</b></label>
           <input type="range" min="1" max="5" step="1" value="${prm.confirmDays}"
             onchange="setMythParam('confirmDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'日'">
         </div>
       </div>
-      <div class="note">跌破＝前一日收盤在均線之上、當日收盤落到均線之下；突破反之。跌破前已連續站在均線之上(突破則為之下)達均線天數的 ${prm.settlePct}% 以上才算「初次」(${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')})，剛穿越不久又再穿越的算「後續」(反覆)。次數少於 ${MYTH_FEW} 次時，下方結論會註明樣本少、參考性較低。有支撐＝跌破後 ${prm.confirmDays} 日內收盤又站回均線(假跌破)；有壓力＝突破後 ${prm.confirmDays} 日內又跌回均線(假突破)；表格另外列出 2 日內站回(跌回)均線的比例。報酬以穿越當天收盤價為基準。</div>
+      <div class="note">跌破＝收盤從均線之上跌到之下，突破反之。穿越前已連續在均線同一側 ${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')} 以上算「初次」，否則算「後續」。穿越後 ${prm.confirmDays} 日內收盤回到均線另一側＝假跌破(有支撐)／假突破(有壓力)。報酬以穿越當天收盤為基準；次數少於 ${MYTH_FEW} 次，結論會註明樣本少。</div>
     </div>
 
     <div class="panel">
