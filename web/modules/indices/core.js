@@ -38,11 +38,13 @@ let state = {
   params: {},     // key -> params per index
   view: {},       // key -> {start,end} index window for chart
   openPattern: null, // 型態總覽中展開的型態
-  mode: 'crash',   // 大盤漲跌分析的模式：'crash' 跌深反彈 | 'myth' 常見迷思 | 'cycle' 週期性分析 | 'm4'
+  mode: 'crash',   // 大盤漲跌分析的模式：'crash' 跌深反彈 | 'myth' 常見迷思 | 'cycle' 週期性分析 | 'twus' 台美股關係
   myth: {},        // key -> 常見迷思統計 (null = 需重算)
   mythParams: {settlePct:50, confirmDays:3},   // settlePct：初次的定義 = 均線天數的幾 %
   cycle: {},       // key -> 週期性分析統計 (null = 需重算)
   cycleParams: {span:0, monthDef:'cal'},
+  twus: null,      // 台美股關係的事件(只算一次)
+  twusParams: {span:10, big:2},   // span：統計期間(近幾年，0 = 全部)；big：大漲大跌門檻 %
   cursor: {},      // key -> K線圖上點選的資料索引
 };
 

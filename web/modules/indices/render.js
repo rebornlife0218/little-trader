@@ -135,9 +135,10 @@ const MODES = [
   {key:'crash', name:'跌深反彈', desc:'急跌事件的底部、反彈報酬與量能結構'},
   {key:'myth', name:'常見迷思', desc:'均線的支撐與壓力、520 行情'},
   {key:'cycle', name:'週期性分析', desc:'月初/月中/月底、週一~週五漲跌與總統選舉'},
-  {key:'m4', name:'模式四', desc:'建置中'},
+  {key:'twus', name:'台美股關係', desc:'那斯達克大漲大跌，隔天台股怎麼開、怎麼收'},
 ];
 function switchMode(m){ state.mode = m; render(); }
+const isTwus = ()=> state.theme==='crash' && state.mode==='twus';   // 這個模式固定比較台灣加權與那斯達克，不能切換指數
 function render(){
   const app = document.getElementById('app');
   if (!app) return; // 目前不在指數頁面
@@ -147,6 +148,7 @@ function render(){
     app.innerHTML = `<div class="panel"><div class="empty"><p>正在載入最新指數資料…</p></div></div>`;
     return;
   }
+  if (isTwus() && state.data.TAIEX) state.active = 'TAIEX';
   if (state.active && state.data[state.active]) ensureComputed(state.active);
   const rows = state.active ? state.data[state.active] : null;
   const meta = state.active ? (state.meta[state.active]||{hasOHLC:true,hasVolume:true,name:state.active}) : null;
@@ -168,7 +170,7 @@ function render(){
       <div class="pickers">
         <div class="pickrow">
           <label for="indexPick">指數</label>
-          <select id="indexPick" class="indexpick" onchange="switchTab(this.value)" onfocus="prefetchIndices()" onpointerenter="prefetchIndices()">
+          <select id="indexPick" class="indexpick" onchange="switchTab(this.value)" onfocus="prefetchIndices()" onpointerenter="prefetchIndices()" ${isTwus()?'disabled':''}>
             ${state.indexList.map(c=>`<option value="${c.key}" ${c.key===state.active?'selected':''}>${c.name}${avail[c.key]?' · '+avail[c.key].rows+'筆':''}</option>`).join('')}
           </select>
         </div>
@@ -308,6 +310,8 @@ function render(){
     html += renderMyth();
   } else if (mode.key==='cycle'){
     html += renderCycle();
+  } else if (mode.key==='twus'){
+    html += renderTwus();
   } else {
     html += LT.UNDER_CONSTRUCTION;
   }
@@ -316,6 +320,7 @@ function render(){
   updateOhlcInfo();
   requestAnimationFrame(()=>drawChart(state.active));
   if (mode.key==='cycle') drawCycleCharts();
+  if (mode.key==='twus') drawTwusCharts();
 }
 
 // 跌深反彈統計表：與K棒型態分析相同的表格呈現
@@ -380,10 +385,10 @@ function mountIndices(container, theme){
   state.theme = theme;
   // 網址帶模式時直接切到該模式(例如首頁近期更新連到 index/crash/myth)
   const m = LT.path()[2];
-  if (theme==='crash' && MODES.some(x=>x.key===m && x.key!=='m4')) state.mode = m;
+  if (theme==='crash' && MODES.some(x=>x.key===m)) state.mode = m;
   if (!_indicesBooted){ _indicesBooted = true; init(); } else { render(); }
 }
 // topics：後台熱門主題列出的子項目(名稱要和 render() 裡 LT.view 記錄的一樣)
 LT.register({ section:'index', key:'crash', name:'大盤漲跌分析', mount: el=>mountIndices(el,'crash'),
-  topics: MODES.filter(m=>m.key!=='m4').map(m=>({ name:m.name, items:INDICES.map(c=>c.name) })) });   // 模式四還在建置中，先不列
+  topics: MODES.map(m=>({ name:m.name, items:INDICES.map(c=>c.name) })) });
 LT.register({ section:'index', key:'candle', name:'K棒型態分析', mount: el=>mountIndices(el,'candle'), topics: INDICES.map(c=>c.name) });
