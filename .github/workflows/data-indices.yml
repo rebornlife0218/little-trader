@@ -5,7 +5,7 @@ on:
   schedule:
     # GitHub 排程使用 UTC 時間(台北 = UTC+8)
     - cron: '30 7 * * 1-5'    # 台北 週一~週五 15:30
-    - cron: '30 21 * * 0-4'   # 台北 週一~週五 05:30 (= UTC 前一日 21:30)
+    - cron: '30 21 * * 1-5'   # 台北 週二~週六 05:30(= UTC 前一日 21:30；美股、歐股週一~五收盤後)
   workflow_dispatch:
 
 permissions:
