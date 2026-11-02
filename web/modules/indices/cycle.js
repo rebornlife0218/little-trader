@@ -155,7 +155,7 @@ function renderCycle(){
           </select>
         </div>
       </div>
-      <div class="note">每日漲跌＝當日收盤 ÷ 前一個交易日收盤 − 1。週一的漲跌包含週末兩天的消息。期間內所有交易日平均每日漲跌 ${fmtPct(cycleSummary(allDaily).avg,3)}、上漲機率 ${(cycleSummary(allDaily).win*100).toFixed(0)}%，可作為各組的比較基準。</div>
+      <div class="note">每日漲跌＝收盤 ÷ 前一交易日收盤 − 1(週一含週末消息)。全部交易日平均 ${fmtPct(cycleSummary(allDaily).avg,3)}、上漲機率 ${(cycleSummary(allDaily).win*100).toFixed(0)}%，作為比較基準。</div>
     </div>
 
     <div class="panel">
@@ -176,7 +176,7 @@ function renderCycle(){
       ${LTChart.legend([{name:'平均報酬(紅漲綠跌)', color:'var(--up)'}, {name:'中位數', color:'var(--blue)'}, {name:'上漲機率(右軸)', color:'var(--amber)'}])}
       <ul class="insight">${insight('月份', monthGroups)}</ul>
       <details class="cy-detail"><summary>詳細數據(次數、最大漲跌幅)</summary>${table('月份', monthGroups, 1)}</details>
-      <div class="note">月報酬＝月底收盤 ÷ 上個月底收盤 − 1，尚未結束的當月不計入。長條為報酬(左軸)，折線為上漲機率(右軸)，虛線為上漲機率 50%。</div>
+      <div class="note">月報酬＝月底收盤 ÷ 上月底收盤 − 1，當月未結束不計。長條＝報酬，折線＝上漲機率(虛線 50%)。</div>
     </div>
 
     <div class="panel">
@@ -184,7 +184,7 @@ function renderCycle(){
       <div id="cyMonthPart"></div>
       ${LTChart.legend(PART_COLORS.map(p=>({name:p.name+' 平均每日漲跌', color:p.color})).concat([{name:'上漲機率(右軸，同色折線)', color:'var(--dim)'}]))}
       <ul class="insight">${partMonthInsight}</ul>
-      <div class="note">每個月份各自依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分成三段，計算該段交易日的平均每日漲跌(長條，左軸)與上漲機率(折線，右軸，虛線為 50%)；可在上方「統計設定」切換定義。</div>
+      <div class="note">每月依「${(MONTH_DEFS.find(m=>m.key===prm.monthDef)||MONTH_DEFS[0]).name}」分三段：長條＝平均每日漲跌，折線＝上漲機率(虛線 50%)；可在「統計設定」切換。</div>
     </div>`;
   state.cycleCharts = { monthGroups, partMonthRows };
   html += renderElection(res.election, key);
@@ -235,7 +235,7 @@ function renderElection(el, key){
           <tr class="allrow"><td colspan="2">上漲機率</td>${sums.map(s=>win(s.win)).join('')}</tr>
         </tbody>
       </table></div>
-      <div class="note">基準日＝投票日當天或之前最後一個交易日的收盤(開票結果出爐前)。「選前20日／5日」＝基準日相對20／5個交易日前的漲跌；「選後」皆以基準日收盤為基準。點選列可在K線圖上定位到選後第一個交易日。${E.note?' '+E.note:''}${skipped.length?` ${skipped.map(e=>e.d.slice(0,4)).join('、')} 年的選舉不在資料範圍內。`:''}樣本只有幾次，僅供參考。</div>
+      <div class="note">基準日＝投票日(或之前最後一個交易日)收盤，選前、選後漲跌都以它為準。點選列可在K線圖上定位到選後第一天。${E.note?' '+E.note:''}${skipped.length?` ${skipped.map(e=>e.d.slice(0,4)).join('、')} 年的選舉不在資料範圍內。`:''}樣本只有幾次，僅供參考。</div>
 
     </div>`;
 }

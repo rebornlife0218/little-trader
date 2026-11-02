@@ -123,7 +123,7 @@ function renderMay20(res, key){
         </tbody>
       </table></div>
       <ul class="insight">${insight}</ul>
-      <div class="note">520 是總統就職日(1996 年起每 4 年一次，本表資料自 ${res.years.length?res.years[0].y:'—'} 年起)。基準日＝5/20 當天或之前最後一個交易日的收盤；「520 前 20 日／5 日」＝基準日相對 20／5 個交易日前的漲跌，「520 後」皆以基準日收盤為基準；「選後至就職」＝總統大選投票日前收盤到基準日的漲跌。「任意一天(基準)」是所有交易日同天期報酬的平均與上漲機率，用來判斷 520 前後是否真的特別。點選列可在K線圖上定位。就職年只有 ${inaug.length} 次，樣本很少，僅供參考。</div>
+      <div class="note">基準日＝5/20(或之前最後一個交易日)收盤，前後漲跌都以它為準；「選後至就職」＝大選投票日前收盤到基準日。「任意一天」＝所有交易日同天期的平均，作為比較基準。資料自 ${res.years.length?res.years[0].y:'—'} 年起，就職年只有 ${inaug.length} 次，僅供參考。點選列可在K線圖上定位。</div>
     </div>`;
 }
 function setMythParam(field, value){
@@ -231,7 +231,7 @@ function renderMyth(){
       <ul class="insight">${insight(res.up, false)}</ul>
       ${candleTable(res.up, false)}
       <ul class="insight">${candleInsight(res.up, false)}</ul>
-      <div class="note">常見說法如「跌破季線就該出場」「突破年線就會大漲」，可對照上表的勝率與報酬檢驗是否成立。紅K／黑K分析合併初次與後續穿越的所有事件，以穿越當天的K棒顏色分組(收盤＞開盤為紅K)。歷史統計不代表未來，樣本數少時僅供參考。</div>
+      <div class="note">紅K／黑K＝穿越當天收盤高於／低於開盤，合併初次與後續穿越。歷史統計不代表未來。</div>
     </div>
     ${renderMay20(res.may20, state.active)}`;
 }

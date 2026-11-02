@@ -264,14 +264,14 @@ function render(){
             onchange="setParam('${state.active}','followUpDays',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value">
         </div>
       </div>
-      <div class="note">定義：於「天數窗口」內從近期高點下跌達「急跌幅度門檻」即判定為一次急跌事件；起跌點取窗口內收盤最高的一日；底部為起跌後「底部搜尋範圍」內的最低價(無最高低價資料時以收盤價替代)；反彈是否成功分別以「回到起跌點價位」與「創歷史新高」兩種基準各自統計；成交量比值 = 下跌區間(起跌點→底部)總量 ÷ 反彈區間(底部隔日起，取與下跌區間相同天數)總量，僅在資料含成交量欄位時計算。</div>
+      <div class="note">急跌＝「天數窗口」內從高點跌超過「急跌幅度門檻」；起跌點＝窗口內最高收盤，底部＝之後「底部搜尋範圍」內的最低價。反彈成功分「回到起跌點」與「創歷史新高」兩種。量比＝下跌期間總量 ÷ 反彈期間(相同天數)總量。</div>
     </div>
 
     ${renderCrashStats(events, meta)}
 
     <div class="panel">
       <h3>急跌事件明細</h3>
-      <div class="note" style="margin-top:0;margin-bottom:10px;">谷底乖離率 = (底部收盤價 − 當日均線) ÷ 當日均線，負值越大代表跌得越深、離均線越遠(超跌)。+5/+10/+20/+60日報酬皆以「底部當天收盤價」為基準，計算其後第N個交易日收盤價的漲跌幅。</div>
+      <div class="note" style="margin-top:0;margin-bottom:10px;">谷底乖離率＝底部收盤相對均線的偏離，越負跌得越深。+N日報酬以底部當天收盤為基準。</div>
       <div class="tablewrap">
         <table>
           <thead><tr>
@@ -353,7 +353,7 @@ function renderCrashStats(events, meta){
             +pct(s.avgBias20)+pct(s.avgBias60)+pct(s.avgStallBias20)+pct(s.avgStallBias60)+prob(s.newHighProb)+prob(s.reDeclineProb))}</tbody>
         </table>
       </div>
-      <div class="note">勝率與報酬以「底部當天收盤價」為基準，計算其後第N個交易日的漲跌。谷底乖離率＝底部收盤價相對均線的偏離，越負代表跌得越深。反彈無力乖離率＝反彈過程中第一次從高點拉回 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 時，那個高點相對均線的偏離(持續強勢未拉回的事件不計入)。量能分組：下跌期間總量 ÷ 反彈期間(取相同天數)總量。樣本數少時僅供參考。</div>
+      <div class="note">勝率與報酬以底部當天收盤為基準。反彈無力乖離率＝反彈中第一次從高點拉回 ${(STALL_PULLBACK_PCT*100).toFixed(0)}% 時，該高點相對均線的偏離(一路沒拉回的不計)。量能分組依下跌期間 ÷ 反彈期間的總量比。樣本少時僅供參考。</div>
     </div>`;
 }
 function ratioCell(ratio){
