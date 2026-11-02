@@ -30,10 +30,10 @@ function computeMyth(rows, ma, prm){
           };
           let extreme = prevAbove ? Infinity : -Infinity;
           for (let k=i+1;k<=ext20;k++) extreme = prevAbove ? Math.min(extreme, rows[k].low) : Math.max(extreme, rows[k].high);
-          const ev = { idx:i, date:rows[i].date, back: backIn(prm.confirmDays), back2: backIn(2),
+          const ev = { idx:i, date:rows[i].date, back: backIn(prm.confirmDays),
             candle: rows[i].close>rows[i].open ? 'red' : rows[i].close<rows[i].open ? 'black' : 'flat',
             ext: ext20>i ? extreme/closes[i]-1 : NaN,
-            ret5:fwd(i,5), ret10:fwd(i,10), ret20:fwd(i,20), ret60:fwd(i,60) };
+            ret5:fwd(i,5), ret20:fwd(i,20), ret60:fwd(i,60) };
           if (prevAbove) down[runAbove>=settle ? 'first' : 'later'].push(ev);
           else up[runBelow>=settle ? 'first' : 'later'].push(ev);
         }
@@ -49,9 +49,9 @@ function mythSummary(list){
   const avg = f=>{ const v=list.map(e=>e[f]).filter(x=>!Number.isNaN(x)); return v.length? v.reduce((a,b)=>a+b,0)/v.length : NaN; };
   const win = f=>{ const v=list.map(e=>e[f]).filter(x=>!Number.isNaN(x)); return v.length? v.filter(x=>x>0).length/v.length : NaN; };
   const rateOf = f=>{ const done = list.filter(e=>e[f]!==null); return done.length? done.filter(e=>e[f]).length/done.length : NaN; };
-  return { count:list.length, backRate:rateOf('back'), back2Rate:rateOf('back2'), ext:avg('ext'),
-    win5:win('ret5'), win10:win('ret10'), win20:win('ret20'), win60:win('ret60'),
-    avg5:avg('ret5'), avg10:avg('ret10'), avg20:avg('ret20'), avg60:avg('ret60'),
+  return { count:list.length, backRate:rateOf('back'), ext:avg('ext'),
+    win5:win('ret5'), win20:win('ret20'), win60:win('ret60'),
+    avg5:avg('ret5'), avg20:avg('ret20'), avg60:avg('ret60'),
     last: list.length ? list[list.length-1].date : null };
 }
 /* 520 行情(台股)：5 月 20 日是總統就職日(1996 年起每 4 年一次)，市場常說「就職前有行情、就職後利多出盡」。
@@ -92,13 +92,18 @@ function renderMay20(res, key){
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
   const F = ['pre20','pre5','post5','post20','post60'];
   const inaug = res.years.filter(x=>x.inaug), other = res.years.filter(x=>!x.inaug), B = res.baseline;
-  const sumRow = (label, list, cls)=>{
+  const NA = '<td class="na">—</td>';
+  const sumRows = (label, avgCells, winCells, cls)=>`<tr class="${cls}"><td rowspan="2" class="line">${label}</td><td class="kind">平均</td>${avgCells}</tr>
+      <tr class="${cls}"><td class="kind">上漲機率</td>${winCells}</tr>`;
+  const groupRows = (label, list, cls)=>{
     const ss = F.map(f=>may20Summary(list,f)), fe = may20Summary(list,'fromElec');
-    return `<tr class="${cls}"><td colspan="2">${label}平均(${list.length} 年)</td>${list===inaug?pct(fe.avg):'<td class="na">—</td>'}${ss.map(x=>pct(x.avg)).join('')}</tr>
-      <tr class="${cls}"><td colspan="2">${label}上漲機率</td>${list===inaug?win(fe.win):'<td class="na">—</td>'}${ss.map(x=>win(x.win)).join('')}</tr>`;
+    return sumRows(`${label}<small>${list.length} 年</small>`, (list===inaug?pct(fe.avg):NA)+ss.map(x=>pct(x.avg)).join(''), (list===inaug?win(fe.win):NA)+ss.map(x=>win(x.win)).join(''), cls);
   };
-  const baseRow = `<tr><td colspan="2">任意一天(基準)平均</td><td class="na">—</td>${pct(B.d20.avg)}${pct(B.d5.avg)}${pct(B.d5.avg)}${pct(B.d20.avg)}${pct(B.d60.avg)}</tr>
-    <tr><td colspan="2">任意一天(基準)上漲機率</td><td class="na">—</td>${win(B.d20.win)}${win(B.d5.win)}${win(B.d5.win)}${win(B.d20.win)}${win(B.d60.win)}</tr>`;
+  const baseKeys = [B.d20, B.d5, B.d5, B.d20, B.d60];
+  const baseRows = sumRows('任意一天', NA+baseKeys.map(x=>pct(x.avg)).join(''), NA+baseKeys.map(x=>win(x.win)).join(''), '');
+  const windowHead = `<th colspan="2">520 前</th><th colspan="3">520 後</th>`;
+  const windowDays = `<th>20 日</th><th>5 日</th><th>+5 日</th><th>+20 日</th><th>+60 日</th>`;
+  const yearRow = (x, elec)=>`<tr class="click" onclick="focusDate('${key}',${x.base})"><td>${x.y}</td>${elec?pct(x.fromElec):''}${F.map(f=>pct(x[f])).join('')}</tr>`;
   // 自動結論：就職年 vs 基準
   const p = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
   const iPre = may20Summary(inaug,'pre20'), iPost = may20Summary(inaug,'post20'), iPost60 = may20Summary(inaug,'post60'), oPre = may20Summary(other,'pre20'), iElec = may20Summary(inaug,'fromElec');
@@ -110,20 +115,32 @@ function renderMay20(res, key){
   return `
     <div class="panel">
       <h3>520 行情：總統就職前後的漲跌</h3>
-      <div class="tablewrap"><table class="stattable cycle">
+      <div class="tablewrap"><table class="stattable myth">
         <thead>
-          <tr><th rowspan="2">年度</th><th rowspan="2">基準日<br>(5/20 前收盤)</th><th rowspan="2">選後至就職<br>(選前收盤→520)</th><th colspan="2">520 前</th><th colspan="3">520 後(以基準日收盤計)</th></tr>
-          <tr><th>20 日</th><th>5 日</th><th>+5 日</th><th>+20 日</th><th>+60 日</th></tr>
+          <tr><th rowspan="2">分組</th><th rowspan="2">指標</th><th rowspan="2">選後至就職</th>${windowHead}</tr>
+          <tr>${windowDays}</tr>
         </thead>
-        <tbody>
-          ${res.years.map(x=>`<tr class="click ${x.inaug?'inaug':''}" onclick="focusDate('${key}',${x.base})"><td>${x.y}${x.inaug?' <span class="tag elec">就職</span>':''}</td><td>${x.date}</td>${x.inaug?pct(x.fromElec):'<td class="na">—</td>'}${F.map(f=>pct(x[f])).join('')}</tr>`).join('')}
-          ${sumRow('就職年', inaug, 'allrow')}
-          ${sumRow('非就職年', other, '')}
-          ${baseRow}
-        </tbody>
+        <tbody>${groupRows('就職年', inaug, 'allrow')}${groupRows('非就職年', other, '')}${baseRows}</tbody>
       </table></div>
       <ul class="insight">${insight}</ul>
-      <div class="note">基準日＝5/20(或之前最後一個交易日)收盤，前後漲跌都以它為準；「選後至就職」＝大選投票日前收盤到基準日。「任意一天」＝所有交易日同天期的平均，作為比較基準。資料自 ${res.years.length?res.years[0].y:'—'} 年起，就職年只有 ${inaug.length} 次，僅供參考。點選列可在K線圖上定位。</div>
+      <h4 class="subhead">就職年逐年</h4>
+      <div class="tablewrap"><table class="stattable cycle">
+        <thead>
+          <tr><th rowspan="2">年度</th><th rowspan="2">選後至就職</th>${windowHead}</tr>
+          <tr>${windowDays}</tr>
+        </thead>
+        <tbody>${inaug.map(x=>yearRow(x,true)).join('')}</tbody>
+      </table></div>
+      <details class="cy-detail"><summary>其他年份逐年(${other.length} 年)</summary>
+        <div class="tablewrap"><table class="stattable cycle">
+          <thead>
+            <tr><th rowspan="2">年度</th>${windowHead}</tr>
+            <tr>${windowDays}</tr>
+          </thead>
+          <tbody>${other.map(x=>yearRow(x,false)).join('')}</tbody>
+        </table></div>
+      </details>
+      <div class="note">基準日＝5/20(或之前最後一個交易日)收盤，前後漲跌都以它為準；「選後至就職」＝大選投票日前收盤到基準日。「任意一天」＝所有交易日同天期的平均。資料自 ${res.years.length?res.years[0].y:'—'} 年起，就職年只有 ${inaug.length} 次，僅供參考。點選列可在K線圖上定位。</div>
     </div>`;
 }
 function setMythParam(field, value){
@@ -137,25 +154,22 @@ function renderMyth(){
   const pct = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v)}</td>`;
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
   const rate = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td><b>${(v*100).toFixed(0)}%</b></td>`;
-  // 另外固定列出 2 日內站回(跌回)均線；觀察天數設成 2 日時兩欄相同，只留一欄
-  const show2 = prm.confirmDays!==2;
-  const backHead = isDown=> `<th rowspan="2">${prm.confirmDays}日內${isDown?'站回均線<br>(有支撐)':'跌回均線<br>(有壓力)'}</th>`
-    + (show2 ? `<th rowspan="2">2日內${isDown?'站回均線':'跌回均線'}</th>` : '');
-  const backCells = s=> rate(s.backRate) + (show2 ? rate(s.back2Rate) : '');
+  const backHead = isDown=> `${prm.confirmDays}日內${isDown?'站回<br>(有支撐)':'跌回<br>(有壓力)'}`;
+  const extHead = isDown=> `20日內最大<br>${isDown?'續跌':'續漲'}`;
+  const lineCell = g=> `<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`;
   const table = (groups, isDown)=>`
     <div class="tablewrap"><table class="stattable myth">
       <thead>
         <tr><th rowspan="2">均線</th><th rowspan="2">類型</th><th rowspan="2">次數</th>
-          ${backHead(isDown)}
-          <th rowspan="2">20日內平均<br>${isDown?'最大續跌':'最大續漲'}</th>
-          <th colspan="4">勝率(上漲機率)</th><th colspan="4">平均報酬率</th></tr>
-        <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+10日</th><th>+20日</th><th>+60日</th></tr>
+          <th rowspan="2">${backHead(isDown)}</th><th rowspan="2">${extHead(isDown)}</th>
+          <th colspan="3">上漲機率</th><th colspan="3">平均報酬</th></tr>
+        <tr><th>+5日</th><th>+20日</th><th>+60日</th><th>+5日</th><th>+20日</th><th>+60日</th></tr>
       </thead>
-      <tbody>${groups.map(g=>[['first', isDown?'初次跌破':'初次突破'], ['later', isDown?'後續跌破':'後續突破']].map(([t,label],j)=>{
+      <tbody>${groups.map(g=>[['first','初次'], ['later','後續']].map(([t,label],j)=>{
         const s = mythSummary(g[t]);
-        return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small><small>初次 ≥${settleOf(g.line.p, prm)}日</small></td>`:''}
-          <td class="kind">${label}</td><td>${s.count}</td>${backCells(s)}${pct(s.ext)}
-          ${win(s.win5)}${win(s.win10)}${win(s.win20)}${win(s.win60)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}${pct(s.avg60)}</tr>`;
+        return `<tr class="${j===0?'allrow':''}">${j===0?lineCell(g):''}
+          <td class="kind">${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}
+          ${win(s.win5)}${win(s.win20)}${win(s.win60)}${pct(s.avg5)}${pct(s.avg20)}${pct(s.avg60)}</tr>`;
       }).join('')).join('')}</tbody>
     </table></div>`;
   // 穿越當天收紅K還是黑K：哪一種比較容易有支撐(跌破)／有壓力(突破)
@@ -163,19 +177,14 @@ function renderMyth(){
     <h4 class="subhead">${isDown?'跌破當天收紅K還是黑K，比較容易有撐？':'突破當天收紅K還是黑K，比較容易遇到壓力？'}</h4>
     <div class="tablewrap"><table class="stattable myth">
       <thead>
-        <tr><th rowspan="2">均線</th><th rowspan="2">${isDown?'跌破':'突破'}當天</th><th rowspan="2">次數</th>
-          ${backHead(isDown)}
-          <th rowspan="2">20日內平均<br>${isDown?'最大續跌':'最大續漲'}</th>
-          <th colspan="3">勝率(上漲機率)</th><th colspan="3">平均報酬率</th></tr>
-        <tr><th>+5日</th><th>+10日</th><th>+20日</th><th>+5日</th><th>+10日</th><th>+20日</th></tr>
+        <tr><th>均線</th><th>當天K棒</th><th>次數</th><th>${backHead(isDown)}</th><th>${extHead(isDown)}</th><th>+20日<br>上漲機率</th><th>+20日<br>平均報酬</th></tr>
       </thead>
       <tbody>${groups.map(g=>{
         const all = g.first.concat(g.later);
         return [['red','紅K','var(--candle-up)'],['black','黑K','var(--candle-down)']].map(([c,label,color],j)=>{
           const s = mythSummary(all.filter(e=>e.candle===c));
-          return `<tr class="${j===0?'allrow':''}">${j===0?`<td rowspan="2" class="line">${g.line.name}<small>${g.line.p}MA</small></td>`:''}
-            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${backCells(s)}${pct(s.ext)}
-            ${win(s.win5)}${win(s.win10)}${win(s.win20)}${pct(s.avg5)}${pct(s.avg10)}${pct(s.avg20)}</tr>`;
+          return `<tr class="${j===0?'allrow':''}">${j===0?lineCell(g):''}
+            <td class="kind"><i class="dot" style="background:${color}"></i> ${label}</td><td>${s.count}</td>${rate(s.backRate)}${pct(s.ext)}${win(s.win20)}${pct(s.avg20)}</tr>`;
         }).join('');
       }).join('')}</tbody>
     </table></div>`;

@@ -3,6 +3,7 @@
    平常日剛好一場；台股休市(過年、連假、颱風假)時美股可能有好幾場，用這段期間的累積漲跌，另外分組，不混進平常日的統計。
    這段期間美股一場都沒有(美股休市)的日子，台股沒有新的美股消息，不列；開盤價等於昨收的日子是資料缺漏，也不列。 */
 const TWUS_SPANS = [{key:0, name:'全部'}, {key:20, name:'近20年'}, {key:10, name:'近10年'}, {key:5, name:'近5年'}];
+const TWUS_COMPARE_SPANS = [...TWUS_SPANS, {key:2, name:'近2年'}, {key:1, name:'近1年'}];   // 不同期間的比較多看最近兩段
 // 那斯達克漲跌分組(單位 %)：跌的組含下緣(≤)，漲的組含下緣(≥)，和大漲大跌門檻的算法一致
 const TWUS_BINS = [
   {name:'≤-3', test:r=>r<=-3}, {name:'-3~-2', test:r=>r>-3 && r<=-2}, {name:'-2~-1', test:r=>r>-2 && r<=-1}, {name:'-1~0', test:r=>r>-1 && r<0},
@@ -62,9 +63,10 @@ function computeTwus(tw, us){
 }
 function twusSummary(list){
   const m = list.length;
-  if (!m) return {count:0, gap:NaN, gapUp:NaN, intra:NaN, red:NaN, black:NaN, up:NaN, day:NaN};
+  if (!m) return {count:0, gap:NaN, gapMed:NaN, gapUp:NaN, intra:NaN, red:NaN, black:NaN, up:NaN, day:NaN};
   const avg = f=>list.reduce((a,e)=>a+e[f],0)/m, rate = f=>list.filter(f).length/m;
-  return { count:m, gap:avg('gap'), gapUp:rate(e=>e.gap>0), intra:avg('intra'), red:rate(e=>e.red), black:rate(e=>e.black), up:rate(e=>e.day>0), day:avg('day') };
+  const g = list.map(e=>e.gap).sort((a,b)=>a-b), mid = m>>1;
+  return { count:m, gap:avg('gap'), gapMed:m%2 ? g[mid] : (g[mid-1]+g[mid])/2, gapUp:rate(e=>e.gap>0), intra:avg('intra'), red:rate(e=>e.red), black:rate(e=>e.black), up:rate(e=>e.day>0), day:avg('day') };
 }
 // x、y 的相關係數與斜率(y 每變動 1 單位 x)；至少要 3 筆
 function twusCorr(pairs){
@@ -113,11 +115,11 @@ function renderTwus(){
   const plain = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td>${(v*100).toFixed(0)}%</td>`;
   const num = (v,d=2)=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td>${v.toFixed(d)}</td>`;
   const cnt = n=> `<td>${n.toLocaleString('en-US')}${n && n<MYTH_FEW ? '<small> 樣本少</small>' : ''}</td>`;
-  const cells = s=>`<td>${s.count.toLocaleString('en-US')}</td>${pct(s.gap)}${win(s.gapUp)}${pct(s.intra)}${win(s.red)}${plain(s.black)}${win(s.up)}${pct(s.day)}`;
-  const head = first=>`<thead><tr><th>${first}</th><th>次數</th><th>平均跳空</th><th>開高機率</th><th>開盤到收盤</th><th>收紅K</th><th>收黑K</th><th>收盤比昨收漲</th><th>當天平均漲跌</th></tr></thead>`;
+  const cells = s=>`<td>${s.count.toLocaleString('en-US')}</td>${pct(s.gap)}${pct(s.gapMed)}${win(s.gapUp)}${pct(s.intra)}${win(s.red)}${plain(s.black)}${win(s.up)}${pct(s.day)}`;
+  const head = first=>`<thead><tr><th>${first}</th><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>開高機率</th><th>開盤到收盤</th><th>收紅K</th><th>收黑K</th><th>收盤比昨收漲</th><th>當天平均漲跌</th></tr></thead>`;
   const few = s=> s.count && s.count<MYTH_FEW ? '，樣本少' : '';
   const pc0 = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
-  const say = (name, s)=> s.count ? `<li><b>那斯達克${name} ${B}% 以上</b>(${s.count} 次${few(s)})：隔天台股平均跳空 ${fmtPct(s.gap,2)}，${pc0(s.gapUp)} 開高；開盤後收紅K ${pc0(s.red)}、收黑K ${pc0(s.black)}，最後 ${pc0(s.up)} 比昨收漲，當天平均 ${fmtPct(s.day,2)}。</li>` : `<li><b>那斯達克${name} ${B}% 以上</b>：這段期間沒有發生過。</li>`;
+  const say = (name, s)=> s.count ? `<li><b>那斯達克${name} ${B}% 以上</b>(${s.count} 次${few(s)})：隔天台股平均跳空 ${fmtPct(s.gap,2)}、中位數 ${fmtPct(s.gapMed,2)}，${pc0(s.gapUp)} 開高；開盤後收紅K ${pc0(s.red)}、收黑K ${pc0(s.black)}，最後 ${pc0(s.up)} 比昨收漲，當天平均 ${fmtPct(s.day,2)}。</li>` : `<li><b>那斯達克${name} ${B}% 以上</b>：這段期間沒有發生過。</li>`;
   const c = twusCorrs(list);
   const f2 = v=> Number.isNaN(v) ? '—' : v.toFixed(2);
   const bins = TWUS_BINS.map(b=>({name:b.name, s:twusSummary(list.filter(e=>b.test(e.r)))}));
@@ -130,15 +132,15 @@ function renderTwus(){
     const L = twusSpanList(normalAll, s.key), k = twusCorrs(L);
     return `<tr class="${s.key===prm.span?'allrow':''}"><td>${s.name}</td>${cnt(L.length)}${num(k.gap.corr)}${num(k.gap.slope)}${num(k.intra.corr)}${num(k.day.corr)}${num(k.day.slope)}${num(k.night.corr)}</tr>`;
   }).join('');
-  const spanRows = TWUS_SPANS.map(s=>{
+  const spanRows = TWUS_COMPARE_SPANS.map(s=>{
     const L = twusSpanList(normalAll, s.key), a = twusSummary(L.filter(isDn)), b = twusSummary(L.filter(isUp));
-    return `<tr class="${s.key===prm.span?'allrow':''}"><td>${s.name}</td><td>${a.count}</td>${pct(a.gap)}${win(a.red)}${win(a.up)}<td>${b.count}</td>${pct(b.gap)}${win(b.red)}${win(b.up)}</tr>`;
+    return `<tr class="${s.key===prm.span?'allrow':''}"><td>${s.name}</td>${cnt(a.count)}${pct(a.gap)}${pct(a.gapMed)}${win(a.red)}${win(a.up)}${cnt(b.count)}${pct(b.gap)}${pct(b.gapMed)}${win(b.red)}${win(b.up)}</tr>`;
   }).join('');
   const kindRows = TWUS_KINDS.map(K=>{
     const L = spanAll.filter(e=>e.kind===K.key), k = twusCorrs(L), s = twusSummary(L);
     const a = twusSummary(L.filter(isDn)), b = twusSummary(L.filter(isUp));
     const sessions = L.length ? L.reduce((x,e)=>x+e.sessions,0)/L.length : NaN;
-    return `<tr class="${K.key==='normal'?'allrow':''}"><td>${K.name}</td>${cnt(s.count)}${num(sessions,1)}${num(k.gap.corr)}${num(k.gap.slope)}${pct(s.gap)}${win(s.red)}${win(s.up)}<td>${a.count}</td>${pct(a.gap)}<td>${b.count}</td>${pct(b.gap)}</tr>`;
+    return `<tr class="${K.key==='normal'?'allrow':''}"><td>${K.name}</td>${cnt(s.count)}${num(sessions,1)}${num(k.gap.corr)}${num(k.gap.slope)}${pct(s.gap)}${pct(s.gapMed)}${win(s.red)}${win(s.up)}<td>${a.count}</td>${pct(a.gap)}<td>${b.count}</td>${pct(b.gap)}</tr>`;
   }).join('');
   const kindName = k=> (TWUS_KINDS.find(x=>x.key===k)||{}).name.replace('後','');
   const closures = state.twus.events.filter(e=>e.kind!=='normal').slice(-10).reverse();
@@ -185,7 +187,6 @@ function renderTwus(){
       <ul class="insight">
         <li><b>那斯達克 → 台股跳空</b>：相關係數 ${f2(c.gap.corr)}，那斯達克每漲跌 1%，台股開盤平均動 ${f2(c.gap.slope)}%。</li>
         <li><b>那斯達克 → 開盤後</b>：和開盤到收盤的相關係數 ${f2(c.intra.corr)}，和全日漲跌 ${f2(c.day.corr)}(斜率 ${f2(c.day.slope)})。</li>
-        <li><b>反過來看</b>：台股當天和當晚那斯達克的相關係數 ${f2(c.night.corr)}。</li>
       </ul>
       <div id="twusYear" style="margin-top:12px"></div>
       ${LTChart.legend([{name:'和台股跳空的相關係數', color:'var(--amber)'}, {name:'和台股全日漲跌的相關係數', color:'var(--blue)'}])}
@@ -196,7 +197,7 @@ function renderTwus(){
       <h3>過年、清明、連假與颱風假</h3>
       <div class="tablewrap"><table class="stattable">
         <thead>
-          <tr><th rowspan="2">休市後第一天</th><th rowspan="2">次數</th><th rowspan="2">美股平均場數</th><th colspan="2">累積漲跌 → 跳空</th><th rowspan="2">平均跳空</th><th rowspan="2">收紅K</th><th rowspan="2">收盤比昨收漲</th><th colspan="2">累積大跌 ${B}% 以上</th><th colspan="2">累積大漲 ${B}% 以上</th></tr>
+          <tr><th rowspan="2">休市後第一天</th><th rowspan="2">次數</th><th rowspan="2">美股平均場數</th><th colspan="2">累積漲跌 → 跳空</th><th rowspan="2">平均跳空</th><th rowspan="2">中位數跳空</th><th rowspan="2">收紅K</th><th rowspan="2">收盤比昨收漲</th><th colspan="2">累積大跌 ${B}% 以上</th><th colspan="2">累積大漲 ${B}% 以上</th></tr>
           <tr><th>相關係數</th><th>斜率</th><th>次數</th><th>平均跳空</th><th>次數</th><th>平均跳空</th></tr>
         </thead>
         <tbody>${kindRows}</tbody>
@@ -213,8 +214,8 @@ function renderTwus(){
       <h3>不同期間的比較</h3>
       <div class="tablewrap"><table class="stattable">
         <thead>
-          <tr><th rowspan="2">期間</th><th colspan="4">那斯達克大跌 ${B}% 以上</th><th colspan="4">那斯達克大漲 ${B}% 以上</th></tr>
-          <tr><th>次數</th><th>平均跳空</th><th>收紅K</th><th>收盤比昨收漲</th><th>次數</th><th>平均跳空</th><th>收紅K</th><th>收盤比昨收漲</th></tr>
+          <tr><th rowspan="2">期間</th><th colspan="5">那斯達克大跌 ${B}% 以上</th><th colspan="5">那斯達克大漲 ${B}% 以上</th></tr>
+          <tr><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>收紅K</th><th>收盤比昨收漲</th><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>收紅K</th><th>收盤比昨收漲</th></tr>
         </thead>
         <tbody>${spanRows}</tbody>
       </table></div>
