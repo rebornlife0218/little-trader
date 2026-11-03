@@ -137,9 +137,8 @@ const MODES = [
   {key:'cycle', name:'週期性分析', desc:'月初/月中/月底、週一~週五漲跌與總統選舉'},
   {key:'twus', name:'台美股關係', desc:'那斯達克大漲大跌，隔天台股怎麼開、怎麼收'},
 ];
-// 換模式或換頁都回到台灣加權；同一個模式裡選的指數，調參數時不會變
+// 換子主題或換頁都回到台灣加權；同一個子主題裡選的指數，調參數時不會變
 const resetIndex = ()=>{ if (state.data.TAIEX) state.active = 'TAIEX'; };
-function switchMode(m){ if (m!==state.mode) resetIndex(); state.mode = m; render(); }
 const isTwus = ()=> state.theme==='crash' && state.mode==='twus';   // 這個模式固定比較台灣加權與那斯達克，不能切換指數
 function render(){
   const app = document.getElementById('app');
@@ -161,13 +160,15 @@ function render(){
     : (state.dataStatus==='error' ? `<div class="updated">無法載入資料(${state.dataError||''})</div>` : '');
   const rd = regimeDef();
 
+  // 大盤漲跌分析是目錄頁(頁首由 LT.catalog 畫)，這裡只放指數與多空定義的選單；K棒型態分析自己畫頁首
+  const inCatalog = state.theme==='crash';
   let html = `
-    <header class="top">
+    ${inCatalog ? `<div class="idx-tools">${updatedLine}` : `<header class="top">
       <div>
         <h1>${themeName}</h1>
-        <p>${state.theme==='crash' ? '全球主要指數 · 1990 年起 · 跌深反彈與均線支撐壓力研究' : '全球主要指數 · 1990 年起 · K棒型態統計研究'}</p>
+        <p>全球主要指數 · 1990 年起 · K棒型態統計研究</p>
         ${updatedLine}
-      </div>
+      </div>`}
       <div class="pickers">
         <div class="pickrow">
           <label for="indexPick">指數</label>
@@ -182,7 +183,7 @@ function render(){
           </select>
         </div>
       </div>
-    </header>
+    ${inCatalog ? '</div>' : '</header>'}
     <div class="regime-note"><b>多頭 / 盤整 / 空頭：</b>${rd.desc}</div>
   `;
 
@@ -203,11 +204,8 @@ function render(){
   }
 
   const mode = MODES.find(m=>m.key===state.mode) || MODES[0];
-  LT.view(mode.name, idxName);   // 後台的熱門主題
+  if (state.catView) state.catView(idxName);   // 後台的熱門主題(目錄頁已記到「子主題」，這裡再記一層指數)
   html += `
-    <div class="mode-tabs">
-      ${MODES.map(m=>`<button class="mode-tab ${m.key===mode.key?'active':''}" onclick="switchMode('${m.key}')"><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}
-    </div>
     ${(!meta.hasVolume && mode.key==='crash') ? `<div class="banner info">此資料集沒有成交量欄位，量能比值分析已停用。</div>` : ''}
 
     <div class="panel">
@@ -381,18 +379,20 @@ async function switchTab(key){
 
 window.addEventListener('resize', ()=>{ if(document.getElementById('app') && state.active && state.data[state.active]) drawChart(state.active); });
 
-/* ============================== 註冊到 Little Trader ============================== */
+/* ============================== 註冊到 Little Trader ==============================
+   大盤漲跌分析：目錄頁(LT.catalog，同 ETF大禮包的卡片)，每個子主題一張卡片，網址 index/crash/<子主題>；K棒型態分析：一般頁面 */
 let _indicesBooted = false;
-function mountIndices(container, theme){
+function mountIndices(container, theme, mode, view){
   container.innerHTML = '<div id="app"></div>';
   state.theme = theme;
+  if (mode) state.mode = mode;
+  state.catView = view || null;
   resetIndex();
-  // 網址帶模式時直接切到該模式(例如首頁近期更新連到 index/crash/myth)
-  const m = LT.path()[2];
-  if (theme==='crash' && MODES.some(x=>x.key===m)) state.mode = m;
   if (!_indicesBooted){ _indicesBooted = true; init(); } else { render(); }
 }
-// topics：後台熱門主題列出的子項目(名稱要和 render() 裡 LT.view 記錄的一樣)
-LT.register({ section:'index', key:'crash', name:'大盤漲跌分析', mount: el=>mountIndices(el,'crash'),
-  topics: MODES.map(m=>({ name:m.name, items:INDICES.map(c=>c.name) })) });
+LT.catalog({ section:'index', key:'crash', name:'大盤漲跌分析',
+  desc:'全球主要指數 · 1990 年起 · 跌深反彈、均線支撐壓力、週期性與台美股關係',
+  groups:[{ name:'', items: MODES.map(m=>({ key:m.key, name:m.name, desc:m.desc,
+    topics: INDICES.map(c=>c.name),   // 後台熱門主題列出的子項目(名稱要和 render() 裡記錄的指數一樣)
+    run:(el, ctx)=>mountIndices(el, 'crash', m.key, ctx.view) })) }] });
 LT.register({ section:'index', key:'candle', name:'K棒型態分析', mount: el=>mountIndices(el,'candle'), topics: INDICES.map(c=>c.name) });

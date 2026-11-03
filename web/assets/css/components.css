@@ -173,6 +173,7 @@
 
   /* 標題列選單、多空定義說明 */
   .pickers{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+  .idx-tools{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:flex-end;gap:10px;margin-bottom:16px;}   /* 大盤漲跌分析(目錄頁)：頁首下方的更新時間與選單 */
   .pickers .pickrow label{min-width:56px;text-align:right;}
   .regime-note{font-size:12px;color:var(--dim);background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:8px;padding:8px 12px;margin:-4px 0 16px;line-height:1.7;}
   .regime-note b{color:var(--amber);font-weight:600;}
@@ -232,11 +233,6 @@
   .reco-foot .go{color:var(--amber);font-family:var(--font-body);font-weight:600;}
 
   /* 大盤漲跌分析：模式分頁 */
-  .mode-tabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:16px;}
-  .mode-tab{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px 14px;text-align:left;border-radius:10px;background:var(--panel);}
-  .mode-tab b{font-family:var(--font-display);font-size:14.5px;}
-  .mode-tab small{color:var(--mute);font-weight:400;font-size:11.5px;}
-  .mode-tab.active{border-color:var(--amber);box-shadow:inset 0 -2px 0 var(--amber);background:var(--panel2);}
 
   /* K線圖：點選K棒的開高低收量 */
   .ohlc-info{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;min-height:32px;padding:6px 10px;margin-bottom:8px;
@@ -598,7 +594,7 @@
   /* ==================== 無障礙：鍵盤焦點、觸控尺寸、減少動態 ==================== */
   :focus-visible{outline:2px solid var(--amber) !important;outline-offset:2px;}
   @media (pointer:coarse), (max-width:860px){
-    .side-link, .side-title, .btnrow-l button, .mode-tab, .login-btn, .acct-link, .topbar button, .theme-toggle, .cat-back, .pk-picks label{min-height:44px;}
+    .side-link, .side-title, .btnrow-l button, .login-btn, .acct-link, .topbar button, .theme-toggle, .cat-back, .pk-picks label{min-height:44px;}
     .side-link{display:flex;align-items:center;}
     select, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]){min-height:44px;}
     .crumbs a{display:inline-block;padding:13px 2px;}

@@ -218,6 +218,7 @@ const LT = (() => {
        locked(選填)：上鎖的策略(完整報告要密碼；清單與頁首不標示，看完整報告時才要密碼)，不能分享、首頁研究重點不列
        redirect(選填)：redirect(項目代碼) 回傳網址時轉過去(舊網址)，回傳空字串就回到列表
        summary(選填)：研究的先講結論(精簡版)；分組裡有 summary 時改成條列，標題下面直接寫結論，desc 變成滑鼠提示
+       list(選填)：整個目錄頁用條列(像策略頁)；沒有 summary 的項目寫 desc
        - <區塊>/<頁面>           卡片列表(依 groups 分組；soon: true 的項目顯示「建置中」，不能點)
        - <區塊>/<頁面>/<項目>    單一內容：上方的麵包屑可以回到列表，內容由 run(el, ctx) 畫；ctx.alive() 同一般頁面，
                                   ctx.view(...) 可再記一層細項(例如策略裡的分頁)
@@ -237,8 +238,8 @@ const LT = (() => {
           el.innerHTML = `<header class="top"><div><h1>${esc(def.title || def.name)}</h1>${def.desc ? `<p>${esc(def.desc)}</p>` : ''}</div></header>
             ${def.groups.map(g => `<section class="cat-group">
               ${g.name ? `<h2 class="cat-group-h">${esc(g.name)}${g.desc ? ` <small>${esc(g.desc)}</small>` : ''}</h2>` : ''}
-              <div class="cat-grid ${g.items.some(x => x.summary) ? 'is-list' : ''}">${g.items.length ? g.items.map(x => x.summary && !x.soon
-                ? `<a class="cat-row" href="${base}/${encodeURIComponent(x.key)}" title="${esc(x.desc || '')}"><b>${esc(x.name)}</b><span>${esc(x.summary)}</span>${x.tags ? `<em>${x.tags}</em>` : ''}</a>`
+              <div class="cat-grid ${def.list || g.items.some(x => x.summary) ? 'is-list' : ''}">${g.items.length ? g.items.map(x => (x.summary || def.list) && !x.soon
+                ? `<a class="cat-row" href="${base}/${encodeURIComponent(x.key)}"${x.summary ? ` title="${esc(x.desc || '')}"` : ''}><b>${esc(x.name)}</b><span>${esc(x.summary || x.desc || '')}</span>${x.tags ? `<em>${x.tags}</em>` : ''}</a>`
                 : x.soon
                 ? `<div class="cat-card soon"><b>${esc(x.name)}</b><span>${esc(x.desc || '')}</span><em>努力建置中</em></div>`
                 : `<a class="cat-card" href="${base}/${encodeURIComponent(x.key)}"><b>${esc(x.name)}</b><span>${esc(x.desc || '')}</span>${x.tags ? `<em>${x.tags}</em>` : ''}</a>`).join('')
