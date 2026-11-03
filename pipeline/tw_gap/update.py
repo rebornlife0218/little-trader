@@ -127,7 +127,6 @@ def gap():
         'limit_up': limit_table(lc, '收漲停'), 'limit_dn': limit_table(lc, '收跌停'),
         'period': pivot_table(read('bins_period', [0, 1]), labels),
         'mkt': pivot_table(read('bins_mkt', [0, 1]), labels, ['上市', '上櫃']),
-        'true': pivot_table(read('bins_true', [0, 1]), labels, ['開在昨低之下', '昨日區間內', '開在昨高之上']),
     }
     x = read('ext')
     facts['ext'] = '\n'.join(head(['跳空倍數', '筆數', '隔夜', '中位數']) +

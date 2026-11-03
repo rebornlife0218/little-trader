@@ -10,6 +10,7 @@
             畫在同一張圖的下方，共用 x 軸與十字線，例如權益曲線下方接回撤(fill:true 時從 0 往下塗色)
    縱軸可切換對數/一般刻度：LTChart.line(el, log => ({ ...選項 }))(傳函式)，主圖左上角的小標旁會出現「對數｜一般」切換鈕；
             設定全站共用(記在瀏覽器)，切換時同一頁所有可切換的圖一起重畫。
+   座標軸標題：xLabel(橫軸，畫在刻度下方)、yLabel(縱軸，直書畫在刻度左邊)，可省略
    顏色請用 CSS 變數(例如 'var(--amber)')，切換主題時不必重畫。
    ========================================================================== */
 const LTChart = (() => {
@@ -51,7 +52,8 @@ const LTChart = (() => {
     const textW = s => [...s].reduce((w, c) => w + (c.charCodeAt(0) > 0x2e80 ? 10.5 : 6.2), 0);
     const labelW = kind === 'bars' && o.xAll ? Math.max(...o.x.map(v => textW(String(xFmt(v))))) : 0;
     const tilt = labelW > 0 && labelW > (W - PAD.l - r) / xs.length - 6, extra = tilt ? Math.ceil(labelW * 0.71) : 0;
-    const H = (o.height || 260) + lh + gap + extra, pb = PAD.b + extra;
+    const xl = o.xLabel ? 18 : 0;   // 橫軸標題多留的高度
+    const H = (o.height || 260) + lh + gap + extra + xl, pb = PAD.b + extra + xl;
     const ys = o.series.filter(s => s.axis !== 'right').flatMap(s => s.y).concat((o.refY || []).filter(q => q.axis !== 'right').map(q => q.y)).filter(Number.isFinite);
     if (kind === 'bars') ys.push(0);
     let yLo = o.yMin ?? Math.min(...ys), yHi = o.yMax ?? Math.max(...ys);
@@ -81,11 +83,13 @@ const LTChart = (() => {
         const t = String(xFmt(o.x[i])), half = textW(t) / 2;
         const anchor = x + half > W - 2 ? 'end' : x - half < 2 ? 'start' : 'middle';
         const ax = anchor === 'end' ? W - 2 : anchor === 'start' ? 2 : x;
-        return `<text x="${ax}" y="${H - 8}" font-size="10.5" text-anchor="${anchor}" fill="var(--mute)">${esc(t)}</text>`;
+        return `<text x="${ax}" y="${H - 8 - xl}" font-size="10.5" text-anchor="${anchor}" fill="var(--mute)">${esc(t)}</text>`;
       }
       const y = H - pb + 12;   // 從刻度下方往左下斜放
       return `<text x="${x + 4}" y="${y}" font-size="10.5" text-anchor="end" transform="rotate(-45 ${x + 4} ${y})" fill="var(--mute)">${esc(xFmt(o.x[i]))}</text>`;
     }).join('');
+    if (o.xLabel) g += `<text x="${PAD.l + iw / 2}" y="${H - 5}" font-size="11.5" text-anchor="middle" fill="var(--mute)">${esc(o.xLabel)}</text>`;
+    if (o.yLabel) { const cy = PAD.t + ih / 2; g += `<text x="11" y="${cy}" font-size="11.5" text-anchor="middle" transform="rotate(-90 11 ${cy})" fill="var(--mute)">${esc(o.yLabel)}</text>`; }
     // 右側 y 軸(只標刻度文字，不另畫格線)
     let Y2 = Y;
     if (R2.length) {

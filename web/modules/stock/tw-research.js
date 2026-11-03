@@ -545,6 +545,7 @@
     // 分組長條：ss = [{ name, y, n, color }](n = 各組筆數，滑鼠提示用，可省略)；o.rate = 比例(0～100%)
     const bars = (div, x, ss, o = {}) => {
       LTChart.bars(div, { x, xAll: true, xFmt: v => v, height: 240, label: o.label, title: o.title,
+        xLabel: '跳空倍數(跳空 ÷ 20 日日報酬標準差)', yLabel: o.y,
         ...(o.rate ? { yMin: 0, yMax: 1, yFmt: v => (v * 100).toFixed(0) + '%' } : { refY: [{ y: 0 }], yFmt: v => +(v * 100).toFixed(2) + '%' }),
         tipFmt: (s, v, i) => { const t = ss.find(z => z.name === s.name); return `${s.name}：${o.rate ? rate(v) : pc(v)}${t.n ? `(${t.n[i].toLocaleString()} 筆)` : ''}`; },
         series: ss.map(s => ({ name: s.name, color: s.color, y: s.y })) });
@@ -555,8 +556,8 @@
     const fillFig = F => div => {
       div.innerHTML = '<div></div><div style="margin-top:14px;"></div>';
       const ss = j => [{ name: '回到實體 K 棒內', y: F['body' + j], n: F.n, color: C }, { name: '回到 K 棒最低(往上跳)／最高(往下跳)', y: F['far' + j], n: F.n, color: CEW }];
-      bars(div.children[0], ks, ss(0), { rate: true, title: '當天', legend: false });
-      bars(div.children[1], ks, ss(1), { rate: true, title: '到隔天收盤前' });
+      bars(div.children[0], ks, ss(0), { rate: true, title: '當天', y: '回到的比例', legend: false });
+      bars(div.children[1], ks, ss(1), { rate: true, title: '到隔天收盤前', y: '回到的比例' });
     };
     const VOLS = ['量縮', '中等', '爆量'], VC = { 量縮: C, 中等: CEW, 爆量: CP };
     const F = B.fillOv;
@@ -568,19 +569,19 @@
         ['期間', '從資料開始到最新交易日。']] })}
       ${full ? reportPanel(S, B.report) : LT.reportLock()}`;
     const $ = s => el.querySelector(s);
-    bars($('#twrBrief'), B.bins, ov, { label: '隔夜平均報酬', legend: false });
+    bars($('#twrBrief'), B.bins, ov, { label: '隔夜平均報酬', y: '隔夜平均報酬', legend: false });
     $('#twrBriefLegend').innerHTML = LTChart.legend(ov);
     $('#twrBriefLegend').insertAdjacentHTML('afterend', '<p class="note">隔夜 = 隔天開盤 ÷ 跳空當天收盤 − 1(還原價、未扣成本)。橫軸是跳空倍數 = 跳空 ÷ 20 日日報酬標準差，負的是往下跳，-0.1～0.1 是沒跳空。</p>');
     if (!full) return;   // 訪客：只有上半部
     drawFigs(el, {
-      'ov.png': div => bars(div, B.bins, ov, { label: '隔夜平均報酬' }),
-      'intra.png': div => bars(div, B.bins, [{ ...ov[0], y: B.all.intra }, { ...ov[1], y: B.nl.intra }], { label: '當天盤中平均報酬' }),
+      'ov.png': div => bars(div, B.bins, ov, { label: '隔夜平均報酬', y: '隔夜平均報酬' }),
+      'intra.png': div => bars(div, B.bins, [{ ...ov[0], y: B.all.intra }, { ...ov[1], y: B.nl.intra }], { label: '當天盤中平均報酬', y: '盤中平均報酬' }),
       'fill_out.png': fillFig(B.fill.out),
       'fill_in.png': fillFig(B.fill.in),
       'fill_ov.png': div => bars(div, ks, [{ name: '當天有回到 K 棒內', y: F.back, n: F.nBack, color: C }, { name: '當天沒回到', y: F.stay, n: F.nStay, color: CP },
-        { name: '當天沒回到，排除收漲跌停', y: F.stayNl, n: F.nStayNl, color: CEW }], { label: '隔夜平均報酬' }),
-      'vol_ov.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].ov, color: VC[q] })), { label: '隔夜平均報酬(排除收漲跌停)' }),
-      'vol_fill.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].fill0, color: VC[q] })), { rate: true, label: '當天回到實體 K 棒內的比例' }),
+        { name: '當天沒回到，排除收漲跌停', y: F.stayNl, n: F.nStayNl, color: CEW }], { label: '隔夜平均報酬', y: '隔夜平均報酬' }),
+      'vol_ov.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].ov, color: VC[q] })), { label: '隔夜平均報酬(排除收漲跌停)', y: '隔夜平均報酬' }),
+      'vol_fill.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].fill0, color: VC[q] })), { rate: true, label: '當天回到實體 K 棒內的比例', y: '回到實體的比例' }),
     });
   }
   window.LTTWR = { disp, dispKbar };
