@@ -81,6 +81,7 @@ scripts/build-site.mjs              部署前產生研究與策略的精簡版(s
 scripts/briefs.mjs                  研究與策略的公開精簡版：每個需要登入的資料集，頁面上半部用到的欄位(白名單)與先講結論
 scripts/site-map.mjs                在 Node 裡載入頁面程式，列出所有頁面與網址(build-site.mjs 與自動測試共用)
 scripts/check-freshness.mjs         本機排程的資料多久沒更新(check-local.yml 呼叫)
+scripts/check-cm.py                 上傳到 Seeking_Alpha 的每日資料多久沒更新(check-local.yml 呼叫)
 scripts/share/                      研究的 IG 圖卡(本機執行)：make-share.mjs 產生 IG/<研究>/1～5.png；ig-card.mjs 是圖卡版面、ig-topics.mjs 是各研究的圖卡內容
 tests/                              自動測試(npm test，node:test)：site(頁面註冊、權限清單、defer、外部腳本、#/ 舊網址)、build(部署流程)、functions(來源檢查、會員權限)
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose；esbuild 給自動測試打包 functions/)
@@ -89,7 +90,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
   _dataset.yml                      共用流程：update.py → publish_data.sh → deploy
   data-<資料集>.yml                  各資料集的排程，只呼叫 _dataset.yml
   deploy.yml                        自動測試 → 組合 web/ 與 data 分支 → Cloudflare Pages(完整版＋functions/)＋ GitHub Pages(公開版)；測試沒過就不部署
-  check-local.yml                   本機排程檢查：台北週二~六 14:00 檢查本機資料集與股票查詢的更新時間，停更就失敗(GitHub 寄信)
+  check-local.yml                   本機排程檢查：台北週二~六 14:00 檢查本機資料集、股票查詢與 Seeking_Alpha 每日資料(台股、美股、國際指數)的更新時間，停更就失敗(GitHub 寄信)
 ```
 
 ## 資料怎麼流動
