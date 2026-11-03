@@ -95,6 +95,15 @@
   .paramgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px 24px;}
   .paramitem label{display:flex;justify-content:space-between;font-size:12px;color:var(--dim);margin-bottom:6px;}
   .paramitem label b{color:var(--amber);font-family:var(--font-num);font-weight:600;}
+  /* 大盤漲跌分析的參數區：手機版預設收起 */
+  .paramfold-btn{display:none;}
+  @media (max-width:640px){
+    .paramfold-head{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .paramfold-head h3{margin:0;}
+    .paramfold-btn{display:block;flex:none;padding:6px 14px;font-size:13px;color:var(--amber);background:transparent;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;}
+    .paramfold-body{margin-top:12px;}
+    .paramfold:not(.open) .paramfold-body{display:none;}
+  }
   input[type=range]{width:100%;accent-color:var(--amber);}
 
   .chartwrap{position:relative;}

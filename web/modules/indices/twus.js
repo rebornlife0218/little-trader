@@ -147,8 +147,9 @@ function renderTwus(){
   const recent = list.filter(e=>isDn(e)||isUp(e)).slice(-20).reverse();
   const kCell = e=> `<td class="${e.red?'up':e.black?'down':''}">${e.red?'紅K':e.black?'黑K':'平'}</td>`;
   return `
-    <div class="panel">
-      <h3>統計設定</h3>
+    <div class="panel paramfold ${paramFoldCls()}">
+      ${paramFoldHead('統計設定')}
+      <div class="paramfold-body">
       <div class="paramgrid">
         <div class="paramitem">
           <label>統計期間 <b>${spanAll[0].date} ~ ${spanAll[spanAll.length-1].date}</b></label>
@@ -161,6 +162,7 @@ function renderTwus(){
         </div>
       </div>
       <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。</div>
+      </div>
     </div>
 
     <div class="panel">

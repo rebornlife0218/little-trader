@@ -19,7 +19,7 @@ web/                                網站(部署時整個資料夾就是網站�
   modules/
     home/home.js                    首頁：近期更新、各區塊入口、各資料集更新狀態
     indices/core.js … render.js     指數：大盤漲跌分析、K棒型態分析，拆成 7 個檔、共用全域變數(順序不能換，見 index.html)：
-                                    core(常數、state、均線、多空定義)、patterns(K棒型態偵測)、events(急跌反彈偵測、資料載入)、
+                                    core(常數、state、均線、多空定義、大盤漲跌分析參數區在手機版的收合)、patterns(K棒型態偵測)、events(急跌反彈偵測、資料載入)、
                                     kchart(K 線圖，標出畫面中的最高、最低點)、myth(常見迷思)、cycle(週期性分析)、twus(台美股關係；颱風假日期手動維護在 TW_TYPHOON)、render(畫面與註冊)
                                     大盤漲跌分析、K棒型態分析只用 1990 年以後的資料(core 的 INDEX_START)；資料檔本身保留最早的歷史，給統計學、ETF 研究用
     indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)

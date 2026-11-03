@@ -137,7 +137,9 @@ const MODES = [
   {key:'cycle', name:'週期性分析', desc:'月初/月中/月底、週一~週五漲跌與總統選舉'},
   {key:'twus', name:'台美股關係', desc:'那斯達克大漲大跌，隔天台股怎麼開、怎麼收'},
 ];
-function switchMode(m){ state.mode = m; render(); }
+// 換模式或換頁都回到台灣加權；同一個模式裡選的指數，調參數時不會變
+const resetIndex = ()=>{ if (state.data.TAIEX) state.active = 'TAIEX'; };
+function switchMode(m){ if (m!==state.mode) resetIndex(); state.mode = m; render(); }
 const isTwus = ()=> state.theme==='crash' && state.mode==='twus';   // 這個模式固定比較台灣加權與那斯達克，不能切換指數
 function render(){
   const app = document.getElementById('app');
@@ -241,8 +243,9 @@ function render(){
 
   if (mode.key==='crash'){
     html += `
-    <div class="panel">
-      <h3>偵測參數</h3>
+    <div class="panel paramfold ${paramFoldCls()}">
+      ${paramFoldHead('偵測參數')}
+      <div class="paramfold-body">
       <div class="paramgrid">
         <div class="paramitem">
           <label>急跌幅度門檻 <b>${params.dropPct}%</b></label>
@@ -266,6 +269,7 @@ function render(){
         </div>
       </div>
       <div class="note">急跌＝「天數窗口」內從高點跌超過「急跌幅度門檻」；起跌點＝窗口內最高收盤，底部＝之後「底部搜尋範圍」內的最低價。反彈成功分「回到起跌點」與「創歷史新高」兩種。量比＝下跌期間總量 ÷ 反彈期間(相同天數)總量。</div>
+      </div>
     </div>
 
     ${renderCrashStats(events, meta)}
@@ -382,6 +386,7 @@ let _indicesBooted = false;
 function mountIndices(container, theme){
   container.innerHTML = '<div id="app"></div>';
   state.theme = theme;
+  resetIndex();
   // 網址帶模式時直接切到該模式(例如首頁近期更新連到 index/crash/myth)
   const m = LT.path()[2];
   if (theme==='crash' && MODES.some(x=>x.key===m)) state.mode = m;

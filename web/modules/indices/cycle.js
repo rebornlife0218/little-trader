@@ -141,8 +141,9 @@ function renderCycle(){
   })() : '';
   const periodText = `${rows[Math.max(res.from-1,0)].date} ~ ${rows[rows.length-1].date}`;
   let html = `
-    <div class="panel">
-      <h3>統計設定</h3>
+    <div class="panel paramfold ${paramFoldCls()}">
+      ${paramFoldHead('統計設定')}
+      <div class="paramfold-body">
       <div class="paramgrid">
         <div class="paramitem">
           <label>統計期間 <b>${periodText}</b></label>
@@ -156,6 +157,7 @@ function renderCycle(){
         </div>
       </div>
       <div class="note">每日漲跌＝收盤 ÷ 前一交易日收盤 − 1(週一含週末消息)。全部交易日平均 ${fmtPct(cycleSummary(allDaily).avg,3)}、上漲機率 ${(cycleSummary(allDaily).win*100).toFixed(0)}%，作為比較基準。</div>
+      </div>
     </div>
 
     <div class="panel">

@@ -213,8 +213,9 @@ function renderMyth(){
     return `<li><b>${g.line.name}</b>：初次${verb}後 ${p(f.backRate)} 在${prm.confirmDays}日內${act}，後續${verb} ${p(l.backRate)}${stronger?`(${stronger})`:''}；初次${verb}後20日勝率 ${p(f.win20)}、平均報酬 ${Number.isNaN(f.avg20)?'—':fmtPct(f.avg20)}${few}。</li>`;
   }).join('');
   return `
-    <div class="panel">
-      <h3>判定參數</h3>
+    <div class="panel paramfold ${paramFoldCls()}">
+      ${paramFoldHead('判定參數')}
+      <div class="paramfold-body">
       <div class="paramgrid">
         <div class="paramitem">
           <label>初次的定義(連續站在均線之上的天數) 均線天數的 <b>${prm.settlePct}%</b></label>
@@ -228,6 +229,7 @@ function renderMyth(){
         </div>
       </div>
       <div class="note">跌破＝收盤從均線之上跌到之下，突破反之。穿越前已連續在均線同一側 ${MYTH_LINES.map(L=>`${L.name} ${settleOf(L.p, prm)} 日`).join('、')} 以上算「初次」，否則算「後續」。穿越後 ${prm.confirmDays} 日內收盤回到均線另一側＝假跌破(有支撐)／假突破(有壓力)。表格另列 1 日內就回到均線的比例。報酬以穿越當天收盤為基準。</div>
+      </div>
     </div>
 
     <div class="panel">

@@ -45,11 +45,24 @@ let state = {
   cycle: {},       // key -> 週期性分析統計 (null = 需重算)
   cycleParams: {span:0, monthDef:'cal'},
   twus: null,      // 台美股關係的事件(只算一次)
+  paramOpen: {},   // 手機版參數區有沒有展開(依模式)；參數一改頁面會重畫，要記住才不會又收起來
   twusParams: {span:10, big:2},   // span：統計期間(近幾年，0 = 全部)；big：大漲大跌門檻 %
   cursor: {},      // key -> K線圖上點選的資料索引
 };
 
 /* ============================== 小工具 ============================== */
+// 大盤漲跌分析的參數區：手機版預設收起，桌機一律展開(components.css 的 .paramfold)
+const paramFoldCls = ()=> state.paramOpen[state.mode] ? 'open' : '';
+function paramFoldHead(title){
+  const open = !!state.paramOpen[state.mode];
+  return `<div class="paramfold-head"><h3>${title}</h3><button type="button" class="paramfold-btn" aria-expanded="${open}" onclick="toggleParamFold(this)">${open?'收起':'展開'}</button></div>`;
+}
+function toggleParamFold(btn){
+  const open = state.paramOpen[state.mode] = !state.paramOpen[state.mode];
+  btn.closest('.paramfold').classList.toggle('open', open);
+  btn.setAttribute('aria-expanded', open);
+  btn.textContent = open ? '收起' : '展開';
+}
 function fmtPct(x,digits=1){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return (x*100>=0?'+':'')+(x*100).toFixed(digits)+'%'; }
 function fmtNum(x,digits=2){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return Number(x).toLocaleString('en-US',{maximumFractionDigits:digits}); }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
