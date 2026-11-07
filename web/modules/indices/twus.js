@@ -55,9 +55,16 @@ function computeTwus(tw, us){
     const pc = tw[i-1].close, o = tw[i].open, c = tw[i].close;
     if (o===pc){ bad++; continue; }
     const n = usIdx[T];   // 當晚的美股(可能休市)
+    let vol = NaN;   // 近期標準差：這段美股之前 20 場日漲跌幅的標準差(%)
+    if (j>=21){
+      const rs = [];
+      for (let m=j-20; m<j; m++) rs.push(us[m].close/us[m-1].close-1);
+      const mu = rs.reduce((a,x)=>a+x,0)/20;
+      vol = Math.sqrt(rs.reduce((a,x)=>a+(x-mu)**2,0)/19)*100;
+    }
     out.push({ idx:i, date:T, prev:P, usDate:us[k-1].date, sessions, kind:twusKind(twusClosedDays(P,T), T),
       r:(us[k-1].close/us[j-1].close-1)*100, gap:o/pc-1, intra:c/o-1, day:c/pc-1, red:c>o, black:c<o,
-      night: n>0 ? us[n].close/us[n-1].close-1 : NaN });
+      vol, night: n>0 ? us[n].close/us[n-1].close-1 : NaN });
   }
   return { events:out, usClosed, bad };
 }
@@ -104,11 +111,13 @@ function renderTwus(){
     return `<div class="panel"><div class="empty"><p>${state.twusErr?'資料載入失敗，請稍後重新整理頁面。':'正在載入那斯達克資料…'}</p></div></div>`;
   }
   if (!state.twus) state.twus = computeTwus(tw, us);
-  const prm = state.twusParams, B = prm.big;
+  const prm = state.twusParams, B = prm.big, V = prm.vol||0;
   const spanAll = twusSpanList(state.twus.events, prm.span);
   const list = spanAll.filter(e=>e.kind==='normal');   // 平常日：前一晚剛好一場美股
   if (!list.length) return `<div class="panel"><div class="empty"><p>沒有可以比對的資料。</p></div></div>`;
-  const isDn = e=>e.r<=-B, isUp = e=>e.r>=B;
+  const volOk = e=> !(V>0) || e.vol>V;   // 近期標準差要大於設定值(0 = 不篩選；沒有足夠的前期資料算不出來的不算)
+  const isDn = e=>e.r<=-B && volOk(e), isUp = e=>e.r>=B && volOk(e);
+  const vtxt = V>0 ? `(近期標準差 > ${V}%)` : '';
   const all = twusSummary(list), dn = twusSummary(list.filter(isDn)), up = twusSummary(list.filter(isUp));
   const pct = (v,d=2)=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v,d)}</td>`;
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
@@ -119,7 +128,7 @@ function renderTwus(){
   const head = first=>`<thead><tr><th>${first}</th><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>開高機率</th><th>開盤到收盤</th><th>收紅K</th><th>收黑K</th><th>收盤比昨收漲</th><th>當天平均漲跌</th></tr></thead>`;
   const few = s=> s.count && s.count<MYTH_FEW ? '，樣本少' : '';
   const pc0 = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
-  const say = (name, s)=> s.count ? `<li><b>那斯達克${name} ${B}% 以上</b>(${s.count} 次${few(s)})：隔天台股平均跳空 ${fmtPct(s.gap,2)}、中位數 ${fmtPct(s.gapMed,2)}，${pc0(s.gapUp)} 開高；開盤後收紅K ${pc0(s.red)}、收黑K ${pc0(s.black)}，最後 ${pc0(s.up)} 比昨收漲，當天平均 ${fmtPct(s.day,2)}。</li>` : `<li><b>那斯達克${name} ${B}% 以上</b>：這段期間沒有發生過。</li>`;
+  const say = (name, s)=> s.count ? `<li><b>那斯達克${name} ${B}% 以上${vtxt}</b>(${s.count} 次${few(s)})：隔天台股平均跳空 ${fmtPct(s.gap,2)}、中位數 ${fmtPct(s.gapMed,2)}，${pc0(s.gapUp)} 開高；開盤後收紅K ${pc0(s.red)}、收黑K ${pc0(s.black)}，最後 ${pc0(s.up)} 比昨收漲，當天平均 ${fmtPct(s.day,2)}。</li>` : `<li><b>那斯達克${name} ${B}% 以上${vtxt}</b>：這段期間沒有發生過。</li>`;
   const c = twusCorrs(list);
   const f2 = v=> Number.isNaN(v) ? '—' : v.toFixed(2);
   const bins = TWUS_BINS.map(b=>({name:b.name, s:twusSummary(list.filter(e=>b.test(e.r)))}));
@@ -160,8 +169,13 @@ function renderTwus(){
           <input type="range" min="1" max="5" step="0.5" value="${B}"
             onchange="setTwusParam('big',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
+        <div class="paramitem">
+          <label>近期標準差大於 <b>${V>0 ? V+'%' : '不限'}</b></label>
+          <input type="range" min="0" max="3" step="0.25" value="${V}"
+            onchange="setTwusParam('vol',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=(+this.value>0 ? this.value+'%' : '不限')">
+        </div>
       </div>
-      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。</div>
+      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。近期標準差＝前一晚之前 20 場那斯達克日漲跌幅的標準差，設定後只算標準差高於該值的大漲大跌(用來只看波動大的時期)，選「不限」就不篩選。</div>
       </div>
     </div>
 
@@ -169,8 +183,8 @@ function renderTwus(){
       <h3>那斯達克大漲大跌，隔天台股怎麼走</h3>
       <div class="tablewrap"><table class="stattable">${head('那斯達克前一晚')}
         <tbody>
-          <tr><td>大跌 ${B}% 以上</td>${cells(dn)}</tr>
-          <tr><td>大漲 ${B}% 以上</td>${cells(up)}</tr>
+          <tr><td>大跌 ${B}% 以上${vtxt}</td>${cells(dn)}</tr>
+          <tr><td>大漲 ${B}% 以上${vtxt}</td>${cells(up)}</tr>
           <tr class="allrow"><td>所有平常日(基準)</td>${cells(all)}</tr>
         </tbody>
       </table></div>
@@ -199,7 +213,7 @@ function renderTwus(){
       <h3>過年、清明、連假與颱風假</h3>
       <div class="tablewrap"><table class="stattable">
         <thead>
-          <tr><th rowspan="2">休市後第一天</th><th rowspan="2">次數</th><th rowspan="2">美股平均場數</th><th colspan="2">累積漲跌 → 跳空</th><th rowspan="2">平均跳空</th><th rowspan="2">中位數跳空</th><th rowspan="2">收紅K</th><th rowspan="2">收盤比昨收漲</th><th colspan="2">累積大跌 ${B}% 以上</th><th colspan="2">累積大漲 ${B}% 以上</th></tr>
+          <tr><th rowspan="2">休市後第一天</th><th rowspan="2">次數</th><th rowspan="2">美股平均場數</th><th colspan="2">累積漲跌 → 跳空</th><th rowspan="2">平均跳空</th><th rowspan="2">中位數跳空</th><th rowspan="2">收紅K</th><th rowspan="2">收盤比昨收漲</th><th colspan="2">累積大跌 ${B}% 以上${vtxt}</th><th colspan="2">累積大漲 ${B}% 以上${vtxt}</th></tr>
           <tr><th>相關係數</th><th>斜率</th><th>次數</th><th>平均跳空</th><th>次數</th><th>平均跳空</th></tr>
         </thead>
         <tbody>${kindRows}</tbody>
@@ -216,7 +230,7 @@ function renderTwus(){
       <h3>不同期間的比較</h3>
       <div class="tablewrap"><table class="stattable">
         <thead>
-          <tr><th rowspan="2">期間</th><th colspan="5">那斯達克大跌 ${B}% 以上</th><th colspan="5">那斯達克大漲 ${B}% 以上</th></tr>
+          <tr><th rowspan="2">期間</th><th colspan="5">那斯達克大跌 ${B}% 以上${vtxt}</th><th colspan="5">那斯達克大漲 ${B}% 以上${vtxt}</th></tr>
           <tr><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>收紅K</th><th>收盤比昨收漲</th><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>收紅K</th><th>收盤比昨收漲</th></tr>
         </thead>
         <tbody>${spanRows}</tbody>
