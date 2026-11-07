@@ -123,12 +123,11 @@ function renderTwus(){
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
   const plain = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td>${(v*100).toFixed(0)}%</td>`;
   const num = (v,d=2)=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td>${v.toFixed(d)}</td>`;
-  const cnt = n=> `<td>${n.toLocaleString('en-US')}${n && n<MYTH_FEW ? '<small> 樣本少</small>' : ''}</td>`;
+  const cnt = n=> `<td>${n.toLocaleString('en-US')}</td>`;
   const cells = s=>`<td>${s.count.toLocaleString('en-US')}</td>${pct(s.gap)}${pct(s.gapMed)}${win(s.gapUp)}${pct(s.intra)}${win(s.red)}${plain(s.black)}${win(s.up)}${pct(s.day)}`;
   const head = first=>`<thead><tr><th>${first}</th><th>次數</th><th>平均跳空</th><th>中位數跳空</th><th>開高機率</th><th>開盤到收盤</th><th>收紅K</th><th>收黑K</th><th>收盤比昨收漲</th><th>當天平均漲跌</th></tr></thead>`;
-  const few = s=> s.count && s.count<MYTH_FEW ? '，樣本少' : '';
   const pc0 = v=> Number.isNaN(v) ? '—' : (v*100).toFixed(0)+'%';
-  const say = (name, s)=> s.count ? `<li><b>那斯達克${name} ${B}% 以上${vtxt}</b>(${s.count} 次${few(s)})：隔天台股平均跳空 ${fmtPct(s.gap,2)}、中位數 ${fmtPct(s.gapMed,2)}，${pc0(s.gapUp)} 開高；開盤後收紅K ${pc0(s.red)}、收黑K ${pc0(s.black)}，最後 ${pc0(s.up)} 比昨收漲，當天平均 ${fmtPct(s.day,2)}。</li>` : `<li><b>那斯達克${name} ${B}% 以上${vtxt}</b>：這段期間沒有發生過。</li>`;
+  const say = (name, s)=> s.count ? `<li><b>那斯達克${name} ${B}% 以上${vtxt}</b>(${s.count} 次)：隔天台股平均跳空 ${fmtPct(s.gap,2)}、中位數 ${fmtPct(s.gapMed,2)}，${pc0(s.gapUp)} 開高；開盤後收紅K ${pc0(s.red)}、收黑K ${pc0(s.black)}，最後 ${pc0(s.up)} 比昨收漲，當天平均 ${fmtPct(s.day,2)}。</li>` : `<li><b>那斯達克${name} ${B}% 以上${vtxt}</b>：這段期間沒有發生過。</li>`;
   const c = twusCorrs(list);
   const f2 = v=> Number.isNaN(v) ? '—' : v.toFixed(2);
   const bins = TWUS_BINS.map(b=>({name:b.name, s:twusSummary(list.filter(e=>b.test(e.r)))}));
