@@ -1,0 +1,21 @@
+name: 資料 · 大盤漲跌分析研究
+
+# 資料集 index_research：pipeline/index_research/update.py(讀 data 分支的 indices/TAIEX.json) → data 分支的 index_research/
+# 要排在 indices(data-indices.yml：週一~週五 18:30)之後；表格與走勢圖每天跟著加權指數更新，報告內文的數字是手寫的
+on:
+  schedule:
+    # GitHub 排程使用 UTC 時間(台北 = UTC+8)
+    - cron: '30 11 * * 1-5'   # 台北 週一~週五 19:30
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  run:
+    uses: ./.github/workflows/_dataset.yml
+    with:
+      dataset: index_research
+    secrets: inherit   # Cloudflare Pages 部署用

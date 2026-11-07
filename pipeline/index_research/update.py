@@ -5,7 +5,7 @@
 加權指數讀 data 分支的 indices/TAIEX.json(GitHub Actions 每天更新)；歷次進場的日期與時空背景寫在這裡(EVENTS)與報告範本。
 報告範本 reports/nsf.md 依 CLAUDE.md「研究報告」的結構，表格由這裡填入，內文的數字與限空令的措施內容是手寫的，國安基金再進場、金管會再發布限空令或數字改變時要同步更新。
 報告裡的圖片 ![說明](xxx.png) 由網頁依 JSON 重畫(indices/nsf.js)。
-不是回測，沒有淨值。不每日更新，研究改版或國安基金有新動作時手動執行：
+不是回測，沒有淨值。GitHub Actions 週一~五 19:30(indices 更新之後)自動重算表格與走勢圖；研究改版或國安基金、限空令有新動作時，內文的數字要手動核對，再執行：
   python pipeline/run_local.py index_research        (產生、發佈到 data 分支並重新部署)
 """
 import re
@@ -207,7 +207,7 @@ def main():
     out = dataset_dir(NAME)
     B = nsf()
     write_json(out / 'nsf.json', B)
-    write_meta(NAME, '加權指數(indices 資料集)', '', '不定期(研究更新時手動執行)', asof=B['asof'])
+    write_meta(NAME, '加權指數(indices 資料集)', '', '週一~五 19:30(加權指數更新之後)', asof=B['asof'])
     print(f"nsf：{len(B['events'])} 次進場，資料到 {B['asof']}")
 
 
