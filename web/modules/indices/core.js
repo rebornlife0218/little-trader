@@ -46,7 +46,7 @@ let state = {
   cycleParams: {span:0, monthDef:'cal'},
   twus: null,      // 台美股關係的事件(只算一次)
   paramOpen: {},   // 手機版參數區有沒有展開(依模式)；參數一改頁面會重畫，要記住才不會又收起來
-  twusParams: {span:10, big:2, vol:0},   // span：統計期間(近幾年，0 = 全部)；big：大漲大跌門檻 %；vol：近 20 場那斯達克日漲跌幅的標準差要大於幾 %(0 = 不篩選)
+  twusParams: {span:10, big:2, vol:0},   // span：統計期間(近幾年，0 = 全部)；big：大漲大跌門檻 %；vol：漲跌幅還要超過近 20 場那斯達克日漲跌幅標準差的幾倍(0 = 不篩選)
   cursor: {},      // key -> K線圖上點選的資料索引
 };
 

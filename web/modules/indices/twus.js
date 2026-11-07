@@ -115,9 +115,9 @@ function renderTwus(){
   const spanAll = twusSpanList(state.twus.events, prm.span);
   const list = spanAll.filter(e=>e.kind==='normal');   // 平常日：前一晚剛好一場美股
   if (!list.length) return `<div class="panel"><div class="empty"><p>沒有可以比對的資料。</p></div></div>`;
-  const volOk = e=> !(V>0) || e.vol>V;   // 近期標準差要大於設定值(0 = 不篩選；沒有足夠的前期資料算不出來的不算)
+  const volOk = e=> !(V>0) || Math.abs(e.r)>=V*e.vol;   // 漲跌幅還要超過近期標準差的 V 倍(0 = 不篩選；算不出標準差的不算)
   const isDn = e=>e.r<=-B && volOk(e), isUp = e=>e.r>=B && volOk(e);
-  const vtxt = V>0 ? `(近期標準差 > ${V}%)` : '';
+  const vtxt = V>0 ? `且超過 ${V} 倍標準差` : '';
   const all = twusSummary(list), dn = twusSummary(list.filter(isDn)), up = twusSummary(list.filter(isUp));
   const pct = (v,d=2)=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0?'up':'down'}">${fmtPct(v,d)}</td>`;
   const win = v=> Number.isNaN(v) ? '<td class="na">—</td>' : `<td class="${v>=0.5?'up':'down'}">${(v*100).toFixed(0)}%</td>`;
@@ -170,12 +170,12 @@ function renderTwus(){
             onchange="setTwusParam('big',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=this.value+'%'">
         </div>
         <div class="paramitem">
-          <label>近期標準差大於 <b>${V>0 ? V+'%' : '不限'}</b></label>
-          <input type="range" min="0" max="3" step="0.25" value="${V}"
-            onchange="setTwusParam('vol',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=(+this.value>0 ? this.value+'%' : '不限')">
+          <label>還要超過近期標準差的 <b>${V>0 ? V+' 倍' : '不限'}</b></label>
+          <input type="range" min="0" max="4" step="0.5" value="${V}"
+            onchange="setTwusParam('vol',+this.value)" oninput="this.previousElementSibling.lastElementChild.textContent=(+this.value>0 ? this.value+' 倍' : '不限')">
         </div>
       </div>
-      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。近期標準差＝前一晚之前 20 場那斯達克日漲跌幅的標準差，設定後只算標準差高於該值的大漲大跌(用來只看波動大的時期)，選「不限」就不篩選。</div>
+      <div class="note">台股每天對應前一晚的美股(週一對週五)。跳空＝開盤 ÷ 昨收 − 1；開盤到收盤＝收盤 ÷ 開盤 − 1；紅K＝收盤高於開盤，黑K反之。休市後第一天另外分組，除了「過年、清明、連假與颱風假」都只算平常日。前一晚美股休市的 ${state.twus.usClosed} 天、開盤價缺漏的 ${state.twus.bad} 天不列。近期標準差＝前一晚之前 20 場那斯達克日漲跌幅的標準差；設定倍數後，漲跌幅除了超過門檻，還要超過標準差的幾倍才算大漲大跌(例如標準差 1%、設 2 倍，就要漲跌 2% 以上)，平常波動就大的時期同樣的漲跌不算異常。選「不限」就不篩選。</div>
       </div>
     </div>
 
