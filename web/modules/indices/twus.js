@@ -206,7 +206,7 @@ function renderTwus(){
       </ul>
       <div id="twusYear" style="margin-top:12px"></div>
       ${LTChart.legend([{name:'和台股跳空的相關係數', color:'var(--amber)'}, {name:'和台股全日漲跌的相關係數', color:'var(--blue)'}])}
-      <div class="note">相關係數 1＝完全同向，0＝沒有關係。斜率的單位是「那斯達克每 1% 對應台股幾 %」。相關不代表因果，兩邊可能同時反應全球消息。</div>
+      <div class="note">斜率的單位是「那斯達克每 1% 對應台股幾 %」。相關不代表因果，兩邊可能同時反應全球消息。</div>
     </div>
 
     <div class="panel">
