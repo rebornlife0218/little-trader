@@ -24,7 +24,7 @@ web/                                網站(部署時整個資料夾就是網站�
                                     大盤漲跌分析是目錄頁(LT.catalog 卡片，同 ETF大禮包)：跌深反彈、常見迷思、週期性分析、台美股關係、國安基金進場與限空令各一張卡片，網址 index/crash/<子主題>(crash、myth、cycle、twus、nsf)；K棒型態分析是一般頁面
                                     大盤漲跌分析、K棒型態分析只用 1990 年以後的資料(core 的 INDEX_START)；資料檔本身保留最早的歷史，給統計學、ETF 研究用
     indices/nsf.js                  指數：大盤漲跌分析 › 國安基金進場與限空令(研究報告，上半部公開、完整報告要登入；資料集 index_research 的 nsf.json；和上面 7 個檔不共用變數)
-    indices/futures.js              指數：台指期貨(轉倉、結算日曆；用到 option/lib.js)
+    indices/futures.js              指數：台指期貨(期現貨價差的點數與 %、轉倉、結算日曆、三大法人淨未平倉與多空口數；用到 option/lib.js)
     etf/lib.js                      ETF 共用(window.LTETF)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料(etf_compare)
     etf/pack.js                     ETF：ETF大禮包(目錄頁：ETF介紹、怎麼存ETF、即將發行ETF 三個子主題，網址 etf/pack/<子主題>；舊網址 etf/intro、etf/save、etf/upcoming 轉過來，更早的 etf/pack/<研究> 轉到 ETF研究)
     etf/intro.js                    ETF：ETF大禮包 › ETF介紹
@@ -56,7 +56,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   indices/update.py、twse.py        全球指數與台灣加權(Seeking_Alpha 的 CM/國際指數，要 secret SEEKING_ALPHA_DEPLOY_KEY(Seeking_Alpha 的唯讀 Deploy key)，各從最早的資料開始)；台灣加權的成交值、加權報酬指數用證交所
   etf_upcoming/update.py            即將發行 ETF(MoneyDJ)
   options/update.py                 臺指選擇權(期交所)：IV、Put/Call 比、T 字報價；並呼叫 futures.py
-  options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉、期限結構
+  options/futures.py                台指期(期交所)：近月走勢、三大法人淨未平倉與多方、空方未平倉口數(欄位有新增時自動整段回補)、期限結構
   earnings/update.py                美股財報行事曆(Nasdaq)：上週、本週、下週
   etf_compare/update.py             常存 ETF 比較、0050 vs 勞退基金(勞動基金運用局；台股 ETF 股價用本機 PostgreSQL，2016 年以前 Yahoo Finance)
   disposition/update.py             台股處置股(處置名單與股價：本機 PostgreSQL；加權指數用 indices 資料集、櫃買指數用櫃買中心；只在本機執行)
@@ -222,7 +222,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 | tw_gap | 本機研究資料夾(台股日資料) | 不定期(研究更新時手動執行) | `gap.json` 跳空與隔夜報酬(依跳空倍數 = 跳空 ÷ 20 日日報酬標準差分 13 組)：`bins`(組名)、`down`／`up`(往下跳、往上跳的組，回補與成交量的圖不含沒跳空那一組)、`all`／`nl`(全部、排除跳空當天收漲跌停：各組筆數、跳空、盤中、隔夜平均與中位數、勝率)、`fill`(`out` 開在前一天 K 棒外、`in` 開在 K 棒內實體外：當天與到隔天收盤前回到實體 K 棒內、回到 K 棒最低／最高的比例)、`fillOv`(開在 K 棒外，當天有沒有回到 K 棒內的隔夜平均)、`vol`(各組內量比三等分：量縮、中等、爆量的隔夜平均(排除收漲跌停)、勝率與回到實體 K 棒內的比例)、`report`(報告 Markdown)。不到 30 筆的組是 null。不發佈 csv、png 與原始股價 |
 | index_research | indices 資料集的 `TAIEX.json`(data 分支) | 週一~五 19:30(GitHub Actions `data-index_research.yml`，indices 更新之後) | `nsf.json` 國安基金進場與限空令：`events`(歷次決議前最後一個收盤日 `base`、進場日 `entry`、類型(預防／跌破均線／急跌)、護盤結束日、決議前收盤、近 20 日跌幅 `r20`、離一年高點 `hi250`、季線到五年線的乖離 `b60`～`b1200`、進場日開盤起算 5／20／60／200 日的漲跌 `y5`～`y200`、200 日內最低與第幾天)、`x`／`paths`(決議前 120 日到之後 200 日的加權指數，決議前收盤 = 100，報告的走勢圖)、`report`(報告 Markdown)。精簡版只有走勢圖 |
 | sp500 | fja05680/sp500 歷史成分股、Yahoo Finance、Tiingo | 週二~六 07:00(美股每個交易日收盤後) | `backtest.json`(四種策略、全部成分股等權重、SPY 的每日淨值(未扣成本)；每季的成分股數、可取得股價數、換手率、無風險利率、持股) |
-| options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
+| options | 臺灣期貨交易所 期貨、選擇權每日交易行情、三大法人 | 週一~五 06:00、16:00 | `history.json`(每日 30 天 IV、P/C 比)、`chain.json`(最新 T 字報價)、`futures.json`(台指期近月走勢、三大法人淨未平倉與多空口數、各月份契約)、`spot.json`(加權指數近 300 日收盤，選擇權頁面用) |
 | tw_strategy | 本機 PostgreSQL `cm.tw_daily`(台股日資料) | 週一~五 23:45、週二~六 12:15(本機排程) | `backtest.json`(低波動 10 檔、低波動 10%、全部合格股票等權重、0050 的每日淨值(本金 100 萬、整數股，已扣手續費、交易稅、滑價)；每日持有檔數 `npos`、交易統計 `tstat`(筆數、勝率、平均與中位數報酬、平均持倉天期)；每月換股日、合格股票數、換手率(買賣合計)；最新一次選股的持股)；事件型策略各一個 `<策略>.json`(`margin` 融資都沒退(加密：`{enc: {iter, salt, iv, ct}}`，解密後另含網頁說明 `info`)、`against` 大盤跌個股逆勢漲、`rev20` 月營收年增率長期以來第一次破20%(做多，另讀 `cm.tw_monthly_revenue` 與 `cm.tw_daily` 的 `買分價家數`、`分價買張1～5`、`分價賣張1～5`)、`boss` 老闆回頭發動了(做多，另讀 `cm.tw_open_close_vol` 的開盤量(2020/3/2 起，回測從 2020/3 開始)與 `cm.tw_daily` 的外資買賣超、買／賣分價家數、資買、券增減、券買)：每日淨值(已扣成本、未扣借券費)、0050 淨值、持有檔數、做空另有每天放空比例 `expo`(網頁扣借券費)、每筆交易(含漲跌停延後天數、持有日曆天數)、進不了場而放棄的訊號 `skipped`、連一股都買不起而放棄的筆數 `nocash`(有新股票進場時所有部位再平衡到 min(上限, 1/持有檔數)，現金不夠時新股票平分剩下的現金)、每筆資金上限 `cap`、最近 20 個交易日的選股與欄位) |
 
 增量更新：證交所與期交所一次只能查一個月，所以 indices 與 options 都用 `common.load_published()` 讀回 data 分支上的舊檔，只補最近的資料；沒有舊檔時才完整回補(options 回補 1 年)。

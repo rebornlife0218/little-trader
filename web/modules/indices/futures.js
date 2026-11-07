@@ -1,4 +1,4 @@
-/* 指數 · 台指期貨：近月走勢與現貨價差、每月轉倉(換月)、結算日曆、三大法人淨未平倉、成交量與未平倉量、各月份契約
+/* 指數 · 台指期貨：近月走勢與現貨價差(點數與 %)、每月轉倉(換月)、結算日曆、三大法人淨未平倉與多空口數、成交量與未平倉量、各月份契約
    資料集：data/options/futures.json(pipeline/options/futures.py，隨選擇權資料一起更新)
    需要 modules/option/lib.js(LTOpt.load、結算日曆)先載入 */
 (() => {
@@ -6,6 +6,7 @@
   const int = v => Number.isFinite(v) ? Math.round(v).toLocaleString() : '—';
   const signed = v => Number.isFinite(v) ? (v > 0 ? '+' : '') + Math.round(v).toLocaleString() : '—';
   const cls = v => v > 0 ? 'up' : v < 0 ? 'down' : '';
+  const pct = (v, base) => Number.isFinite(v) && base > 0 ? (v >= 0 ? '+' : '') + (v / base * 100).toFixed(2) + '%' : '—';   // 價差占基準的 %
   const monthName = code => code ? `${code.slice(0, 4)}/${code.slice(4, 6)}` : '—';
 
   LT.register({
@@ -30,6 +31,8 @@
       const near = curve.contracts.find(x => x.code === s.code[n]) || curve.contracts[0];
       const dFi = n > 0 && Number.isFinite(s.fi[n - 1]) ? s.fi[n] - s.fi[n - 1] : null;
       const nextMonthly = LTOpt.settlements(D, 20).find(x => x.kind === 'month');
+      const WHO = [['fi', '外資及陸資'], ['it', '投信'], ['dl', '自營商']];
+      const hasSides = WHO.every(([k]) => Array.isArray(s[k + '_l']) && s[k + '_l'].some(Number.isFinite));
       el.innerHTML = `
         <header class="top"><div>
           <h1>台指期貨</h1>
@@ -39,9 +42,9 @@
           <div class="stat"><div class="v" style="font-size:18px;">${esc(s.d[n])}</div><div class="l">最新交易日</div></div>
           <div class="stat"><div class="v ${cls(near.chg)}">${int(s.c[n])}</div><div class="l">近月 ${monthName(s.code[n])} 收盤 · ${signed(near.chg)}</div></div>
           <div class="stat"><div class="v">${int(idx[n])}</div><div class="l">加權指數收盤</div></div>
-          <div class="stat"><div class="v ${cls(basis[n])}">${signed(basis[n])}</div><div class="l">期現貨價差${Number.isFinite(basis[n]) ? (basis[n] >= 0 ? ' · 正價差' : ' · 逆價差') : ''}</div></div>
+          <div class="stat"><div class="v ${cls(basis[n])}">${signed(basis[n])}</div><div class="l">期現貨價差 ${pct(basis[n], idx[n])}${Number.isFinite(basis[n]) ? (basis[n] >= 0 ? ' · 正價差' : ' · 逆價差') : ''}</div></div>
           <div class="stat"><div class="v" style="font-size:18px;">${nextMonthly ? esc(nextMonthly.date) : '—'}</div><div class="l">近月結算日${nextMonthly ? ` · 剩 ${nextMonthly.days} 天` : ''}</div></div>
-          <div class="stat"><div class="v ${cls(roll[n])}">${signed(roll[n])}</div><div class="l">轉倉價差(${monthName(s.code2[n])} − ${monthName(s.code[n])})</div></div>
+          <div class="stat"><div class="v ${cls(roll[n])}">${signed(roll[n])}</div><div class="l">轉倉價差(${monthName(s.code2[n])} − ${monthName(s.code[n])}) ${pct(roll[n], s.c[n])}</div></div>
           <div class="stat"><div class="v">${Number.isFinite(share[n]) ? share[n].toFixed(0) + '%' : '—'}</div><div class="l">近月未平倉占比(近月 ÷ 近月＋次月)</div></div>
           <div class="stat"><div class="v ${cls(s.fi[n])}">${signed(s.fi[n])}</div><div class="l">外資淨未平倉(口) · 較前日 ${signed(dFi)}</div></div>
         </div></div>
@@ -52,20 +55,16 @@
           <p class="note">虛線為換月日：近月契約結算後，連續走勢改接下一個月份的契約，換月前後的價格差距是兩個契約本身的價差，不是當天真的漲跌。</p>
           <h3>期現貨價差(期貨 − 現貨)</h3>
           <div id="bChart"></div>
-          <p class="note">期貨價格理論上 ≈ 現貨 × (1 + 利率 − 股利率) ^ 剩餘時間，越接近結算日價差越小、結算時歸零。台股 6～8 月除權息旺季時，期貨會先扣掉預期的股利而出現逆價差，屬於正常現象；其他時間的大幅逆價差通常代表市場偏空、避險需求高。</p>
+          <p class="note">滑鼠移到圖上可以看到點數與百分比(價差 ÷ 加權指數)。期貨價格理論上 ≈ 現貨 × (1 + 利率 − 股利率) ^ 剩餘時間，越接近結算日價差越小、結算時歸零。台股 6～8 月除權息旺季時，期貨會先扣掉預期的股利而出現逆價差，屬於正常現象；其他時間的大幅逆價差通常代表市場偏空、避險需求高。</p>
         </div>
         <div class="panel">
           <h3>每月轉倉</h3>
-          <div class="heat-pair">
-            <div><h4>近月與次月的未平倉量(口)</h4><div id="rOiChart"></div>
-              ${LTChart.legend([{ name: '近月', color: 'var(--amber)' }, { name: '次月', color: 'var(--blue)' }])}</div>
-            <div><h4>轉倉價差(次月 − 近月，點)</h4><div id="rSpreadChart"></div></div>
-          </div>
+          <h4>轉倉價差(次月 − 近月，點)</h4><div id="rSpreadChart"></div>
           <div class="doc" style="margin-top:12px;">
             <ul>
               <li><b>結算</b>：台指期每個月第 3 個週三(遇假日順延)結算，到期的近月契約以當天的特別結算價現金結算。</li>
-              <li><b>轉倉</b>：想繼續持有部位的人，要在結算前平掉近月、同時建立次月部位。左圖可以看到結算前幾天，未平倉量從近月(橘)大量移到次月(藍)；次月未平倉超過近月的那天，次月就成為成交最熱絡的<b>主力合約</b>。</li>
-              <li><b>轉倉價差</b>：次月比近月貴的點數。多單轉倉要「賣近買遠」，價差為正代表要多付這些點數(成本)，空單轉倉則相反；價差大小反映持有成本與市場對除權息、多空的預期。</li>
+              <li><b>轉倉</b>：想繼續持有部位的人，要在結算前平掉近月、同時建立次月部位，所以結算前幾天未平倉量會從近月大量移到次月(上方的「近月未平倉占比」會快速下降)；次月未平倉超過近月的那天，次月就成為成交最熱絡的<b>主力合約</b>。</li>
+              <li><b>轉倉價差</b>：次月比近月貴的點數(百分比 = 價差 ÷ 近月收盤)。多單轉倉要「賣近買遠」，價差為正代表要多付這些點數(成本)，空單轉倉則相反；價差大小反映持有成本與市場對除權息、多空的預期。</li>
               <li>最近的主力換月日：${majors.slice(-3).map(d => esc(d)).join('、') || '—'}；換月(結算)日：${switches.slice(-3).map(d => esc(d)).join('、') || '—'}。</li>
             </ul>
           </div>
@@ -80,6 +79,11 @@
           <div id="iChart"></div>
           ${LTChart.legend([{ name: '外資及陸資', color: 'var(--amber)' }, { name: '投信', color: 'var(--blue)' }, { name: '自營商', color: 'var(--dim)' }])}
           <p class="note">多方未平倉 − 空方未平倉(所有月份合計，不受轉倉影響)。外資的淨部位常被當成籌碼面的參考，但其中有大量是為現股部位避險，淨空單不一定代表看空；觀察「變化方向」比看絕對數字更有意義。投信的大量淨多單多半是期貨 ETF 的部位。</p>
+          <h3>三大法人多方與空方未平倉(口)</h3>
+          ${hasSides ? `<div class="heat-pair">${WHO.map(([k, name]) => `<div><h4>${name} · 多 ${int(s[k + '_l'][n])} / 空 ${int(s[k + '_s'][n])}</h4><div id="sChart_${k}"></div></div>`).join('')}</div>
+          ${LTChart.legend([{ name: '多方未平倉', color: 'var(--up)' }, { name: '空方未平倉', color: 'var(--down)' }])}
+          <p class="note">淨未平倉一樣的時候，多空兩邊可能都很大(同時有避險與投機部位)，也可能都很小；分開看可以知道淨部位的變化是來自加碼多單、還是回補空單。</p>`
+          : '<p class="note">多方與空方口數將於下次資料更新後顯示。</p>'}
         </div>
         <div class="panel">
           <div class="heat-pair">
@@ -94,7 +98,7 @@
             <thead><tr><th>月份</th><th>到期日</th><th>收盤</th><th>漲跌</th><th>結算價</th><th>與現貨價差</th><th>成交量</th><th>未平倉</th></tr></thead>
             <tbody>${curve.contracts.map(x => `<tr><td>${monthName(x.code)}${x.code === s.code[n] ? ' <span class="tag">近月</span>' : x.code === s.code2[n] ? ' <span class="tag">次月</span>' : ''}</td><td>${esc(x.expiry)}</td>
               <td>${int(x.c)}</td><td class="${cls(x.chg)}">${signed(x.chg)}</td><td>${int(x.s)}</td>
-              <td class="${cls((x.c ?? x.s) - idx[n])}">${signed((x.c ?? x.s) - idx[n])}</td><td>${int(x.vol)}</td><td>${int(x.oi)}</td></tr>`).join('')}</tbody>
+              ${(gap => `<td class="${cls(gap)}">${signed(gap)}<br><small>${pct(gap, idx[n])}</small></td>`)(Number.isFinite(idx[n]) ? (x.c ?? x.s) - idx[n] : null)}<td>${int(x.vol)}</td><td>${int(x.oi)}</td></tr>`).join('')}</tbody>
           </table></div>
           <p class="note">遠月契約成交量少，收盤價可能是很久以前的成交，比較時以結算價為準。</p>
         </div>
@@ -117,21 +121,21 @@
         series: [{ name: '台指期近月', y: s.c, color: 'var(--amber)' }, { name: '加權指數', y: idx, color: 'var(--blue)', width: 1.4 }],
       });
       LTChart.bars(document.getElementById('bChart'), {
-        x: s.d, label: '期現貨價差', height: 200, xFmt: dfmt, yFmt: int, tipFmt: (_, v) => signed(v) + ' 點',
+        x: s.d, label: '期現貨價差', height: 200, xFmt: dfmt, yFmt: int, tipFmt: (_, v, i) => `${signed(v)} 點(${pct(v, idx[i])})`,
         series: [{ name: '價差', y: basis, color: 'var(--amber)' }],
       });
-      LTChart.line(document.getElementById('rOiChart'), {
-        x: s.d, xType: 'date', label: '近月與次月未平倉', height: 220, xFmt: dfmt, yFmt: int, tipFmt: (_, v) => int(v) + ' 口', refX: switchLines,
-        series: [{ name: '近月', y: s.oi1, color: 'var(--amber)' }, { name: '次月', y: s.oi2, color: 'var(--blue)' }],
-      });
       LTChart.line(document.getElementById('rSpreadChart'), {
-        x: s.d, xType: 'date', label: '轉倉價差', height: 220, xFmt: dfmt, yFmt: int, tipFmt: (_, v) => signed(v) + ' 點', refY: [{ y: 0 }], refX: switchLines,
+        x: s.d, xType: 'date', label: '轉倉價差', height: 220, xFmt: dfmt, yFmt: int, tipFmt: (_, v, i) => `${signed(v)} 點(${pct(v, s.c[i])})`, refY: [{ y: 0 }], refX: switchLines,
         series: [{ name: '轉倉價差', y: roll, color: 'var(--amber)' }],
       });
       LTChart.line(document.getElementById('iChart'), {
         x: s.d, xType: 'date', label: '三大法人淨未平倉', xFmt: dfmt, yFmt: int, tipFmt: (_, v) => signed(v) + ' 口', refY: [{ y: 0 }],
         series: [{ name: '外資及陸資', y: s.fi, color: 'var(--amber)' }, { name: '投信', y: s.it, color: 'var(--blue)' }, { name: '自營商', y: s.dl, color: 'var(--dim)', width: 1.4 }],
       });
+      if (hasSides) WHO.forEach(([k, name]) => LTChart.line(document.getElementById('sChart_' + k), {
+        x: s.d, xType: 'date', label: name + '多方與空方未平倉', height: 200, xFmt: dfmt, yFmt: int, tipFmt: (_, v) => int(v) + ' 口',
+        series: [{ name: '多方', y: s[k + '_l'], color: 'var(--up)' }, { name: '空方', y: s[k + '_s'], color: 'var(--down)' }],
+      }));
       LTChart.bars(document.getElementById('vChart'), {
         x: s.d, label: '成交量', height: 200, xFmt: dfmt, yFmt: int, tipFmt: (_, v) => int(v) + ' 口',
         series: [{ name: '成交量', y: s.vol, color: 'var(--blue)' }],

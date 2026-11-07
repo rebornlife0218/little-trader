@@ -1,7 +1,7 @@
 """
 臺股期貨(TX，台指期)：由 options/update.py 一併更新，輸出 web/data/options/futures.json
   - 每日近月契約的開高低收、結算價，全部契約的成交量(一般＋盤後)與未平倉量
-  - 三大法人(外資及陸資、投信、自營商)的臺股期貨多空未平倉淨額(口)
+  - 三大法人(外資及陸資、投信、自營商)的臺股期貨多方、空方未平倉口數與淨額(口)
   - 最新交易日各月份契約(期限結構)
 來源：臺灣期貨交易所「期貨每日交易行情下載」「三大法人-區分各期貨契約」(一次最多查一個月)
 
@@ -20,8 +20,10 @@ QUOTE_URL = 'https://www.taifex.com.tw/cht/3/dlFutDataDown'
 INST_URL = 'https://www.taifex.com.tw/cht/3/futContractsDateDown'
 HEADERS = {'User-Agent': 'Mozilla/5.0 (little-trader data bot)'}
 # code2/c2：次月契約與收盤；v1/v2、oi1/oi2：近月、次月的成交量與未平倉(看轉倉時部位從近月移到次月)
-KEYS = ['d', 'code', 'o', 'h', 'l', 'c', 's', 'vol', 'oi', 'fi', 'it', 'dl', 'code2', 'c2', 'v1', 'v2', 'oi1', 'oi2']
+# fi/it/dl：三大法人多空未平倉淨額；<身份>_l、<身份>_s：多方、空方未平倉口數
 INST = {'外資及陸資': 'fi', '投信': 'it', '自營商': 'dl'}
+SIDES = [k + x for k in INST.values() for x in ('_l', '_s')]
+KEYS = ['d', 'code', 'o', 'h', 'l', 'c', 's', 'vol', 'oi', 'fi', 'it', 'dl', 'code2', 'c2', 'v1', 'v2', 'oi1', 'oi2'] + SIDES
 
 
 def _post(url, form, retries=3):
@@ -96,7 +98,10 @@ def summarize(q, inst):
         for _, r in inst.iterrows():
             key = INST.get(r['身份別'])
             if key:
-                net.setdefault(pd.to_datetime(r['日期']).date(), {})[key] = int(float(r['多空未平倉口數淨額']))
+                x = net.setdefault(pd.to_datetime(r['日期']).date(), {})
+                x[key] = int(float(r['多空未平倉口數淨額']))
+                x[key + '_l'] = int(float(r['多方未平倉口數']))
+                x[key + '_s'] = int(float(r['空方未平倉口數']))
     rows, curve = {}, None
     for d, g in q.groupby('date'):
         reg = g[g['交易時段'] == '一般']
@@ -115,7 +120,7 @@ def summarize(q, inst):
              **{k: (float(n[k]) if pd.notna(n[k]) else None) for k in ['o', 'h', 'l', 'c', 's']},
              'vol': int(g['vol'].sum()),
              'oi': int(reg[reg['到期月份(週別)'].map(_expiry) != d]['oi'].fillna(0).sum()),
-             **{k: net.get(d, {}).get(k) for k in INST.values()}}
+             **{k: net.get(d, {}).get(k) for k in [*INST.values(), *SIDES]}}
         rows[r['d']] = r
         curve = {'date': d.isoformat(), 'contracts': [
             {'code': x['到期月份(週別)'], 'expiry': _expiry(x['到期月份(週別)']).isoformat(),
