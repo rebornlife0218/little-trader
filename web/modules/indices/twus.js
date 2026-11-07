@@ -143,7 +143,7 @@ function renderTwus(){
   }).join('');
   const spanRows = TWUS_COMPARE_SPANS.map(s=>{
     const L = twusSpanList(normalAll, s.key), a = twusSummary(L.filter(isDn)), b = twusSummary(L.filter(isUp));
-    return `<tr class="${s.key===prm.span?'allrow':''}"><td>${s.name}</td>${cnt(a.count)}${pct(a.gap)}${pct(a.gapMed)}${win(a.red)}${win(a.up)}${cnt(b.count)}${pct(b.gap)}${pct(b.gapMed)}${win(b.red)}${win(b.up)}</tr>`;
+    return `<tr class="${s.key===prm.span?'allrow':''}"><td>${s.name}</td><td>${a.count}</td>${pct(a.gap)}${pct(a.gapMed)}${win(a.red)}${win(a.up)}<td>${b.count}</td>${pct(b.gap)}${pct(b.gapMed)}${win(b.red)}${win(b.up)}</tr>`;
   }).join('');
   const kindRows = TWUS_KINDS.map(K=>{
     const L = spanAll.filter(e=>e.kind===K.key), k = twusCorrs(L), s = twusSummary(L);
