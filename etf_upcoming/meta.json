@@ -1,0 +1,13 @@
+{
+  "dataset": "etf_upcoming",
+  "updated_at": "2026-11-07 00:52",
+  "version": "202611070052",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "MoneyDJ 理財網 · 新基金一覽表",
+    "url": "https://www.moneydj.com/funddj/fundmarket.djhtm?a=broncho-1"
+  },
+  "schedule": "每個工作日 08:30、17:30",
+  "count": 27,
+  "page_title": "新基金一覽表 (核准募集/送件申請)(115/11/06)"
+}
