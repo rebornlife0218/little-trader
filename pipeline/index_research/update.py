@@ -1,9 +1,9 @@
 """
 資料集 index_research：大盤漲跌分析的研究報告 → web/data/index_research/<研究>.json
-  nsf.json  國安基金進場：歷次決議前的收盤和各長期均線的乖離、近 20 日跌幅、離一年高點，以及進場後的漲跌
+  nsf.json  國安基金進場與限空令：歷次決議前的收盤和各長期均線的乖離、近 20 日跌幅、離一年高點，進場後的漲跌，以及歷次限空令生效前後的走勢
 
 加權指數讀 data 分支的 indices/TAIEX.json(GitHub Actions 每天更新)；歷次進場的日期與時空背景寫在這裡(EVENTS)與報告範本。
-報告範本 reports/nsf.md 依 CLAUDE.md「研究報告」的結構，表格由這裡填入，內文的數字是手寫的，國安基金再進場或數字改變時要同步更新。
+報告範本 reports/nsf.md 依 CLAUDE.md「研究報告」的結構，表格由這裡填入，內文的數字與限空令的措施內容是手寫的，國安基金再進場、金管會再發布限空令或數字改變時要同步更新。
 報告裡的圖片 ![說明](xxx.png) 由網頁依 JSON 重畫(indices/nsf.js)。
 不是回測，沒有淨值。不每日更新，研究改版或國安基金有新動作時手動執行：
   python pipeline/run_local.py index_research        (產生、發佈到 data 分支並重新部署)
@@ -38,7 +38,17 @@ EVENTS = [
     ('2026-11-06', '2026-11-09', '美股科技股重挫 2026/11', '急跌', None),
 ]
 DECIDE_NOTE = {'2015-08-24': '當天(8/25 上午)決議'}
-H = (5, 20, 60, 250)
+# 金管會限空令：(生效前最後一個收盤日, 生效第一個交易日, 名稱)；措施內容與日期在報告範本
+SHORTS = [
+    ('2008-09-19', '2008-09-22', '金融海嘯 2008/9'),
+    ('2015-08-21', '2015-08-24', '股災 2015/8'),
+    ('2020-03-18', '2020-03-19', '疫情 2020/3'),
+    ('2022-09-30', '2022-10-03', '升息 2022/10'),
+    ('2025-04-02', '2025-04-07', '關稅 2025/4'),
+    ('2026-11-06', '2026-11-09', '2026/11'),
+]
+W = 200                                 # 進場後最多看幾個交易日
+H = (5, 20, 60, W)
 pct = lambda v, d=1: '—' if v is None or not np.isfinite(v) else f'{v * 100:+.{d}f}%'  # noqa: E731
 
 
@@ -69,6 +79,26 @@ def head(cols, align):
     return [f"| {' | '.join(cols)} |", '|' + '|'.join(align) + '|']
 
 
+def shorts(f):
+    """限空令：生效前最後一個收盤的位置，以及生效當天和之後的走勢(報酬從生效第一天開盤算起)"""
+    idx, c = f.index, f['c']
+    L = head(['事件', '近 20 日', '離一年高', '年線', '生效當天', '當天盤中最低', '5 日', '20 日', '60 日', f'{W} 日', '最低收盤', '最低收盤在第幾天'], ['---'] + ['---:'] * 11)
+    for base, eff, name in SHORTS:
+        t = idx.get_loc(pd.Timestamp(base))
+        x = f.iloc[t]
+        cells = [pct(x['r20']), pct(x['hi250']), pct(x['b240'])]
+        if pd.Timestamp(eff) in idx:
+            i = idx.get_loc(pd.Timestamp(eff))
+            w = c.iloc[i:i + 60].to_numpy()
+            cells += [pct(c.iloc[i] / c.iloc[i - 1] - 1), pct(f['l'].iloc[i] / c.iloc[i - 1] - 1)]
+            cells += [pct(fwd(f, i, h)) for h in (5, 20, 60, W)]
+            cells += [pct(w.min() / c.iloc[i - 1] - 1), str(int(w.argmin()) + 1)]
+        else:
+            cells += ['—'] * 8
+        L.append(f'| {name} | ' + ' | '.join(cells) + ' |')
+    return '\n'.join(L)
+
+
 def nsf():
     f = features(taiex())
     idx, c = f.index, f['c']
@@ -82,8 +112,8 @@ def nsf():
             i = idx.get_loc(pd.Timestamp(entry))
             for h in H:
                 e[f'y{h}'] = fwd(f, i, h)
-            if i + 249 < len(f):
-                w = f['l'].iloc[i:i + 250].to_numpy()
+            if i + W - 1 < len(f):
+                w = f['l'].iloc[i:i + W].to_numpy()
                 e['low'] = float(w.min() / f['o'].iloc[i] - 1)
                 e['lowDay'] = int(w.argmin()) + 1
         ev.append(e)
@@ -126,23 +156,23 @@ def nsf():
     rows = []
     for d in hits:
         i = idx.get_loc(d) + 1
-        rows.append({'d': d, 'tag': tag(d), 'x': f.loc[d], 'y60': fwd(f, i, 60), 'y250': fwd(f, i, 250)})
+        rows.append({'d': d, 'tag': tag(d), 'x': f.loc[d], 'y60': fwd(f, i, 60), 'yw': fwd(f, i, W)})
     pre = [r for r in rows if r['d'] < FOUNDED]
-    L = head(['日期', '年線', '近 20 日', '離一年高', '國安基金', '之後 60 日', '250 日'], ['---', '---:', '---:', '---:', '---', '---:', '---:'])
+    L = head(['日期', '年線', '近 20 日', '離一年高', '國安基金', '之後 60 日', f'{W} 日'], ['---', '---:', '---:', '---:', '---', '---:', '---:'])
     for r in rows:
         if r['d'] < FOUNDED:
             continue
         x = r['x']
-        L.append(f"| {r['d']:%Y/%m/%d} | {pct(x['b240'], 0)} | {pct(x['r20'], 0)} | {pct(x['hi250'], 0)} | {r['tag']} | {pct(r['y60'])} | {pct(r['y250'])} |")
+        L.append(f"| {r['d']:%Y/%m/%d} | {pct(x['b240'], 0)} | {pct(x['r20'], 0)} | {pct(x['hi250'], 0)} | {r['tag']} | {pct(r['y60'])} | {pct(r['yw'])} |")
     scan = '\n'.join(L)
 
-    # 三、進場後的漲跌：救市型(有 250 日資料的)平均與任意一天
-    L = head(['次', '事件', '類型', '5 日', '20 日', '60 日', '250 日', '250 日內最低', '見低在第幾天'], ['---:', '---', '---'] + ['---:'] * 6)
+    # 三、進場後的漲跌：救市型(有 200 日資料的)平均與任意一天
+    L = head(['次', '事件', '類型', '5 日', '20 日', '60 日', f'{W} 日', f'{W} 日內最低', '見低在第幾天'], ['---:', '---', '---'] + ['---:'] * 6)
     for k, e in enumerate(ev, 1):
         if 'y5' not in e:
             continue
         L.append(f"| {k} | {e['name']} | {e['type']} | " + ' | '.join(pct(e[f'y{h}']) for h in H) + f" | {pct(e.get('low'))} | {e.get('lowDay', '—')} |")
-    done = [e for e in ev if e['type'] != '預防' and np.isfinite(e.get('y250', np.nan))]
+    done = [e for e in ev if e['type'] != '預防' and np.isfinite(e.get(f'y{W}', np.nan))]
     cell = lambda v: f'**{int((v > 0).sum())}/{len(v)}，{pct(v.mean())}**'  # noqa: E731
     L.append(f'| | **救市型 {len(done)} 次** | | ' + ' | '.join(cell(np.array([e[f"y{h}"] for e in done])) for h in H) + ' | | |')
     o, cl = f['o'].to_numpy(), c.to_numpy()
@@ -157,8 +187,8 @@ def nsf():
     L.append('| | 2000 年以來任意一天 | | ' + ' | '.join(anyday) + ' | | |')
     after_t = '\n'.join(L)
 
-    # 圖：決議前 120 日到之後 250 日(決議前收盤 = 100)
-    X = list(range(-120, 251))
+    # 圖：決議前 120 日到之後 200 日(決議前收盤 = 100)
+    X = list(range(-120, W + 1))
     paths = []
     for e in ev:
         t = idx.get_loc(pd.Timestamp(e['base']))
@@ -168,7 +198,7 @@ def nsf():
     asof = idx[-1]
     md = (HERE / 'reports' / 'nsf.md').read_text(encoding='utf-8')
     md = re.sub(r'^# .*\n+', '', md, count=1)                     # 第一行標題由網頁顯示
-    report = md.format_map({'pos': pos, 'scan': scan, 'after': after_t, 'pre': len(pre), 'asof': f'{asof:%Y/%m/%d}'})
+    report = md.format_map({'pos': pos, 'scan': scan, 'after': after_t, 'short': shorts(f), 'pre': len(pre), 'asof': f'{asof:%Y/%m/%d}'})
     clean = lambda e: {k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in e.items()}  # noqa: E731
     return {'asof': f'{asof:%Y-%m-%d}', 'x': X, 'paths': paths, 'events': [clean(e) for e in ev], 'report': report}
 

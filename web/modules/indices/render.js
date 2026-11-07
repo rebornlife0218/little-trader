@@ -391,11 +391,11 @@ function mountIndices(container, theme, mode, view){
   if (!_indicesBooted){ _indicesBooted = true; init(); } else { render(); }
 }
 LT.catalog({ section:'index', key:'crash', name:'大盤漲跌分析',
-  desc:'全球主要指數 · 1990 年起 · 跌深反彈、均線支撐壓力、週期性、台美股關係與國安基金進場',
+  desc:'全球主要指數 · 1990 年起 · 跌深反彈、均線支撐壓力、週期性、台美股關係與國安基金進場、限空令',
   groups:[{ name:'', items: [...MODES.map(m=>({ key:m.key, name:m.name, desc:m.desc,
     topics: INDICES.map(c=>c.name),   // 後台熱門主題列出的子項目(名稱要和 render() 裡記錄的指數一樣)
     run:(el, ctx)=>mountIndices(el, 'crash', m.key, ctx.view) })),
     // 研究報告(nsf.js)：上半部公開、完整報告要登入
-    { key:'nsf', name:'國安基金進場', desc:'歷次進場時跌破哪些長期均線、離高點多遠，以及進場後的走勢', report:true,
+    { key:'nsf', name:'國安基金進場與限空令', desc:'歷次進場時跌破哪些長期均線、離高點多遠，以及進場後、限空令生效後的走勢', report:true,
       run:(el, ctx)=>LTNSF.run(el, ctx) }] }] });
 LT.register({ section:'index', key:'candle', name:'K棒型態分析', mount: el=>mountIndices(el,'candle'), topics: INDICES.map(c=>c.name) });
