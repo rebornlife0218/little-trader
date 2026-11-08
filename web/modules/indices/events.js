@@ -138,7 +138,7 @@ function loadIndex(key){
     state.meta[key] = {name:TICKER_NAMES[key]||key, hasOHLC:true, hasVolume:rows.some(r=>r.volume>0)};
     state.params[key] = state.params[key] || {...DEFAULT_PARAMS};
     state.candleParams[key] = state.candleParams[key] || {...DEFAULT_CANDLE_PARAMS};
-    state.view[key] = {start:0, end:rows.length-1};
+    state.view[key] = defaultView(key);
   }).finally(()=>{ delete state.loading[key]; });
   return state.loading[key];
 }

@@ -384,7 +384,9 @@ window.addEventListener('resize', ()=>{ if(document.getElementById('app') && sta
 let _indicesBooted = false;
 function mountIndices(container, theme, mode, view){
   container.innerHTML = '<div id="app"></div>';
+  const switched = state.theme !== theme;
   state.theme = theme;
+  if (switched) Object.keys(state.data).forEach(k=>{ state.view[k] = defaultView(k); });   // 換頁面就回到該頁的預設範圍(大盤漲跌分析近一年、K棒型態分析全部)
   if (mode) state.mode = mode;
   state.catView = view || null;
   resetIndex();

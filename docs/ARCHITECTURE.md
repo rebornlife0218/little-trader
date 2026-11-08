@@ -23,6 +23,7 @@ web/                                網站(部署時整個資料夾就是網站�
                                     kchart(K 線圖，標出畫面中的最高、最低點)、myth(常見迷思)、cycle(週期性分析)、twus(台美股關係；颱風假日期手動維護在 TW_TYPHOON)、render(畫面與註冊)
                                     大盤漲跌分析是目錄頁(LT.catalog 卡片，同 ETF大禮包)：跌深反彈、常見迷思、週期性分析、台美股關係、國安基金進場與限空令各一張卡片，網址 index/crash/<子主題>(crash、myth、cycle、twus、nsf)；K棒型態分析是一般頁面
                                     大盤漲跌分析、K棒型態分析只用 1990 年以後的資料(core 的 INDEX_START)；資料檔本身保留最早的歷史，給統計學、ETF 研究用
+                                    K線圖預設範圍(core 的 DEFAULT_VIEW_DAYS)：大盤漲跌分析近一年(250 個交易日，同「1年」按鈕)，K棒型態分析全部；兩頁之間切換時回到該頁的預設
     indices/nsf.js                  指數：大盤漲跌分析 › 國安基金進場與限空令(研究報告，上半部公開、完整報告要登入；資料集 index_research 的 nsf.json；和上面 7 個檔不共用變數)
     indices/futures.js              指數：台指期貨(期現貨價差的點數與 %、轉倉、結算日曆、三大法人淨未平倉與多空口數；用到 option/lib.js)
     etf/lib.js                      ETF 共用(window.LTETF)：格式化、報酬統計、滾動期間比較、配息課稅試算、載入常存 ETF 資料(etf_compare)

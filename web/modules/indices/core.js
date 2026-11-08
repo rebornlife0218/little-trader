@@ -3,6 +3,7 @@
    多個檔案共用同一組全域變數與函式(一般 <script>，不是 module)，載入順序見 index.html */
 const INDICES_DATASET = 'indices';
 const INDEX_START = '1990-01-01';   // 大盤漲跌分析、K棒型態分析的資料從這天開始(更早的開高低收多半不是真實資料)
+const DEFAULT_VIEW_DAYS = { crash: 250, candle: 'all' };   // K線圖預設顯示的交易日數：大盤漲跌分析近一年(同「1年」按鈕)，K棒型態分析全部
 /* ============================== 常數與設定 ============================== */
 // 指數代碼與中文名稱(下拉選單依此順序排列)
 const INDICES = [
@@ -66,6 +67,11 @@ function toggleParamFold(btn){
 function fmtPct(x,digits=1){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return (x*100>=0?'+':'')+(x*100).toFixed(digits)+'%'; }
 function fmtNum(x,digits=2){ if(x===null||x===undefined||Number.isNaN(x)) return '—'; return Number(x).toLocaleString('en-US',{maximumFractionDigits:digits}); }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+// K線圖的預設範圍(依目前頁面，見 DEFAULT_VIEW_DAYS)：載入指數、在大盤漲跌分析與 K棒型態分析之間切換時套用
+function defaultView(key){
+  const end = state.data[key].length-1, n = DEFAULT_VIEW_DAYS[state.theme];
+  return { start: n==='all' ? 0 : clamp(end-n,0,end), end };
+}
 
 /* ============================== 移動平均線 ============================== */
 const MA_PERIODS = [5,10,20,60,120,240];
