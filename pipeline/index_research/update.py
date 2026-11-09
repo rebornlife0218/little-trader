@@ -1,6 +1,9 @@
 """
 資料集 index_research：大盤漲跌分析的研究報告 → web/data/index_research/<研究>.json
   nsf.json  國安基金進場與限空令：歷次決議前的收盤和各長期均線的乖離、近 20 日跌幅、離一年高點，進場後的漲跌，以及歷次限空令生效前後的走勢
+  margin.json  大跌反彈和融資的關係：報告 reports/margin.md(全部手寫，研究數字改變時要同步更新)，圖的資料讀本機研究資料夾
+            (預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/大跌反彈訊號/市值融資，環境變數 MARGIN_DIR 可改)的每日融資與訊號明細；
+            GitHub Actions 讀不到這個資料夾，沿用上一次發佈的 margin.json
 
 加權指數讀 data 分支的 indices/TAIEX.json(GitHub Actions 每天更新)；歷次進場的日期與時空背景寫在這裡(EVENTS)與報告範本。
 報告範本 reports/nsf.md 依 CLAUDE.md「研究報告」的結構，表格由這裡填入，內文的數字與限空令的措施內容是手寫的，國安基金再進場、金管會再發布限空令或數字改變時要同步更新。
@@ -8,6 +11,7 @@
 不是回測，沒有淨值。GitHub Actions 週一~五 19:30(indices 更新之後)自動重算表格與走勢圖；研究改版或國安基金、限空令有新動作時，內文的數字要手動核對，再執行：
   python pipeline/run_local.py index_research        (產生、發佈到 data 分支並重新部署)
 """
+import os
 import re
 import sys
 from pathlib import Path
@@ -18,7 +22,7 @@ import requests
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
-from common import REPO, dataset_dir, write_json, write_meta  # noqa: E402
+from common import REPO, dataset_dir, load_published, write_json, write_meta  # noqa: E402
 
 NAME = 'index_research'
 MAS = (60, 120, 240, 480, 1200)          # 季線、半年線、年線、兩年線、五年線
@@ -203,10 +207,56 @@ def nsf():
     return {'asof': f'{asof:%Y-%m-%d}', 'x': X, 'paths': paths, 'events': [clean(e) for e in ev], 'report': report}
 
 
+MARGIN_DIR = Path(os.environ.get('MARGIN_DIR', Path.home() / 'Desktop/ETF_PANEL/CLAUDE/其他策略/大跌反彈訊號/市值融資'))
+
+
+def margin():
+    """大跌反彈和融資的關係：報告與三張圖(重點、訊號總覽、訊號後走勢)的資料；本機研究資料夾不在時回傳 None"""
+    if not (MARGIN_DIR / '每日市值與融資.csv').exists():
+        return None
+    f = pd.read_csv(MARGIN_DIR / '每日市值與融資.csv', dtype={'d': str}).set_index('d')
+    ev = pd.read_csv(MARGIN_DIR / '檢驗' / '定案明細.csv', dtype={'d': str})
+    g = pd.read_csv(MARGIN_DIR / '檢驗' / '定案分組.csv').set_index('分組')
+    r = f['amt'].pct_change(fill_method=None)
+    b = r.shift(1).rolling(120, min_periods=120)
+    za = -(r - b.mean()) / b.std()                         # 單日融資金額 z：基準是過去 120 日的變化率，算到昨天
+    keep = f.index >= '20020101'
+    ymd = lambda d: f'{d[:4]}-{d[4:6]}-{d[6:]}'  # noqa: E731
+    r2 = lambda v: None if not np.isfinite(v) else round(float(v), 2)  # noqa: E731
+    # 訊號後走勢：隔天開盤買進，到第 k 個交易日收盤
+    pos = {d: i for i, d in enumerate(f.index)}
+    c, o = f['c'].to_numpy(), f['o'].to_numpy()
+    K = 60
+    M = np.array([[c[pos[d] + k] / o[pos[d] + 1] - 1 if pos[d] + k < len(c) else np.nan for k in range(1, K + 1)] for d in ev['d']]) * 100
+    st = int(np.flatnonzero(keep)[0])
+    base = [np.nanmean(c[st + k:] / o[st + 1:len(c) - k + 1] - 1) * 100 for k in range(1, K + 1)]   # 任意一天：同樣隔天開盤買進
+    md = (HERE / 'reports' / 'margin.md').read_text(encoding='utf-8')
+    md = re.sub(r'^# .*\n+', '', md, count=1)
+    return {
+        'asof': ymd(f.index[-1]),
+        'key': {k: {'n': int(g.at[k, '次數']) if k in g.index and np.isfinite(g.at[k, '次數']) else None,
+                    **{f'u{h}': r2(g.at[k, f'{h}上']) for h in (5, 20, 60)}, **{f'm{h}': r2(g.at[k, f'{h}均']) for h in (5, 20, 60)}}
+                for k in ('全部', '任意一天')},
+        'd': [ymd(d) for d in f.index[keep]], 'c': [round(float(v)) for v in f['c'][keep]], 'z': [r2(v) for v in za[keep].clip(lower=-8)],
+        'sig': [{'d': ymd(d), 'c': round(float(v))} for d, v in zip(ev['d'], ev['c'])],
+        'last': ymd(ev['d'].iloc[-1]),
+        'path': {'x': list(range(1, K + 1)), 'mean': [r2(v) for v in np.nanmean(M, 0)], 'p25': [r2(v) for v in np.nanpercentile(M, 25, 0)],
+                 'p75': [r2(v) for v in np.nanpercentile(M, 75, 0)], 'base': [r2(v) for v in base]},
+        'report': md,
+    }
+
+
 def main():
+    prev = load_published(NAME, 'margin.json')          # 先讀回上一次的檔(dataset_dir 會清空本機資料夾)
     out = dataset_dir(NAME)
     B = nsf()
     write_json(out / 'nsf.json', B)
+    m = margin() or prev
+    if m:
+        write_json(out / 'margin.json', m)
+        print(f"margin：{len(m['sig'])} 次訊號，資料到 {m['asof']}")
+    else:
+        print('margin：找不到本機研究資料夾，也沒有上一次發佈的 margin.json', file=sys.stderr)
     write_meta(NAME, '加權指數(indices 資料集)', '', '週一~五 19:30(加權指數更新之後)', asof=B['asof'])
     print(f"nsf：{len(B['events'])} 次進場，資料到 {B['asof']}")
 

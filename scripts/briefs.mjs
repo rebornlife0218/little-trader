@@ -51,8 +51,9 @@ export const BRIEFS = {
   // 跳空與隔夜報酬(stock/tw-research.js)：精簡版只有各組的隔夜平均
   tw_gap: (f, j) => f === 'gap.json'
     ? withHero({ ...pick(j, ['asof', 'start', 'n', 'bins', 'down', 'up']), all: pick(j.all, ['n', 'ov']), nl: pick(j.nl, ['n', 'ov']) }, j) : null,
-  // 大盤漲跌分析的研究(indices/nsf.js)：國安基金進場的精簡版只有走勢圖
-  index_research: (f, j) => f === 'nsf.json' ? withHero(pick(j, ['asof', 'x', 'paths']), j) : null,
+  // 大盤漲跌分析的研究：國安基金進場(indices/nsf.js)的精簡版只有走勢圖；大跌反彈和融資(indices/margin.js)只有重點圖與最近一次訊號日
+  index_research: (f, j) => f === 'nsf.json' ? withHero(pick(j, ['asof', 'x', 'paths']), j)
+    : f === 'margin.json' ? withHero(pick(j, ['asof', 'key', 'last']), j) : null,
   // A 系列 ETF 跟單(etf/research.js)：精簡版只有「加碼｜全部｜跟單出場」
   etf_research: (f, j) => {
     if (f !== 'etf_follow.json') return null;

@@ -88,6 +88,9 @@ test('精簡版的先講結論：只取報告開頭的 > 引言', async () => {
   const n = BRIEFS.index_research('nsf.json', { asof: 'x', x: [0], paths: [], events: [{ b240: -0.2 }], report: '> **先講結論**：丁\n\n## 一、研究目的\n機密' });
   assert.equal(n.hero, '> **先講結論**：丁');
   assert.ok(!('report' in n) && !('events' in n), '國安基金進場：精簡版只有走勢圖');
+  const mg = BRIEFS.index_research('margin.json', { asof: 'x', key: {}, last: 'y', d: [], c: [], z: [], sig: [], path: {}, report: '> **先講結論**：戊\n\n## 一、研究目的\n機密' });
+  assert.equal(mg.hero, '> **先講結論**：戊');
+  assert.deepEqual(Object.keys(mg).sort(), ['asof', 'hero', 'key', 'last'], '大跌反彈和融資：精簡版只有重點圖與最近一次訊號日');
   // 近期明細要登入：精簡版不能有股票代號、名稱、日期與選股
   const t = BRIEFS.tw_strategy('rev20.json', { d: [], nav: {}, trades: [['2330', '台積電', '2026-01-02', '2026-01-10', 0.1, 'time', 5, 0, 0, 8]], recent: [{ d: 'x', p: [['2330']] }], cols: [], skipped: [] });
   assert.deepEqual(t.trades[0].slice(0, 4), ['', '', '', '2026']);
