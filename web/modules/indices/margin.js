@@ -36,7 +36,7 @@ window.LTMargin = (() => {
   function overview(div, B) {
     LTChart.line(div, log => {
       const tf = v => log ? Math.log10(v) : v;
-      return { x: B.d, xType: 'date', height: 300, label: `2002 年以來 ${B.sig.length} 次訊號`, title: `2002 年以來 ${B.sig.length} 次訊號`,
+      return { x: B.d, xType: 'date', xFmt: (v, tip) => tip ? v.replaceAll('-', '/') : v.slice(0, 7), height: 300, label: `2002 年以來 ${B.sig.length} 次訊號`, title: `2002 年以來 ${B.sig.length} 次訊號`,
         yFmt: v => Math.round(log ? 10 ** v : v).toLocaleString(), tipFmt: (sr, v) => Math.round(log ? 10 ** v : v).toLocaleString(),
         yTicks: log ? () => [5000, 10000, 20000, 40000].map(Math.log10) : undefined,
         series: [{ name: '加權指數', y: B.c.map(tf), color: 'var(--text)', width: 1.2 }],
@@ -45,6 +45,24 @@ window.LTMargin = (() => {
           series: [{ name: '單日融資金額 z', y: B.z, color: 'var(--mute)', width: 1 }, { name: '門檻', y: B.z.map(() => 3), color: SIG, width: 1.2 }] } };
     });
     div.insertAdjacentHTML('afterend', LTChart.legend([{ name: '加權指數', color: 'var(--text)' }, { name: '訊號', color: SIG }, { name: '單日融資金額 z(門檻 3)', color: 'var(--mute)' }]));
+  }
+
+  // 訊號總覽下方的明細表：由新到舊，先顯示最近 3 筆，其餘展開(報告 Markdown 裡是由舊到新)；在原表格上調整，保留報告表格的樣式
+  function signalTable(fig) {
+    const wrap = fig.nextElementSibling, tb = wrap && wrap.querySelector('tbody'), N = 3;
+    if (!tb) return;
+    const rows = [...tb.rows].reverse();
+    tb.append(...rows);
+    if (rows.length <= N) return;
+    wrap.insertAdjacentHTML('afterend', '<div class="btnrow-l" style="margin-top:10px;"><button type="button"></button></div>');
+    const b = wrap.nextElementSibling.firstElementChild;
+    let all = false;
+    const draw = () => {
+      rows.forEach((r, i) => { r.hidden = !all && i >= N; });
+      b.textContent = all ? `收合，只顯示最近 ${N} 筆` : `顯示全部 ${rows.length} 筆`;
+    };
+    b.onclick = () => { all = !all; draw(); };
+    draw();
   }
 
   // 訊號後走勢：訊號隔天開盤買進的平均漲跌，和任意一天比較
@@ -80,7 +98,7 @@ window.LTMargin = (() => {
     lg.insertAdjacentHTML('beforeend', `<p class="note">平常買進後抱 20 天，10 次大約只有 6 次賺錢；在指數已經跌深、融資戶被斷頭砍出來的那幾天買進，10 次將近 8 次賺錢，平均漲幅是平常的 ${Math.round(s.m20 / B.key['任意一天'].m20)} 倍。只看指數跌深沒有這個效果，要融資也大減才有。這個訊號 25 年只出現 ${s.n} 次${B.last ? `，最近一次是 ${B.last.replaceAll('-', '/')}` : ''}。</p>`);
     if (!full) return;   // 訪客：只有上半部
     el.querySelectorAll('.md-fig [data-fig]').forEach(div => {
-      if (div.dataset.fig === '圖/訊號總覽.png') overview(div, B);
+      if (div.dataset.fig === '圖/訊號總覽.png') { overview(div, B); signalTable(div.closest('figure')); }
       else if (div.dataset.fig === '圖/訊號後走勢.png') path(div, B);
       else div.parentElement.remove();
     });
