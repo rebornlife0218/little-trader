@@ -26,7 +26,7 @@ window.LTMargin = (() => {
   function key(div, B, legend) {
     const H = [5, 20, 60], s = B.key['全部'], a = B.key['任意一天'];
     const ss = [{ name: `訊號(${s.n} 次)`, y: H.map(h => s['u' + h]), color: SIG }, { name: '任意一天', y: H.map(h => a['u' + h]), color: ANY }];
-    LTChart.bars(div, { x: H.map(h => `買進後 ${h} 日`), xAll: true, height: 260, yMin: 0, yMax: 100, label: '加權指數上漲機率',
+    LTChart.bars(div, { x: H.map(h => `買進後 ${h} 日`), xAll: true, xFmt: v => v, height: 260, yMin: 0, yMax: 100, label: '加權指數上漲機率',
       yFmt: v => Math.round(v) + '%', series: ss,
       tipFmt: (sr, v, i) => `${v.toFixed(0)}%，平均 ${pct((sr.name === '任意一天' ? a : s)['m' + H[i]])}`, refY: [{ y: 50 }] });
     legend.innerHTML = LTChart.legend(ss);
