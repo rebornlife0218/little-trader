@@ -69,7 +69,7 @@ pipeline/                           資料抓取，一個資料集一個資料�
   tw_research/update.py             台股其他研究：用本機 PostgreSQL(日資料、月營收、公告股本)計算各研究的淨值、交易統計與報告(報告範本 tw_research/reports/<研究>.md，依 CLAUDE.md「研究報告」的結構，數字由程式填入；進出場、成本與資金模擬共用 tw_strategy/events.py；只在本機手動執行)
   etf_research/update.py            「ETF研究」的資料檔：把本機研究資料夾(A 系列 ETF 跟單，預設 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，環境變數 ETF_FOLLOW_DIR 可改)輸出的淨值、交易統計、統計表與報告轉成 JSON；網頁版報告依「研究報告」結構重新編排，存在 etf_research/reports/etf_follow.md(有這份就用這份，研究數字改變時要同步更新)；研究結果不每日更新，只在本機手動執行
   tw_gap/update.py                  台股其他研究「跳空與隔夜報酬」的資料檔：把本機研究資料夾(預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/跳空隔夜報酬，環境變數 GAP_DIR 可改)輸出的統計表轉成 JSON；網頁版報告範本 tw_gap/reports/gap.md(依「研究報告」結構，表格由程式填入，內文數字手寫，研究數字改變時要同步更新)；不是回測，沒有淨值；只在本機手動執行
-  index_research/update.py          大盤漲跌分析的研究報告：國安基金進場與限空令(nsf.json；加權指數讀 data 分支的 indices/TAIEX.json，歷次進場日期與類型寫在 EVENTS、限空令生效日寫在 SHORTS；報告範本 index_research/reports/nsf.md，表格由程式填入、內文數字與限空令措施手寫，國安基金再進場、金管會再發布限空令或數字改變時要同步更新)；大跌反彈和融資的關係(margin.json；報告範本 index_research/reports/margin.md 全部手寫，圖的資料讀本機研究資料夾，預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/大跌反彈訊號/市值融資，環境變數 MARGIN_DIR 可改；GitHub Actions 讀不到時沿用上一次發佈的檔)；不是回測，只在本機手動執行
+  index_research/update.py          大盤漲跌分析的研究報告：國安基金進場與限空令(nsf.json；加權指數讀 data 分支的 indices/TAIEX.json，歷次進場日期與類型寫在 EVENTS、限空令生效日寫在 SHORTS；報告範本 index_research/reports/nsf.md，表格由程式填入、內文數字與限空令措施手寫，國安基金再進場、金管會再發布限空令或數字改變時要同步更新)；大跌反彈和融資的關係(margin.json；報告範本 index_research/reports/margin.md 全部手寫，圖的資料讀本機研究資料夾，預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/大跌反彈訊號/市值融資，環境變數 MARGIN_DIR 可改；GitHub Actions 讀不到時圖的資料沿用上一次發佈的檔，報告文字仍用 repo 裡最新的 margin.md)；不是回測，只在本機手動執行
   sp500/update.py                   S&P500 季度換股回測：歷史成分股(fja05680/sp500)、Yahoo Finance、Tiingo(已下市公司)
   price_query/sync.py               股票查詢的資料：cm schema → Cloudflare D1(本機執行，只上傳有變動的部分)
 
@@ -238,7 +238,7 @@ wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專�
 - 只發佈回測結果，不發佈原始股價。
 - etf_research(ETF研究)不在排程裡：研究在本機的研究資料夾計算(不在 repo 內)，研究改版後執行 `python pipeline/run_local.py etf_research`(轉檔、發佈到 data 分支並重新部署)。
 - tw_gap(台股其他研究「跳空與隔夜報酬」)不在排程裡：研究在本機的研究資料夾計算，研究改版後執行 `python pipeline/run_local.py tw_gap`。另外成一個資料集、不放進 tw_research，因為 tw_research 每天由排程整個資料夾發佈，放在裡面會被覆蓋。
-- index_research(大盤漲跌分析的研究報告)在 GitHub Actions 排程裡(`data-index_research.yml`，週一~五 19:30，排在 indices 之後)：表格與走勢圖每天跟著加權指數更新(例如新進場的進場後報酬)，但報告內文的數字與限空令措施是手寫的，不會跟著變。國安基金再進場、退場、金管會再發布限空令或研究改版時，先核對內文與 `EVENTS`、`SHORTS`，再執行 `python pipeline/run_local.py index_research`(產生、發佈到 data 分支並重新部署)。大跌反彈和融資的關係(`margin.json`)的資料在本機研究資料夾，排程讀不到，沿用上一次發佈的檔；研究更新後在本機執行同一個指令。
+- index_research(大盤漲跌分析的研究報告)在 GitHub Actions 排程裡(`data-index_research.yml`，週一~五 19:30，排在 indices 之後)：表格與走勢圖每天跟著加權指數更新(例如新進場的進場後報酬)，但報告內文的數字與限空令措施是手寫的，不會跟著變。國安基金再進場、退場、金管會再發布限空令或研究改版時，先核對內文與 `EVENTS`、`SHORTS`，再執行 `python pipeline/run_local.py index_research`(產生、發佈到 data 分支並重新部署)。大跌反彈和融資的關係(`margin.json`)的圖表資料在本機研究資料夾，排程讀不到，沿用上一次發佈的資料(報告文字每次都用 repo 裡的 `margin.md`，只改文字時 push 後等排程即可)；研究資料更新後在本機執行同一個指令。
 - tw_research(台股其他研究)：`pipeline/tw_research/update.py` 直接用本機 PostgreSQL 計算(規則同 tw_strategy，共用 `events.py`)，報告文字在 `pipeline/tw_research/reports/`。處置股策略(`disp.json`)每天在排程裡重跑(run_local.py 的 `tw_research:disp`，處置股更新之後)，策略頁才能列出已公告、隔天要進場的處置股；其他研究不在排程裡，研究更新後手動執行 `python pipeline/run_local.py tw_research`(全部重跑、發佈到 data 分支並重新部署)。發佈時是整個 `web/data/tw_research/` 資料夾，每天只重跑 disp 時其他研究沿用本機上次算好的檔案；本機排程檢查(`check-local.yml`)也檢查 tw_research 的 `updated_at`。
 - 台股回測的規則(進出場、漲跌停、資金分配、交易成本、績效指標)以根目錄 `CLAUDE.md` 的「選股回測原則」為準，實作在 `events.py`(事件型)與 `update.py`(低波動，共用 events.py 的成本與漲跌停函式)；績效統計在網頁 `tw-strategy.js` 的 `stats`、`tradeStats` 計算。
 

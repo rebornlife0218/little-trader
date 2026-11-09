@@ -210,6 +210,12 @@ def nsf():
 MARGIN_DIR = Path(os.environ.get('MARGIN_DIR', Path.home() / 'Desktop/ETF_PANEL/CLAUDE/其他策略/大跌反彈訊號/市值融資'))
 
 
+def margin_report():
+    """大跌反彈和融資的關係的報告：reports/margin.md 去掉第一行標題"""
+    md = (HERE / 'reports' / 'margin.md').read_text(encoding='utf-8')
+    return re.sub(r'^# .*\n+', '', md, count=1)
+
+
 def margin():
     """大跌反彈和融資的關係：報告與三張圖(重點、訊號總覽、訊號後走勢)的資料；本機研究資料夾不在時回傳 None"""
     if not (MARGIN_DIR / '每日市值與融資.csv').exists():
@@ -230,8 +236,6 @@ def margin():
     M = np.array([[c[pos[d] + k] / o[pos[d] + 1] - 1 if pos[d] + k < len(c) else np.nan for k in range(1, K + 1)] for d in ev['d']]) * 100
     st = int(np.flatnonzero(keep)[0])
     base = [np.nanmean(c[st + k:] / o[st + 1:len(c) - k + 1] - 1) * 100 for k in range(1, K + 1)]   # 任意一天：同樣隔天開盤買進
-    md = (HERE / 'reports' / 'margin.md').read_text(encoding='utf-8')
-    md = re.sub(r'^# .*\n+', '', md, count=1)
     return {
         'asof': ymd(f.index[-1]),
         'key': {k: {'n': int(g.at[k, '次數']) if k in g.index and np.isfinite(g.at[k, '次數']) else None,
@@ -242,7 +246,7 @@ def margin():
         'last': ymd(ev['d'].iloc[-1]),
         'path': {'x': list(range(1, K + 1)), 'mean': [r2(v) for v in np.nanmean(M, 0)], 'p25': [r2(v) for v in np.nanpercentile(M, 25, 0)],
                  'p75': [r2(v) for v in np.nanpercentile(M, 75, 0)], 'base': [r2(v) for v in base]},
-        'report': md,
+        'report': margin_report(),
     }
 
 
@@ -253,6 +257,7 @@ def main():
     write_json(out / 'nsf.json', B)
     m = margin() or prev
     if m:
+        m['report'] = margin_report()                   # 沿用上一次的圖表資料時，報告文字仍用 repo 裡最新的 margin.md
         write_json(out / 'margin.json', m)
         print(f"margin：{len(m['sig'])} 次訊號，資料到 {m['asof']}")
     else:
