@@ -1,12 +1,12 @@
 """
 資料集 index_research：大盤漲跌分析的研究報告 → web/data/index_research/<研究>.json
   nsf.json  國安基金進場與限空令：歷次決議前的收盤和各長期均線的乖離、近 20 日跌幅、離一年高點，進場後的漲跌，以及歷次限空令生效前後的走勢
-  margin.json  大跌反彈和融資的關係：報告 reports/margin.md(全部手寫，研究數字改變時要同步更新)，圖的資料讀本機研究資料夾
+  margin.json  大跌反彈和融資的關係：報告 reports/大跌反彈和融資的關係.md(全部手寫，研究數字改變時要同步更新)，圖的資料讀本機研究資料夾
             (預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/大跌反彈訊號/市值融資，環境變數 MARGIN_DIR 可改)的每日融資與訊號明細；
             GitHub Actions 讀不到這個資料夾，沿用上一次發佈的 margin.json
 
 加權指數讀 data 分支的 indices/TAIEX.json(GitHub Actions 每天更新)；歷次進場的日期與時空背景寫在這裡(EVENTS)與報告範本。
-報告範本 reports/nsf.md 依 CLAUDE.md「研究報告」的結構，表格由這裡填入，內文的數字與限空令的措施內容是手寫的，國安基金再進場、金管會再發布限空令或數字改變時要同步更新。
+報告範本 reports/國安基金進場與限空令.md 依 CLAUDE.md「研究報告」的結構，表格由這裡填入，內文的數字與限空令的措施內容是手寫的，國安基金再進場、金管會再發布限空令或數字改變時要同步更新。
 報告裡的圖片 ![說明](xxx.png) 由網頁依 JSON 重畫(indices/nsf.js)。
 不是回測，沒有淨值。GitHub Actions 週一~五 19:30(indices 更新之後)自動重算表格與走勢圖；研究改版或國安基金、限空令有新動作時，內文的數字要手動核對，再執行：
   python pipeline/run_local.py index_research        (產生、發佈到 data 分支並重新部署)
@@ -200,7 +200,7 @@ def nsf():
         paths.append({'name': e['name'], 'type': e['type'], 'y': y})
 
     asof = idx[-1]
-    md = (HERE / 'reports' / 'nsf.md').read_text(encoding='utf-8')
+    md = (HERE / 'reports' / '國安基金進場與限空令.md').read_text(encoding='utf-8')
     md = re.sub(r'^# .*\n+', '', md, count=1)                     # 第一行標題由網頁顯示
     report = md.format_map({'pos': pos, 'scan': scan, 'after': after_t, 'short': shorts(f), 'pre': len(pre), 'asof': f'{asof:%Y/%m/%d}'})
     clean = lambda e: {k: (None if isinstance(v, float) and not np.isfinite(v) else v) for k, v in e.items()}  # noqa: E731
@@ -211,8 +211,8 @@ MARGIN_DIR = Path(os.environ.get('MARGIN_DIR', Path.home() / 'Desktop/ETF_PANEL/
 
 
 def margin_report():
-    """大跌反彈和融資的關係的報告：reports/margin.md 去掉第一行標題"""
-    md = (HERE / 'reports' / 'margin.md').read_text(encoding='utf-8')
+    """大跌反彈和融資的關係的報告：reports/大跌反彈和融資的關係.md 去掉第一行標題"""
+    md = (HERE / 'reports' / '大跌反彈和融資的關係.md').read_text(encoding='utf-8')
     return re.sub(r'^# .*\n+', '', md, count=1)
 
 
@@ -257,7 +257,7 @@ def main():
     write_json(out / 'nsf.json', B)
     m = margin() or prev
     if m:
-        m['report'] = margin_report()                   # 沿用上一次的圖表資料時，報告文字仍用 repo 裡最新的 margin.md
+        m['report'] = margin_report()                   # 沿用上一次的圖表資料時，報告文字仍用 repo 裡最新的 大跌反彈和融資的關係.md
         write_json(out / 'margin.json', m)
         print(f"margin：{len(m['sig'])} 次訊號，資料到 {m['asof']}")
     else:
