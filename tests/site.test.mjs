@@ -175,3 +175,24 @@ test('新策略、研究上線：events.py 的每個台股事件型策略都列�
   const { TOPICS } = await import('../scripts/share/ig-topics.mjs');
   for (const t of TOPICS) assert.ok(all.has(t.path), `IG 圖卡 ${t.key} 的網址 ${t.path} 沒有對應的頁面`);
 });
+
+test('研究報告 md 的圖寫成 <報告>/檔名.png，每份有圖的報告都列在 scripts/md-figs.py 的 REPORTS、網址對得到頁面', () => {
+  const ROOT = join(WEB, '..');
+  const py = readFileSync(join(ROOT, 'scripts/md-figs.py'), 'utf8');
+  const reports = new Map([...py.matchAll(/^\s*'(pipeline\/[^']+\.md)': '([^']+)',/gm)].map(m => [m[1], m[2]]));
+  assert.ok(reports.size >= 10, `md-figs.py 的 REPORTS 只讀到 ${reports.size} 筆`);
+  const pages = new Set(site.pages.filter(p => p.catalog).flatMap(p => p.catalog.groups.flatMap(g => g.items.map(it => `${p.section}/${p.key}/${it.key}`))));
+  for (const [md, url] of reports) {
+    assert.ok(existsSync(join(ROOT, md)), `md-figs.py 的 ${md} 不存在`);
+    assert.ok(pages.has(url), `md-figs.py 的 ${md} 網址 ${url} 沒有對應的頁面`);
+  }
+  const mds = readdirSync(join(ROOT, 'pipeline'), { withFileTypes: true }).filter(d => d.isDirectory() && existsSync(join(ROOT, 'pipeline', d.name, 'reports')))
+    .flatMap(d => readdirSync(join(ROOT, 'pipeline', d.name, 'reports')).filter(f => f.endsWith('.md')).map(f => `pipeline/${d.name}/reports/${f}`));
+  for (const md of mds) {
+    const stem = md.split('/').pop().replace(/\.md$/, '');
+    const figs = [...readFileSync(join(ROOT, md), 'utf8').matchAll(/^!\[[^\]]*\]\(([^()\s]+\.png)\)[ \t]*$/gm)].map(m => m[1]);
+    if (!figs.length) continue;
+    assert.ok(reports.has(md), `${md} 有圖，要加到 scripts/md-figs.py 的 REPORTS`);
+    for (const f of figs) assert.match(f, new RegExp(`^${stem}/[^/]+\\.png$`), `${md}：圖片路徑要寫成 ${stem}/檔名.png(${f})`);
+  }
+});

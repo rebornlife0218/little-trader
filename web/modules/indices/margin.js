@@ -98,7 +98,7 @@ window.LTMargin = (() => {
     lg.insertAdjacentHTML('beforeend', `<p class="note">平常買進後抱 20 天，10 次大約只有 6 次賺錢；在指數已經跌深、融資戶被斷頭砍出來的那幾天買進，10 次將近 8 次賺錢，平均漲幅是平常的 ${Math.round(s.m20 / B.key['任意一天'].m20)} 倍。只看指數跌深沒有這個效果，要融資也大減才有。這個訊號 25 年只出現 ${s.n} 次${B.last ? `，最近一次是 ${B.last.replaceAll('-', '/')}` : ''}。</p>`);
     if (!full) return;   // 訪客：只有上半部
     el.querySelectorAll('.md-fig [data-fig]').forEach(div => {
-      const f = div.dataset.fig.split('/').pop();   // 報告裡的圖只寫檔名(同其他研究)；舊版寫成 圖/xxx.png 也對得到
+      const f = div.dataset.fig.split('/').pop();   // 只看檔名(報告寫成 <報告>/xxx.png，同其他研究)
       if (f === '訊號總覽.png') { overview(div, B); signalTable(div.closest('figure')); }
       else if (f === '訊號後走勢.png') path(div, B);
       else div.parentElement.remove();

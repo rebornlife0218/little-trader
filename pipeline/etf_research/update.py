@@ -6,7 +6,7 @@
 
 研究本身在本機的研究資料夾計算(ETF 持股明細、ETF 折溢價表與台股日資料；進出場、成本與資金模擬共用 tw_strategy/events.py)，
 這裡只把研究輸出的結果(淨值、交易統計、報告用的統計表)與報告 Markdown 轉成網頁用的 JSON；不發佈 csv、png 與原始股價。
-報告裡的圖片 ![說明](xxx.png) 由網頁依 JSON 重畫。研究結果不每日更新，研究改版後手動執行：
+報告裡的圖片 ![說明](etf_follow/xxx.png) 由網頁依 JSON 重畫(md 預覽用的 PNG：scripts/md-figs.py)。研究結果不每日更新，研究改版後手動執行：
   python pipeline/run_local.py etf_research        (轉檔、發佈到 data 分支並重新部署)
 研究資料夾預設為 ~/Desktop/ETF_PANEL/CLAUDE/A系列ETF跟單，可用環境變數 ETF_FOLLOW_DIR 指定。
 """

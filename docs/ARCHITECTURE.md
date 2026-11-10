@@ -87,6 +87,7 @@ scripts/briefs.mjs                  研究與策略的公開精簡版：每個�
 scripts/site-map.mjs                在 Node 裡載入頁面程式，列出所有頁面與網址(build-site.mjs 與自動測試共用)
 scripts/check-freshness.mjs         本機排程的資料多久沒更新(check-local.yml 呼叫)
 scripts/check-cm.py                 上傳到 Seeking_Alpha 的每日資料多久沒更新(check-local.yml 呼叫)
+scripts/md-figs.py                  研究報告 md 預覽用的圖(本機執行)：把網頁畫好的圖截成 PNG，放在 pipeline/*/reports/<報告>/(不進版控)
 scripts/share/                      研究的 IG 圖卡(本機執行)：make-share.mjs 產生 IG/<研究>/1～5.png；ig-card.mjs 是圖卡版面、ig-topics.mjs 是各研究的圖卡內容
 tests/                              自動測試(npm test，node:test)：site(頁面註冊、權限清單、defer、外部腳本、#/ 舊網址)、build(部署流程)、functions(來源檢查、會員權限)
 wrangler.toml、package.json         Cloudflare 設定(D1 綁定、Firebase 專案 ID)與本機開發工具(wrangler、jose；esbuild 給自動測試打包 functions/)
@@ -309,6 +310,7 @@ LT.register({
 - **分享研究**：目錄頁的單一內容(研究、策略)在頁首有「分享」按鈕(app.js 的 `share`；登入的會員才有，要密碼的策略沒有)，呼叫 `POST api/share`(`functions/api/share.ts`)產生專屬連結 `/s/<8 碼代碼>`(同一個人分享同一份報告是同一個連結，存在 D1 的 `share_links`)。手機用系統分享選單，電腦複製連結。
   打開連結(`functions/s/[code].ts`)：點開次數 +1(社群網站抓預覽不算)、存 `lt_ref` cookie(30 天)、轉到報告頁；沒登入的人看得到上半部，完整報告的位置是登入提示。登入後看報告時，`api/track` 依 `lt_ref` 記到 `share_views`(誰、看了幾次；分享的人自己不算)。後台「分享紀錄」列出誰分享了哪份報告、點開次數、登入後看的人與新會員(點了連結才第一次登入)。`_routes.json` 已包含 `/s/*`。
 - **IG 圖卡**：`node scripts/share/make-share.mjs [研究 key …]`，在本機開網站並截出圖卡；新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
+- **報告 Markdown 的圖**：寫成 `![說明](<報告>/檔名.png)`(`<報告>` = md 檔名，例如 `rev_drop/cum_return.png`；同一個資料夾的報告圖檔名重複也不會互蓋)。網頁不用 PNG：遇到這行就依 JSON 重畫(只看檔名，各頁面的 `figs` / `drawFigs`)。要在 VS Code、GitHub 預覽 md 時看到圖，在本機執行 `python scripts/md-figs.py [報告 …] [--local] [--light]`：用 Playwright 打開本機網頁的完整報告(請求都被攔截，不啟動伺服器；`api/me` 當作會員，資料預設讀 data 分支上已發佈的版本，`--local` 改用本機 `web/data`；處置股策略的密碼從 `private_strategies.py` 讀進 sessionStorage，不寫進檔案)，把每張圖截成 PNG 放在 md 旁邊的 `<報告>/`，不進版控(`.gitignore`)，重跑時覆蓋、報告不再用到的圖會刪掉。新增研究報告時在 `md-figs.py` 的 `REPORTS` 加一筆(md 路徑 → 網址)，`tests/site.test.mjs` 會檢查。
 - **圖表**：用 `LTChart.line` / `LTChart.bars`(選項見 `chart.js` 開頭註解)，顏色用 CSS 變數，主題切換不用重畫。累積報酬圖的縱軸用 `LTChart.line(el, log => ({ … }))`(傳函式)：主圖左上角小標旁有「對數｜一般」切換鈕(預設一般)，設定全站共用(記在瀏覽器)，同一頁的累積報酬圖一起切換；策略與研究頁的報酬回撤圖(`LTTW.navCharts`)都用這個，頁面上不另放縱軸選單。
 - **公式**：KaTeX 已全域載入，`katex.renderToString('\\sigma^2')`。
 

@@ -26,10 +26,11 @@
   const LSI_HERO = '<b>先講結論</b>：已經有一筆錢時，一次投入大約 2/3 的時間贏過分批投入(定期定額)，等下跌才買(逢低買入)平均更差；怕一次投入的波動，不如先調低股票比重再一次投入。';
   const tagOf = s => `<span class="series-tag"><i style="background:${RSERIES[s].color}"></i>${esc(RSERIES[s].name)}</span>`;
 
-  // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png)
+  // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](<報告>/xxx.png) 換成依 JSON 畫的圖(網站不放 png，只看檔名；
+  // 本機預覽 md 用的 PNG 由 scripts/md-figs.py 產生)
   function md(src) {
     const box = document.createElement('div');
-    src = src.replace(/^!\[([^\]]*)\]\(([\w.-]+\.png)\)[ \t]*$/gm, (_, cap, f) => `
+    src = src.replace(/^!\[([^\]]*)\]\(([^()\s]+\.png)\)[ \t]*$/gm, (_, cap, f) => `
 <figure class="md-fig twr-fig"><div data-fig="${esc(f)}"></div><figcaption>${esc(cap)}</figcaption></figure>
 `);
     box.innerHTML = marked.parse(src);
@@ -186,7 +187,7 @@
         div.insertAdjacentHTML('afterend', LTChart.legend(L));
       },
     };
-    el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig]; if (f) f(div); else div.parentElement.remove(); });
+    el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig.split('/').pop()]; if (f) f(div); else div.parentElement.remove(); });
   }
 
   // 單一研究：ARKK、LSI 用常存 ETF 的資料(lib.js 的 load)，A 系列 ETF 跟單用自己的資料集

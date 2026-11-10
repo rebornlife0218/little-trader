@@ -54,10 +54,11 @@
     const h = B.hero || ((B.report || '').match(/^\s*((?:>.*(?:\r?\n|$))+)/) || [])[1];
     return h ? md(h) : '';
   };
-  // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](xxx.png) 換成依 JSON 畫的圖(網站不放 png，見 drawFigs)
+  // 報告(Markdown)：表格加上站內表格樣式，## → h3、### → h4；圖片 ![說明](<報告>/xxx.png) 換成依 JSON 畫的圖(網站不放 png，見 drawFigs；
+  // 本機預覽 md 用的 PNG 由 scripts/md-figs.py 產生)
   function md(src) {
     const box = document.createElement('div');
-    src = src.replace(/^!\[([^\]]*)\]\(([\w.-]+\.png)\)[ 	]*$/gm, (_, cap, f) => `
+    src = src.replace(/^!\[([^\]]*)\]\(([^()\s]+\.png)\)[ 	]*$/gm, (_, cap, f) => `
 <figure class="md-fig twr-fig"><div data-fig="${esc(f)}"></div><figcaption>${esc(cap)}</figcaption></figure>
 `);
     box.innerHTML = marked.parse(src);
@@ -68,9 +69,9 @@
     box.querySelectorAll('a').forEach(a => { if (!/^https?:/.test(a.getAttribute('href') || '')) a.replaceWith(...a.childNodes); });   // 報告內的相對連結在網站上沒有對應頁面
     return box.innerHTML;
   }
-  // 報告內的圖：figs = { 'xxx.png': el => 畫圖 }，沒有對應的圖就移除
+  // 報告內的圖：figs = { 'xxx.png': el => 畫圖 }(只看檔名，不看前面的資料夾)，沒有對應的圖就移除
   function drawFigs(el, figs) {
-    el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig]; if (f) f(div); else div.parentElement.remove(); });
+    el.querySelectorAll('.twr-fig [data-fig]').forEach(div => { const f = figs[div.dataset.fig.split('/').pop()]; if (f) f(div); else div.parentElement.remove(); });
   }
   // 橫軸日期：跨年的只標年份，同一年內(例如處置股新制後)標月/日
   const dateFmt = d => d[0].slice(0, 4) === d[d.length - 1].slice(0, 4) ? (v, tip) => tip ? v : v.slice(5).replace('-', '/') : (v, tip) => tip ? v : v.slice(0, 4);

@@ -3,7 +3,7 @@
 
 直接用本機 PostgreSQL 計算(cm.tw_daily 日資料、cm.tw_monthly_revenue 月營收、cm.tw_company_info 公告股本)。
 回測規則同 tw_strategy(根目錄 CLAUDE.md「選股回測原則」)：進出場、漲跌停、交易成本與資金模擬都共用 pipeline/tw_strategy/events.py。
-報告(Markdown)在 reports/<key>.md，裡面的 {名稱} 由這裡算出的數字填入；圖片 ![說明](xxx.png) 由網頁依 JSON 畫圖。
+報告(Markdown)在 reports/<key>.md，裡面的 {名稱} 由這裡算出的數字填入；圖片 ![說明](<key>/xxx.png) 由網頁依 JSON 畫圖(md 預覽用的 PNG：scripts/md-figs.py)。
 
 研究：
   rev_pre    營收公告前布局：每月 21 日進場買進綜合分數最高的 10 檔 / 5 檔，營收公告後隔天開盤賣出；不限市值與市值四分位

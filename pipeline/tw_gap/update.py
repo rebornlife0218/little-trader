@@ -4,7 +4,7 @@
 研究本身在本機的研究資料夾計算(台股日資料，還原價；跳空倍數 = 跳空 ÷ 20 日日報酬標準差)，
 這裡只把研究輸出的統計表(output/*.csv、events.parquet)轉成網頁用的 JSON；不發佈 csv、png 與原始股價。
 報告範本 reports/gap.md 依 CLAUDE.md「研究報告」的結構重新編排，表格由這裡依 csv 填入，內文的數字是手寫的，研究數字改變時要同步更新。
-報告裡的圖片 ![說明](xxx.png) 由網頁依 JSON 重畫(tw-research.js 的 gap)。
+報告裡的圖片 ![說明](gap/xxx.png) 由網頁依 JSON 重畫(tw-research.js 的 gap；md 預覽用的 PNG：scripts/md-figs.py)。
 不是回測，沒有淨值。研究結果不每日更新，研究改版後手動執行：
   python pipeline/run_local.py tw_gap        (轉檔、發佈到 data 分支並重新部署)
 另外成一個資料集(不放 tw_research)：tw_research 由另一台電腦每天發佈整個資料夾，放在裡面會被覆蓋。

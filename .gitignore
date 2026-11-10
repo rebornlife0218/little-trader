@@ -10,5 +10,8 @@ node_modules/
 .wrangler/
 .dev.vars
 
+# 研究報告 md 預覽用的圖(scripts/md-figs.py 從網頁截圖，只留在本機；網頁依 JSON 重畫，不用這些 PNG)
+/pipeline/*/reports/*/*.png
+
 # 分享素材(scripts/share/make-share.mjs 產生，只留在本機)
 /IG/

@@ -56,7 +56,7 @@ window.LTNSF = (() => {
     el.querySelector('#nsfBriefLegend').insertAdjacentHTML('beforeend', '<p class="note">救市型的每一次進場：以決議前最後一個收盤為 100，往前 120 個交易日、往後 200 個交易日的加權指數。</p>');
     if (!full) return;   // 訪客：只有上半部
     el.querySelectorAll('.md-fig [data-fig]').forEach(div => {
-      if (div.dataset.fig === '進場前後走勢.png') paths(div, B, ['預防', '跌破均線', '急跌']);
+      if (div.dataset.fig.split('/').pop() === '進場前後走勢.png') paths(div, B, ['預防', '跌破均線', '急跌']);   // 只看檔名(報告寫成 <報告>/xxx.png)
       else div.parentElement.remove();
     });
   }
