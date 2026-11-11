@@ -74,7 +74,8 @@ export async function rateLimit(env: Env, id: Identity, ip: string, waitUntil: (
   // 約 1% 的請求順手清掉 10 分鐘前的計數，資料表不會越長越大
   if (Math.random() < 0.01) {
     waitUntil(env.DB.prepare('DELETE FROM rate_minute WHERE minute < ?1')
-      .bind(new Date(now.getTime() - 10 * 60e3).toISOString().slice(0, 16)).run());
+      .bind(new Date(now.getTime() - 10 * 60e3).toISOString().slice(0, 16)).run()
+      .catch(e => console.error('rate limit cleanup failed', e)));   // 清理失敗不影響這次請求
   }
   const limit = bucket ? bucket.limit : PER_MINUTE[id.kind];
   if ((row?.count ?? 0) <= limit) return null;

@@ -83,6 +83,16 @@ test('會員資料集：訪客 401(meta.json 公開)，登入後可以下載；�
   assert.equal(r.passed, true);
 });
 
+test('次數限制：順手清理舊計數失敗時，背景工作不會丟出錯誤(以前約 1% 的機率讓測試失敗)', async () => {
+  const random = Math.random, jobs = [];
+  Math.random = () => 0;   // 一定觸發清理
+  try {
+    await F.dataMw({ request: req(`/data/${F.ACCESS.memberDatasets[0]}/x.json`, { Cookie: await memberCookie() }), env, next: async () => new Response('ok'), waitUntil: p => jobs.push(p) });
+  } finally { Math.random = random; }
+  assert.ok(jobs.length > 0, '要有清理的背景工作');
+  for (const p of jobs) await p;   // 不能 reject
+});
+
 test('研究與策略：精簡版(brief/)訪客可以下載，完整報告要登入；用編碼過的路徑也繞不過', async () => {
   for (const ds of F.ACCESS.memberDatasets) {
     let r = await call(F.dataMw, req(`/data/${ds}/brief/x.json`));
