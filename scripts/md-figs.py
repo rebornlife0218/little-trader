@@ -39,6 +39,7 @@ REPORTS = {
     'pipeline/tw_research/reports/rev_drop.md': 'stock/tw-research/rev_drop',
     'pipeline/tw_research/reports/rev_turn.md': 'stock/tw-research/rev_turn',
     'pipeline/tw_gap/reports/gap.md': 'stock/tw-research/gap',
+    'pipeline/tw_dip/reports/dip.md': 'stock/tw-research/dip',
     'pipeline/tw_research/reports/disp_kbar.md': 'stock/disposition/kbar',
     'pipeline/tw_research/reports/disp.md': 'stock/disposition/strategy',
     'pipeline/etf_research/reports/etf_follow.md': 'etf/research/etf_follow',

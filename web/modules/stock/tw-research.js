@@ -1,5 +1,5 @@
 /* 股票 · 台股 · 其他研究：依主題(營收、跳空、因子、事件、機器學習)分類的研究(資料集 tw_research，pipeline/tw_research/update.py；
-   跳空與隔夜報酬用資料集 tw_gap，pipeline/tw_gap/update.py)
+   跳空與隔夜報酬用資料集 tw_gap，pipeline/tw_gap/update.py；大跌後抄底選股用資料集 tw_dip，pipeline/tw_dip/update.py)
    目錄頁(LT.catalog)：依主題分組的研究卡片，點進去是單一研究；同一系列的研究標同一個顏色。
    淨值與交易統計已在 pipeline 用本機資料庫算好(整數股、交易成本與資金規則同台股策略，根目錄 CLAUDE.md)，網頁端只計算績效統計、畫圖與顯示報告(Markdown)。
    績效統計與圖表共用 tw-strategy.js 的 LTTW。新增研究：pipeline 加一個 <key>.json，這裡的 CATS 加一筆(run = 畫面函式)
@@ -9,7 +9,7 @@
   const W = () => window.LTTW;
   const DATASET = 'tw_research';
   // 系列：同一系列的研究用同一個顏色標記
-  const SERIES = { rev: { name: '營收系列', color: 'var(--amber)' }, disp: { name: '處置股', color: '#B07CF0' }, gap: { name: '跳空', color: '#5fd0c5' } };
+  const SERIES = { rev: { name: '營收系列', color: 'var(--amber)' }, disp: { name: '處置股', color: '#B07CF0' }, gap: { name: '跳空', color: '#5fd0c5' }, dip: { name: '大跌抄底', color: '#F06FB0' } };
   const CATS = [
     { key: 'revenue', name: '營收', desc: '月營收公告前後的股價行為與選股', studies: [
       { key: 'rev_pre', name: '營收公告前布局', series: 'rev', desc: '月底先買進預期營收會好的股票，營收公告後隔天開盤賣出', summary: '營收可以事先預測，但不限市值時輸給 0050；只在市值第二小的一群裡選股，才和 0050 相當', run: (...a) => revPre(...a) },
@@ -21,7 +21,9 @@
       { key: 'gap', name: '跳空與隔夜報酬', series: 'gap', desc: '開盤跳空幾倍標準差，和當天收盤買、隔天開盤賣的隔夜報酬有沒有關係', summary: '跳空越大當天越會回吐，但隔夜報酬和沒跳空的日子差不多；差別主要來自收盤有沒有鎖漲跌停', run: (...a) => gap(...a) },
     ] },
     { key: 'factor', name: '因子', desc: '橫斷面因子選股', studies: [] },
-    { key: 'event', name: '事件', desc: '特定事件前後的股價表現', studies: [] },
+    { key: 'event', name: '事件', desc: '特定事件前後的股價表現', studies: [
+      { key: 'dip', name: '大跌後抄底選股', series: 'dip', desc: '指數跌深、融資大減的訊號出現時，依跌幅、營收成長、投信持股、融資使用率四個因子挑股', summary: '大跌訊號後挑跌深、營收成長、投信抱著、融資用得滿的股票，每次大跌幾乎都贏 0050；但訊號很少、資金大多閒置', run: (...a) => dip(...a) },
+    ] },
     { key: 'ml', name: '機器學習', desc: '用模型預測報酬', studies: [] },
   ];
   const tag = s => `<span class="series-tag"><i style="background:${SERIES[s].color}"></i>${esc(SERIES[s].name)}</span>`;
@@ -584,6 +586,114 @@
       'vol_ov.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].ov, color: VC[q] })), { label: '隔夜平均報酬(排除收漲跌停)', y: '隔夜平均報酬' }),
       'vol_fill.png': div => bars(div, ks, VOLS.map(q => ({ name: q, y: B.vol[q].fill0, color: VC[q] })), { rate: true, label: '當天回到實體 K 棒內的比例', y: '回到實體的比例' }),
     });
+  }
+  /* ---------- 大跌後抄底選股(資料集 tw_dip 的 dip.json)：融資大減訊號時買跌幅＋基本面＋投信＋融資(或不看融資)第 10 組 × 持有 60 / 20 日 ----------
+     資金規則同台股策略(本金 100 萬、複利、1 ÷ 平均一天持有檔數的上限)，和 0050 買進持有比；進場是使用者指定的例外：隔天開盤一律買得到，開盤跌停不買 */
+  // T.sig = [[訊號日, 實際買進檔數, 勝率, 每筆平均, 最好, 最差, 0050 同樣進出場的報酬]]
+  const dipCards = (T, Sx) => {
+    const { card, stats, vs0050Cards, tradeCards } = W(), t = T.ts, wins = (T.sig || []).filter(r => r[3] > r[6]).length;
+    return vs0050Cards(stats(T.nav), Sx, t) + (T.sig ? card(`${wins} / ${T.sig.length} 次`, '每次大跌贏 0050', `同樣持有 ${T.h} 日、都扣成本`, wins * 2 > T.sig.length ? 'up' : '') : '')
+      + tradeCards(t) + extraCards({ ...t, fail: 0 }) + (t.fail ? card(`${t.fail.toLocaleString()} 筆`, '隔天開盤跌停不買', '放棄的訊號') : '');
+  };
+  const dipSigTable = T => {
+    const { pct, cls } = W();
+    return `<div class="tablewrap"><table class="stattable us-strat"><thead><tr><th>訊號日</th><th>檔數</th><th>勝率</th><th>每筆平均</th><th>最好 / 最差</th><th>0050 ${T.h} 日</th><th>相差</th></tr></thead><tbody>
+      ${T.sig.map(([d, n, w, m, hi, lo, b]) => `<tr><td>${d.replace(/-/g, '/')}</td><td>${n}</td><td>${(w * 100).toFixed(0)}%</td><td class="${cls(m)} ${m > b ? 'beat' : ''}">${pct(m, 1)}</td>
+        <td>${pct(hi, 0)} / ${pct(lo, 0)}</td><td class="${cls(b)}">${pct(b, 1)}</td><td class="${cls(m - b)}">${((m - b) * 100).toFixed(1)}</td></tr>`).join('')}
+      </tbody></table></div><p class="note">檔數是實際買進的檔數(扣掉隔天開盤跌停沒買的)；每筆平均含加減碼與成本；0050 = 同樣隔天開盤買、第 ${T.h} 個交易日收盤賣，扣成本、含股息；相差 = 每筆平均 − 0050(百分點)。</p>`;
+  };
+  async function dip(el, ctx, S) {
+    const [B, full] = await load(el, ctx, 'dip', 'tw_dip');
+    if (!B) return;
+    const C = SERIES.dip.color;
+    let k = B.strats[0].key;
+    el.innerHTML = `
+      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
+        ['邏輯', '指數跌深、融資又被大量斷頭砍出的那幾天，挑跌得深、營收還在成長、投信抱著、大跌前融資用得滿的股票，等被錯殺的股票補漲。'],
+        ['進出場', '大跌訊號出現的隔天開盤買進(開盤跌停的不買)，持有一段時間後收盤賣出；沒有訊號時持有現金。'],
+        ['停利停損', NO_STOP], ['持有期間', '約一季。']] })}
+      ${!full ? LT.reportLock() : `<div class="panel">
+        <h3>${esc(S.name)} ${tag(S.series)}</h3>
+        <div class="doc">
+          <p><b>規則</b>：融資金額單日變化 z ≥ 3、加權指數收盤跌破布林下軌、收盤離當天低點 ≥ 25% 的訊號日收盤，在可買股票(近 5 日平均成交量 ≥ 500 張或平均成交金額 > 5,000 萬、上市櫃滿 120 個交易日)裡依「20 日乖離(越負越前面)」、「近 3 個月營收年增率平均」、「投信持股比率」、「5 個交易日前的融資使用率」四個因子的百分位平均排名，取前 10%；隔天開盤買進，第 60 或 20 個交易日收盤賣出。另比較不看融資的跌幅＋基本面＋投信。</p>
+          <p><b>進場(使用者指定)</b>：隔天開盤一律當作買得到(開盤漲停也買)，只有隔天開盤跌停不買。</p>
+          <p><b>資金分配</b>：每檔上限 = 前一天收盤總資產 ÷ 平均一天持有檔數(只用進場日之前的持股紀錄、只算有部位的日子；之前有部位的日子不到 20 個交易日時上限 20%)；有新股票進場的那天，新股票的目標金額 = 前一天收盤總資產 × min(上限, 1 ÷ 持有檔數)；先用現金買，現金不夠時差額由舊持股平均分攤(每檔減碼相等的金額，以整數股調整)。${MONEY}</p>
+        </div>
+        <div class="paramgrid opt-form" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:12px;">
+          <div class="paramitem"><label for="twrS">版本</label><select id="twrS">${B.strats.map(s => `<option value="${esc(s.key)}">${esc(s.name)}</option>`).join('')}</select></div>
+        </div>
+      </div>
+      <div id="twrView"></div>
+      <div class="panel"><h3>四個版本比較</h3><div id="twrAll"></div></div>
+      ${reportPanel(S, B.report)}`}`;
+    const $ = s => el.querySelector(s);
+    const T0 = B.strats[0];
+    briefChart(el, B.d, T0.nav, B.b0050, T0.name, C, null);
+    $('#twrBriefStats').innerHTML = dipCards(T0, W().stats(B.b0050));
+    if (!full) return;   // 訪客：只有上半部(近期明細也要登入)
+    // 近期明細：主策略的交易，最新的在前；最新一次訊號還沒進場的股票框起來排最前面(下個交易日開盤買進)
+    const up = T0.upcoming || [], nextTag = '<span class="next-tag">下個交易日開盤買進</span>', ymd = v => v ? v.replace(/-/g, '/') : '—';
+    $('#twrRecentNote').textContent = `${T0.name}；最新進場的在最前面。${up.length ? `框起來的是 ${ymd(B.current)} 訊號選出、下個交易日開盤要買進的 ${up.length} 檔(開盤跌停的不買)。` : ''}`;
+    LT.moreTable($('#twrRecent'), ['代號', '名稱', '訊號日', '買進(開盤)', '賣出(收盤)', '20 日乖離', '報酬'], [
+      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${nextTag}</td><td>${ymd(u[2])}</td><td>—</td><td>—</td><td class="down">${W().pct(u[3], 1)}</td><td>—</td></tr>`),
+      ...T0.trades.slice().reverse().map(r => `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${ymd(r[2])}</td><td>${ymd(r[3])}</td>
+        <td>${r[4] ? ymd(r[4]) + (r[6] === 'delist' ? ' <small class="mute">下市櫃</small>' : '') : '<small class="mute">持有中</small>'}</td><td>—</td><td class="${W().cls(r[5])}">${W().pct(r[5], 2)}</td></tr>`)]);
+    function draw() {
+      const { stats, vs0050Txt, navCharts } = W();
+      const T = B.strats.find(s => s.key === k), x = stats(T.nav), Sx = stats(B.b0050);
+      $('#twrView').innerHTML = `
+        <div class="panel">
+          <h3>${esc(T.name)}</h3>
+          <div class="statgrid" style="margin:12px 0;">${dipCards(T, Sx)}</div>
+          <ul class="insight"><li>${vs0050Txt(B.d[1], B.asof, x, Sx)}。</li></ul>
+          <h4>累積報酬與回撤：${esc(T.name)} vs 0050</h4>
+          <div id="twrChart"></div><div id="twrLegend"></div>
+          <h4>每年報酬</h4>
+          ${yearTableHtml(B.d, [{ name: T.name, nav: T.nav, cmp: true }], B.b0050)}
+          <h4>每次大跌：和 0050 比</h4>
+          ${dipSigTable(T)}
+        </div>`;
+      navCharts({ d: B.d, i0: 0, navs: { s: T.nav, b0050: B.b0050 }, meta: { s: { name: T.name, color: C }, b0050: { name: '0050 買進持有', color: C0050 } },
+        main: 's', chart: $('#twrChart'), legend: $('#twrLegend') });
+      $('#twrAll').innerHTML = compareTable(B.strats.map(s => ({ name: s.name, nav: s.nav, ts: s.ts, main: s.key === k })), Sx);
+    }
+    // 十分位：每個條件一張小長條圖(第 1～10 組的超額，紅漲綠跌)，看是否一路變好
+    const pc1 = v => Number.isFinite(v) ? W().pct(v, 1) : '—';
+    const grid = (div, tbl) => {
+      const m = Math.max(...B.names.flatMap(n => tbl[n]).filter(Number.isFinite).map(Math.abs)) * 1.1;
+      div.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px 14px;">${B.names.map(() => '<div></div>').join('')}</div>`;
+      [...div.firstChild.children].forEach((box, i) => {
+        const n = B.names[i], y = tbl[n];
+        LTChart.bars(box, { x: y.map((_, j) => String(j + 1)), xAll: true, xFmt: v => v, title: n, height: 170, yMin: -m, yMax: m, refY: [{ y: 0 }],
+          yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v, j) => `第 ${j + 1} 組：${pc1(v)}`,
+          series: [{ name: n, y, colors: y.map(v => v >= 0 ? 'var(--up)' : 'var(--down)') }] });
+      });
+      div.insertAdjacentHTML('beforeend', '<p class="note">橫軸：第 1 組 → 第 10 組(第 10 組 = 跌最深／營收成長最多／投信持股比率最高／融資使用率最高；組合 = 各條件百分位排名平均最高)；縱軸：和同一天全部可買股票比的超額報酬(扣成本)。</p>');
+    };
+    const HC = ['#94a3b8', '#B07CF0', C, 'var(--amber)'];
+    drawFigs(el, {
+      '重點.png': div => {
+        const ss = ['5', '20', '60', '120'].map((h, i) => ({ name: `${h} 日`, color: HC[i], y: B.top[h] }));
+        LTChart.bars(div, { x: B.names, xAll: true, xFmt: v => v, label: '第 10 組超額', height: 260, refY: [{ y: 0 }], yFmt: v => (v * 100).toFixed(0) + '%',
+          tipFmt: (s, v) => `${s.name}：${pc1(v)}`, series: ss });
+        div.insertAdjacentHTML('afterend', LTChart.legend(ss));
+      },
+      '十分位_60日.png': div => grid(div, B.dec['60']),
+      '十分位_20日.png': div => grid(div, B.dec['20']),
+      '十分位_60日_只看指數跌深.png': div => grid(div, B.ctl),
+      '每次大跌.png': div => {   // 持有 60／20 日各一張，兩個選股版本的每筆平均 vs 0050(同樣進出場)
+        div.innerHTML = '<div></div><div style="margin-top:14px;"></div>';
+        [60, 20].forEach((h, j) => {
+          const S2 = B.strats.filter(s => s.h === h), sig = S2[0].sig;
+          const ss = [...S2.map((s, i) => ({ name: s.name.split('｜')[0], color: [C, 'var(--amber)'][i], y: s.sig.map(r => r[3]) })), { name: '0050', color: CEW, y: sig.map(r => r[6]) }];
+          LTChart.bars(div.children[j], { x: sig.map(r => r[0].replace(/-/g, '/')), xAll: true, xFmt: v => v, title: `持有 ${h} 日`, height: 240, refY: [{ y: 0 }],
+            yFmt: v => (v * 100).toFixed(0) + '%', tipFmt: (s, v) => `${s.name}：${pc1(v)}`, series: ss });
+          if (j) div.children[j].insertAdjacentHTML('afterend', LTChart.legend(ss));
+        });
+      },
+    });
+    $('#twrS').onchange = () => { k = $('#twrS').value; draw(); };
+    draw();
   }
   window.LTTWR = { disp, dispKbar };
 })();

@@ -51,6 +51,9 @@ export const BRIEFS = {
   // 跳空與隔夜報酬(stock/tw-research.js)：精簡版只有各組的隔夜平均
   tw_gap: (f, j) => f === 'gap.json'
     ? withHero({ ...pick(j, ['asof', 'start', 'n', 'bins', 'down', 'up']), all: pick(j.all, ['n', 'ov']), nl: pick(j.nl, ['n', 'ov']) }, j) : null,
+  // 大跌後抄底選股(stock/tw-research.js)：精簡版只有主策略(跌幅＋基本面＋投信＋融資｜持有 60 日)的淨值、交易統計、每次大跌 vs 0050 與 0050 淨值；交易明細與即將進場的股票要登入
+  tw_dip: (f, j) => f === 'dip.json'
+    ? { ...withHero(pick(j, ['asof', 'd', 'b0050']), j), strats: [pick(j.strats[0], ['key', 'name', 'h', 'nav', 'ts', 'sig'])] } : null,
   // 大盤漲跌分析的研究：國安基金進場(indices/nsf.js)的精簡版只有走勢圖；大跌反彈和融資(indices/margin.js)只有重點圖與最近一次訊號日
   index_research: (f, j) => f === 'nsf.json' ? withHero(pick(j, ['asof', 'x', 'paths']), j)
     : f === 'margin.json' ? withHero(pick(j, ['asof', 'key', 'last']), j) : null,

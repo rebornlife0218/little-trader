@@ -2,6 +2,6 @@
   "說明": "訪客與會員的權限(唯一的設定處)：後端擋檔案(functions/)、部署時產生 _routes.json、精簡版與 GitHub Pages 的公開版(scripts/build-site.mjs)、網頁載入程式(/api/me 回傳)都讀這裡。目前所有區塊都公開，只有研究與策略的完整報告(memberDatasets 的完整檔)要登入；精簡版在 data/<資料集>/brief/(scripts/briefs.mjs)",
   "memberSections": [],
   "memberScripts": [],
-  "memberDatasets": ["etf_research", "sp500", "tw_strategy", "tw_research", "tw_gap", "index_research"],
+  "memberDatasets": ["etf_research", "sp500", "tw_strategy", "tw_research", "tw_gap", "tw_dip", "index_research"],
   "adminScripts": ["modules/admin/admin.js"]
 }

@@ -85,6 +85,11 @@ test('精簡版的先講結論：只取報告開頭的 > 引言', async () => {
   const b = BRIEFS.tw_gap('gap.json', { asof: 'x', start: 'y', n: 1, bins: [], all: { n: [1], ov: [2], intra: [3] }, nl: { n: [1], ov: [2], intra: [3] }, fill: {}, vol: {}, report: '> **先講結論**：丙\n\n## 一、研究目的\n機密' });
   assert.equal(b.hero, '> **先講結論**：丙');
   assert.ok(!('report' in b) && !('fill' in b) && !('intra' in b.all), '精簡版不能有完整報告的欄位');
+  const dp = BRIEFS.tw_dip('dip.json', { asof: 'x', d: [], b0050: [1], signals: [], current: 'y', dec: {}, top: {}, ctl: {}, report: '> **先講結論**：庚\n\n## 一、研究目的\n機密',
+    strats: [{ key: 'fim_60', name: 'a', h: 60, nav: [1], ts: {}, sig: [], trades: [['2330', '台積電']], upcoming: [['2330', '台積電']] }, { key: 'fi_20', nav: [1] }] });
+  assert.equal(dp.hero, '> **先講結論**：庚');
+  assert.deepEqual(Object.keys(dp).sort(), ['asof', 'b0050', 'd', 'hero', 'strats'], '大跌後抄底選股：精簡版只有主策略與 0050');
+  assert.deepEqual(Object.keys(dp.strats[0]).sort(), ['h', 'key', 'name', 'nav', 'sig', 'ts'], '大跌後抄底選股：交易明細與即將進場的股票要登入');
   const n = BRIEFS.index_research('nsf.json', { asof: 'x', x: [0], paths: [], events: [{ b240: -0.2 }], report: '> **先講結論**：丁\n\n## 一、研究目的\n機密' });
   assert.equal(n.hero, '> **先講結論**：丁');
   assert.ok(!('report' in n) && !('events' in n), '國安基金進場：精簡版只有走勢圖');
