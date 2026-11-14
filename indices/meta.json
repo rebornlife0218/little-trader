@@ -1,0 +1,101 @@
+{
+  "dataset": "indices",
+  "updated_at": "2026-11-14 18:02",
+  "version": "202611141802",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "國際指數彙整資料",
+    "url": ""
+  },
+  "schedule": "週二~六 11:00、週一~五 18:30",
+  "indices": {
+    "TAIEX": {
+      "rows": 14976,
+      "first": "1971-01-05",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交金額(元)"
+    },
+    "SP500": {
+      "rows": 24843,
+      "first": "1927-12-30",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "NASDAQ": {
+      "rows": 14064,
+      "first": "1971-02-05",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "NK225": {
+      "rows": 10524,
+      "first": "1984-01-04",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "KOSPI50": {
+      "rows": 7244,
+      "first": "1997-07-01",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "HSI": {
+      "rows": 9865,
+      "first": "1986-12-31",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "SSEC": {
+      "rows": 8773,
+      "first": "1990-12-19",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "STI": {
+      "rows": 9270,
+      "first": "1990-01-02",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "STOXX50": {
+      "rows": 6883,
+      "first": "2000-01-03",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    },
+    "FTSE100": {
+      "rows": 10801,
+      "first": "1984-04-02",
+      "last": "2026-11-13",
+      "has_volume": true,
+      "source": "國際指數彙整資料",
+      "volume": "成交量"
+    }
+  },
+  "extra": {
+    "TAIEX_TR": {
+      "rows": 5873,
+      "first": "2003-01-02",
+      "last": "2026-11-13",
+      "source": "臺灣證券交易所 發行量加權股價報酬指數"
+    }
+  }
+}

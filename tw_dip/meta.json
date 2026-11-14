@@ -1,0 +1,12 @@
+{
+  "dataset": "tw_dip",
+  "updated_at": "2026-11-12 17:12",
+  "version": "202611121712",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "台股日資料與月營收(本機計算)",
+    "url": ""
+  },
+  "schedule": "不定期(研究更新時手動執行)",
+  "asof": "2026-11-06"
+}

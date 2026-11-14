@@ -1,0 +1,12 @@
+{
+  "dataset": "index_research",
+  "updated_at": "2026-11-14 02:42",
+  "version": "202611140242",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "加權指數(indices 資料集)",
+    "url": ""
+  },
+  "schedule": "週一~五 19:30(加權指數更新之後)",
+  "asof": "2026-11-13"
+}
