@@ -20,9 +20,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = 'rebornlife0218/little-trader'
-DATASETS = ['tw_strategy', 'disposition', 'tw_research:disp', 'etf_compare', 'price_query']
+DATASETS = ['tw_strategy', 'disposition', 'tw_research:disp', 'tw_dip:live', 'etf_compare', 'price_query']
 # tw_research:disp 每天只重跑處置股策略(策略頁要列出隔天進場的處置股)，其他台股研究不定期手動執行 run_local.py tw_research；
 # 發佈時仍是整個 web/data/tw_research/ 資料夾(其他研究用本機上次算好的檔案)
+# tw_dip:live 每天只更新大跌後抄底選股近期明細的報酬(研究本身由研究資料夾所在的電腦手動執行 run_local.py tw_dip)
 # price_query 不發佈到 data 分支：pipeline/price_query/sync.py 直接寫進 Cloudflare D1(股票查詢頁)；
 # wrangler.toml 還沒填 D1 的 database_id(尚未建立資料庫)時略過
 LOG = Path.home() / '.cache' / 'little-trader' / 'local.log'

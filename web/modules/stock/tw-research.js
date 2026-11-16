@@ -631,13 +631,22 @@
     briefChart(el, B.d, T0.nav, B.b0050, T0.name, C, null);
     $('#twrBriefStats').innerHTML = dipCards(T0, W().stats(B.b0050));
     if (!full) return;   // 訪客：只有上半部(近期明細也要登入)
-    // 近期明細：主策略的交易，最新的在前；最新一次訊號還沒進場的股票框起來排最前面(下個交易日開盤買進)
-    const up = T0.upcoming || [], nextTag = '<span class="next-tag">下個交易日開盤買進</span>', ymd = v => v ? v.replace(/-/g, '/') : '—';
-    $('#twrRecentNote').textContent = `${T0.name}；最新進場的在最前面。${up.length ? `框起來的是 ${ymd(B.current)} 訊號選出、下個交易日開盤要買進的 ${up.length} 檔(開盤跌停的不買)。` : ''}`;
+    // 近期明細：主策略的交易，最新的在前；最新一次訊號選出的股票與持有中的交易，報酬依每天收盤更新(live，pipeline 每天算)
+    // 框起來排最前面：還沒進場的(下個交易日開盤買進)、到期或跌停延後中的(下個交易日收盤賣出)
+    const up = T0.upcoming || [], ymd = v => v ? v.replace(/-/g, '/') : '—', nt = t => `<span class="next-tag">${t}</span>`;
+    const bias = Object.fromEntries(up.map(u => [u[0], u[3]])), mute = t => `<small class="mute">${t}</small>`;
+    const live = T0.live || [...up.map(u => [u[0], u[1], u[2], null, null, null, 'wait']), ...T0.trades.filter(r => !r[4]).map(r => [r[0], r[1], r[2], r[3], null, r[5], 'hold'])];
+    const NOTE = { wait: nt('下個交易日開盤買進'), sell: nt('下個交易日收盤賣出') }, ORDER = { wait: 0, sell: 0, hold: 1, done: 1, fail: 2 };
+    const liveRow = ([s, n, sig, din, dout, r, st]) => `<tr${NOTE[st] ? ' class="next-act"' : ''}><td>${LT.stockLink(s)}</td><td>${esc(n)}${NOTE[st] || ''}</td><td>${ymd(sig)}</td>
+      <td>${st === 'fail' ? mute('開盤跌停不買') : ymd(din)}</td><td>${dout ? ymd(dout) : st === 'hold' || st === 'sell' ? mute('持有中') : '—'}</td>
+      <td class="${bias[s] != null ? 'down' : ''}">${bias[s] != null ? W().pct(bias[s], 1) : '—'}</td><td class="${r == null ? '' : W().cls(r)}">${r == null ? '—' : W().pct(r, 2)}</td></tr>`;
+    const nWait = live.filter(r => r[6] === 'wait').length;
+    $('#twrRecentNote').textContent = `${T0.name}；最新進場的在最前面。` + (B.live_asof ? `持有中的報酬以 ${ymd(B.live_asof)} 收盤計(扣成本，不含加減碼)。` : '')
+      + (nWait ? `框起來的是 ${ymd(B.current)} 訊號選出、下個交易日開盤要買進的 ${nWait} 檔(開盤跌停的不買)。` : live.some(r => r[6] === 'sell') ? '框起來的是下個交易日收盤要賣出的股票。' : '');
     LT.moreTable($('#twrRecent'), ['代號', '名稱', '訊號日', '買進(開盤)', '賣出(收盤)', '20 日乖離', '報酬'], [
-      ...up.map(u => `<tr class="next-act"><td>${LT.stockLink(u[0])}</td><td>${esc(u[1])}${nextTag}</td><td>${ymd(u[2])}</td><td>—</td><td>—</td><td class="down">${W().pct(u[3], 1)}</td><td>—</td></tr>`),
-      ...T0.trades.slice().reverse().map(r => `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${ymd(r[2])}</td><td>${ymd(r[3])}</td>
-        <td>${r[4] ? ymd(r[4]) + (r[6] === 'delist' ? ' <small class="mute">下市櫃</small>' : '') : '<small class="mute">持有中</small>'}</td><td>—</td><td class="${W().cls(r[5])}">${W().pct(r[5], 2)}</td></tr>`)]);
+      ...live.slice().sort((a, b) => ORDER[a[6]] - ORDER[b[6]]).map(liveRow),
+      ...T0.trades.filter(r => r[4]).reverse().map(r => `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${ymd(r[2])}</td><td>${ymd(r[3])}</td>
+        <td>${ymd(r[4]) + (r[6] === 'delist' ? ' <small class="mute">下市櫃</small>' : '')}</td><td>—</td><td class="${W().cls(r[5])}">${W().pct(r[5], 2)}</td></tr>`)]);
     function draw() {
       const { stats, vs0050Txt, navCharts } = W();
       const T = B.strats.find(s => s.key === k), x = stats(T.nav), Sx = stats(B.b0050);
