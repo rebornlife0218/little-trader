@@ -17,7 +17,7 @@ export const onRequestGet: PagesFunction<Env, string, Data> = async ({ request, 
   if (!env.DB) return json({ error: 'not_configured' }, 503);
   const q = new URL(request.url).searchParams;
   const symbol = (q.get('symbol') ?? '').trim().toUpperCase();
-  if (!/^[0-9A-Z]{4,6}$/.test(symbol)) return json({ error: 'bad_symbol' }, 400);
+  if (!/^[0-9A-Z]{3,6}$/.test(symbol)) return json({ error: 'bad_symbol' }, 400);   // 3 碼是加權指數 TSE
 
   const policy = POLICY[data.identity.kind];
   const earliest = taipeiDate(-policy.maxDays);

@@ -70,7 +70,7 @@
     function draw() {
       const C = k => LT.cssVar(k);
       const dpr = window.devicePixelRatio || 1, W = Math.max(300, wrap.clientWidth);
-      const panels = PANELS.filter(p => opts.panels.has(p.key) && R[p.key]);
+      const panels = PANELS.filter(p => (J.index || opts.panels.has(p.key)) && R[p.key]);   // 加權指數沒有隱藏按鈕，成交金額一律顯示
       const PH = 300, SH = 66, GAP = 8, AX = 18;
       const H = PH + panels.length * (SH + GAP) + AX;
       canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.height = H + 'px';
@@ -153,7 +153,7 @@
           for (let i = s; i <= e; i++) { const v = R[pn.key][i]; if (!Number.isFinite(v)) { on = false; continue; } if (on) g.lineTo(xAt(i), ys(v)); else g.moveTo(xAt(i), ys(v)); on = true; }
           g.strokeStyle = C(pn.color); g.lineWidth = 1.4; g.stroke(); g.lineWidth = 1;
         }
-        g.fillStyle = C('--dim'); g.fillText(pn.name + '(張)', padL + 4, t0 + 10);
+        g.fillStyle = C('--dim'); g.fillText(J.index && pn.key === 'v' ? '成交金額(億元)' : pn.name + '(張)', padL + 4, t0 + 10);
         g.fillStyle = C('--mute'); g.fillText(short(b), 4, t0 + 10); g.fillText(short(a), 4, t0 + SH - 2);
         top += SH + GAP;
       });
@@ -234,7 +234,7 @@
       try { last = localStorage.getItem('lt.query.symbol') || last; range = localStorage.getItem('lt.query.range') || range; } catch (e) {}
       // 從其他頁面的代號連結過來(stock/query/<代號>)：直接查這一檔，並顯示「返回」按鈕
       const fromLink = (LT.path()[2] || '').toUpperCase();
-      if (/^[0-9A-Z]{4,6}$/.test(fromLink)) last = fromLink;
+      if (/^[0-9A-Z]{3,6}$/.test(fromLink)) last = fromLink;
       let back = null;
       try { back = JSON.parse(sessionStorage.getItem('lt.query.back') || 'null'); } catch (e) {}
       if (!fromLink || !back || typeof back.url !== 'string' || back.url.startsWith('stock/query')) back = null;
@@ -245,11 +245,11 @@
         ${back ? `<button type="button" class="pq-back acct-link">← 返回${esc(back.name)}</button>` : ''}
         <header class="top"><div>
           <h1>股票查詢</h1>
-          <p>上市櫃股票與 ETF 的價量、外資與投信買賣超、融資券、借券，以及月營收、除權息、暫停交易、處置，2016 年起(含已下市櫃)</p>
+          <p>上市櫃股票與 ETF 的價量、外資與投信買賣超、融資券、借券，以及月營收、除權息、暫停交易、處置，2016 年起(含已下市櫃)；加權指數的代號是 TSE</p>
         </div></header>
         <div class="panel">
           <form class="pq-form" autocomplete="off">
-            <label class="pq-sym"><span>股票代號或名稱</span><input id="pqSym" list="pqList" value="${esc(last)}" placeholder="例如 2330 或 台積電" required><datalist id="pqList"></datalist></label>
+            <label class="pq-sym"><span>股票代號或名稱</span><input id="pqSym" list="pqList" value="${esc(last)}" placeholder="例如 2330、台積電或 TSE" required><datalist id="pqList"></datalist></label>
             <div class="pq-range btnrow-l">${RANGES.map(([k, t]) => `<button type="button" data-r="${k}" class="${k === range ? 'active' : ''}">${t}</button>`).join('')}</div>
             <label><span>起</span><input id="pqFrom" type="date" min="2016-01-01"></label>
             <label><span>迄</span><input id="pqTo" type="date" min="2016-01-01"></label>
@@ -280,7 +280,7 @@
       // 輸入名稱時換成代號
       const toSymbol = v => {
         v = v.trim();
-        const m = v.match(/^([0-9A-Za-z]{4,6})\b/);
+        const m = v.match(/^([0-9A-Za-z]{3,6})\b/);   // 3 碼：加權指數 TSE
         if (m) return m[1].toUpperCase();
         const hit = list.find(x => x.name === v) || list.find(x => x.name && x.name.includes(v));
         return hit ? hit.symbol : v;
@@ -311,6 +311,7 @@
 
       function render(j) {
         const R = j.rows, n = R.d.length;
+        j.index = j.market === '指數';   // 加權指數(TSE)：只有價格與成交金額，沒有法人、融資券、事件；還原價 = 收盤，不顯示切換
         const tags = [j.market && `<span class="pq-tag">${esc(j.market)}</span>`, j.capital && `<span class="pq-cap">股本 ${num(j.capital)} 億</span>`,
                       j.delisted && '<span class="soon-tag">已下市櫃</span>'].filter(Boolean).join('');
         const title = `<span class="pq-code">${esc(j.symbol)}</span> ${esc(j.name)} ${tags}`;
@@ -326,28 +327,28 @@
             <p class="mute" style="margin-top:-4px;">${R.d[i0]} ～ ${R.d[last]}，${(n - i0).toLocaleString()} 個交易日${j.truncated ? '(超出可查詢的期間，已從可查詢的第一天開始)' : ''}</p>
             <div class="statgrid" style="margin:12px 0;">
               ${card(num(R.c[last]), `最新收盤(${R.d[last].slice(5).replace('-', '/')})`)}
-              ${card(pct(a1 / a0 - 1), '含息報酬(還原股價)', cls(a1 / a0 - 1))}
-              ${years >= 1 ? card(pct((a1 / a0) ** (1 / years) - 1), '年化含息報酬', cls(a1 / a0 - 1)) : ''}
-              ${card(sint(sum('f')), '外資累計買賣超(張)', cls(sum('f')))}
-              ${card(sint(sum('t')), '投信累計買賣超(張)', cls(sum('t')))}
+              ${card(pct(a1 / a0 - 1), j.index ? '指數漲跌(不含股息)' : '含息報酬(還原股價)', cls(a1 / a0 - 1))}
+              ${years >= 1 ? card(pct((a1 / a0) ** (1 / years) - 1), j.index ? '年化漲跌(不含股息)' : '年化含息報酬', cls(a1 / a0 - 1)) : ''}
+              ${j.index ? '' : `${card(sint(sum('f')), '外資累計買賣超(張)', cls(sum('f')))}
+              ${card(sint(sum('t')), '投信累計買賣超(張)', cls(sum('t')))}`}
             </div>
             <div class="pq-toolbar">
-              <div class="btnrow-l pq-mode">${[['raw', '原始價'], ['adj', '還原價']].map(([k, t]) => `<button type="button" data-m="${k}" class="${opts.mode === k ? 'active' : ''}">${t}</button>`).join('')}</div>
+              ${j.index ? '' : `<div class="btnrow-l pq-mode">${[['raw', '原始價'], ['adj', '還原價']].map(([k, t]) => `<button type="button" data-m="${k}" class="${opts.mode === k ? 'active' : ''}">${t}</button>`).join('')}</div>`}
               <div class="pq-legend">${MAS.map(p => `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
-                <span><b class="up">◆</b><b class="down">◆</b> 月營收公告(年成長 / 衰退)</span><span><b style="color:var(--blue)">息</b> 除權息</span><span><b class="mute">停</b> 暫停交易</span><span><i class="dot" style="background:var(--amber)"></i>處置期間</span></div>
+                ${j.index ? '' : '<span><b class="up">◆</b><b class="down">◆</b> 月營收公告(年成長 / 衰退)</span><span><b style="color:var(--blue)">息</b> 除權息</span><span><b class="mute">停</b> 暫停交易</span><span><i class="dot" style="background:var(--amber)"></i>處置期間</span>'}</div>
             </div>
-            <div class="btnrow-l pq-panels">${PANELS.map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${p.name}</button>`).join('')}</div>
+            ${j.index ? '' : `<div class="btnrow-l pq-panels">${PANELS.map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${p.name}</button>`).join('')}</div>`}
             <div id="pqInfo" class="ohlc-info pq-info"></div>
             <div id="pqChart" class="pq-chart"></div>
-            <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移；上方按鈕可隱藏或顯示下方的小圖。
-              還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
-              「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。
+            <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移${j.index ? '。' : '；上方按鈕可隱藏或顯示下方的小圖。'}
+              ${j.index ? '加權指數(代號 TSE)只有價格與成交金額(億元)，指數不含股息。' : `還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
+              「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。`}
               ${j.kind === 'member' && j.limit - j.remaining >= 400 ? `今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。` : ''}</p>
           </div>`;
 
         const info = $('#pqInfo');
         const showInfo = (i, price, ma, evs, disps) => {
-          if (i == null) { info.innerHTML = '<span class="mute">點選 K 棒可查看當天的價量、法人、融資券與事件</span>'; return; }
+          if (i == null) { info.innerHTML = `<span class="mute">${j.index ? '點選 K 棒可查看當天的開高低收、均線與成交金額' : '點選 K 棒可查看當天的價量、法人、融資券與事件'}</span>`; return; }
           const p = price[i], prev = i > 0 ? R.a[i] / R.a[i - 1] - 1 : NaN, f = v => num(v, v >= 1000 ? 0 : 2);
           const arrow = (arr, k) => k > 0 && arr[k] === arr[k] && arr[k - 1] === arr[k - 1] ? (arr[k] > arr[k - 1] ? '<b class="up">↑</b>' : arr[k] < arr[k - 1] ? '<b class="down">↓</b>' : '') : '';
           const mas = MAS.map(m => ma[m][i] === ma[m][i] ? `<span><i class="dot" style="background:var(--ma${m})"></i>${m}MA <em>${f(ma[m][i])}</em>${arrow(ma[m], i)}</span>` : '').join('');
@@ -356,22 +357,22 @@
           info.innerHTML = `<b>${R.d[i]}</b>
             <span>開 <em>${f(p.o)}</em></span><span>高 <em>${f(p.h)}</em></span><span>低 <em>${f(p.l)}</em></span>
             <span>收 <em class="${cls(prev)}">${f(p.c)}</em></span><span class="${cls(prev)}">${pct(prev)}</span>${mas}
-            <span>量 <em>${int(at('v'))}</em></span><span>外資 <em class="${cls(at('f'))}">${sint(at('f'))}</em></span>
+            ${j.index ? `<span>成交金額 <em>${int(at('v'))}</em> 億</span>` : `<span>量 <em>${int(at('v'))}</em></span><span>外資 <em class="${cls(at('f'))}">${sint(at('f'))}</em></span>
             <span>投信 <em class="${cls(at('t'))}">${sint(at('t'))}</em></span><span>融資 <em>${int(at('m'))}</em></span>
-            <span>融券 <em>${int(at('s'))}</em></span><span>借券 <em>${int(at('b'))}</em></span>
+            <span>融券 <em>${int(at('s'))}</em></span><span>借券 <em>${int(at('b'))}</em></span>`}
             ${evText.length ? `<span class="pq-ev">${evText.map(esc).join('、')}</span>` : ''}`;
         };
         opts.onCursor = showInfo;
         showInfo(null);
         chart = kChart($('#pqChart'), j, opts);
-        el.querySelector('.pq-mode').onclick = e => {
+        if (!j.index) el.querySelector('.pq-mode').onclick = e => {
           const b = e.target.closest('button'); if (!b) return;
           opts.mode = b.dataset.m;
           try { localStorage.setItem('lt.query.mode', opts.mode); } catch (er) {}
           el.querySelectorAll('.pq-mode button').forEach(x => x.classList.toggle('active', x === b));
           chart.redraw();
         };
-        el.querySelector('.pq-panels').onclick = e => {
+        if (!j.index) el.querySelector('.pq-panels').onclick = e => {
           const b = e.target.closest('button'); if (!b) return;
           if (opts.panels.has(b.dataset.p)) opts.panels.delete(b.dataset.p); else opts.panels.add(b.dataset.p);
           b.classList.toggle('active', opts.panels.has(b.dataset.p));

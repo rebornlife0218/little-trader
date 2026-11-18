@@ -128,7 +128,7 @@ const LT = (() => {
     const search = () => {
       const v = input.value.trim();
       if (!v) return;
-      const m = v.match(/^([0-9A-Za-z]{4,6})(\s|$)/);
+      const m = v.match(/^([0-9A-Za-z]{3,6})(\s|$)/);   // 3 碼：加權指數 TSE
       const hit = !m && list && (list.find(x => x.name === v) || list.find(x => x.name && x.name.includes(v)));
       const code = m ? m[1].toUpperCase() : hit ? hit.symbol : v;
       input.value = ''; input.blur();
@@ -138,7 +138,7 @@ const LT = (() => {
     };
     input.addEventListener('focus', loadList);
     // 從建議清單選了一檔(值是「代號 名稱」)就直接查；桌機 Chrome 選建議時沒有 inputType，Android 是 insertReplacementText
-    input.addEventListener('input', e => { if ((!e.inputType || e.inputType === 'insertReplacementText') && list && /^[0-9A-Za-z]{4,6} /.test(input.value)) search(); });
+    input.addEventListener('input', e => { if ((!e.inputType || e.inputType === 'insertReplacementText') && list && /^[0-9A-Za-z]{3,6} /.test(input.value)) search(); });
     form.onsubmit = e => { e.preventDefault(); search(); };
     form.querySelector('.ss-ico').onclick = () => {
       if (document.documentElement.classList.contains('side-collapsed') && window.innerWidth > 860) { toggleSidebar(); setTimeout(() => input.focus(), 250); }

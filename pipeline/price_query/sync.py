@@ -6,6 +6,7 @@
     ev 事件 [[日期, 種類, 說明, 結束日期]]：rev 月營收公告(年成長)、div 除權息、split 分割或減資(由還原與原始股價的比例變化推算)、
        halt 暫停交易、disp 處置(到結束日期)
   查 10 年只要讀約 11 列，不會用掉 D1 的讀取額度。
+  加權指數用代號 TSE(市場「指數」)：data 分支的 indices/TAIEX.json，只有 d o h l c a(= 收盤) v(成交金額，億元)，沒有法人、融資券與事件。
   股票清單(symbols)：名稱、上市/上櫃/創新板、股本(億元，實收資本額)、資料期間、是否已下市櫃；整份清單另存在 meta 的 symbols_gz(查詢頁只讀這 1 列)。
   每次都在本機重算全部，但只上傳內容有變的(新的交易日、除權息後還原股價整段改變、資料修正)；
   上傳過的內容記在 ~/.cache/little-trader/d1_prices.json，刪掉這個檔就會全部重傳。
@@ -49,6 +50,11 @@ SQL_REVENUE = '''
 SQL_HALT = 'SELECT "股票代號", "暫停交易日期"::date, "恢復交易日期"::date FROM cm.tw_trading_halt'
 SQL_DISP = 'SELECT "股票代號", "處置時間起"::date, "處置時間迄"::date, "處置措施" FROM cm.tw_disposition'
 MARKET = {'1': '上市', '2': '上櫃', '7': '創新板'}
+# 加權指數：代號 TSE，來自 data 分支已發佈的 indices/TAIEX.json(開高低收；v 用成交金額，換成億元)；沒有法人、融資券與事件，還原價 = 收盤
+TSE, TSE_NAME, TSE_KEYS = 'TSE', '加權指數', ('o', 'h', 'l', 'c', 'a', 'v')
+TSE_START = '2002-01-01'   # 和 cm.tw_daily 的資料起點相同
+# 不放進股票查詢：2002～2014 年間停止交易的封閉型基金(資料庫沒有名稱，查詢頁 2016 年起也查不到)
+SKIP = {'0001', '0015', '0023', '0025', '0029'}
 MAX_FILE = 40_000_000     # 一次上傳的 SQL 檔上限(位元組)，太大就分批
 
 
@@ -64,7 +70,28 @@ def load():
             out[k] = cur.fetchall()
     buf.seek(0)
     df = pd.read_csv(buf, header=None, names=['sym', 'd', *COLS], dtype={'sym': str, 'd': str})
-    return df, out
+    return df[~df['sym'].isin(SKIP)].reset_index(drop=True), out
+
+
+def load_tse():
+    """加權指數日資料(DataFrame：sym、d 與 COLS 的欄位)；讀 data 分支最新的 TAIEX.json(本機 web/data 可能是舊的)，失敗時用本機的"""
+    import requests
+    from common import REPO, load_published
+    try:
+        j = requests.get(f'https://raw.githubusercontent.com/{REPO}/data/indices/TAIEX.json', timeout=60).json()
+    except Exception as e:  # noqa: BLE001
+        print(f'讀取 data 分支的 TAIEX.json 失敗，改用本機的：{e!r}', file=sys.stderr)
+        j = load_published('indices', 'TAIEX.json')
+    if not j or not j.get('d'):
+        raise RuntimeError('讀不到加權指數(indices/TAIEX.json)')
+    df = pd.DataFrame({'sym': TSE, 'd': j['d'], 'o': j['o'], 'h': j['h'], 'l': j['l'], 'c': j['c'], 'v': j['v']})
+    df = df[(df['d'] >= TSE_START) & (df['c'] > 0)].copy()
+    df['a'] = df['c']
+    df['v'] = df['v'] / 1e8          # 成交金額：元 → 億元
+    for k in COLS:
+        if k not in df:
+            df[k] = np.nan
+    return df[['sym', 'd', *COLS]]
 
 
 ETF_NAMES = STATE.with_name('etf_names.json')   # 累積下來的 ETF 名稱與市場：下市後官方清單就查不到，留著繼續用
@@ -134,7 +161,7 @@ def chunks(df, ev):
     out = {}
     for (s, y), g in df.groupby(['sym', 'y'], sort=False):
         obj = {'d': g['d'].tolist()}
-        for k in COLS:
+        for k in (TSE_KEYS if s == TSE else COLS):   # 加權指數只放開高低收、還原(= 收盤)與成交金額
             digits = 4 if k == 'a' else 2 if k in 'ohlc' else 0
             obj[k] = [(round(float(x), digits) if digits else int(round(x))) if pd.notna(x) else None for x in g[k]]
         obj['ev'] = [e for e in ev.get(s, []) if e[0][:4] == str(y)]
@@ -188,9 +215,13 @@ def main():
     print(f'cm.tw_daily：{df["sym"].nunique()} 檔、{len(df):,} 筆，{df["d"].min()} ~ {df["d"].max()}')
     ev = events(df, ext)
     print(f'事件：{sum(len(v) for v in ev.values()):,} 筆(月營收、除權息、暫停交易、處置)')
+    last = df['d'].max()                      # 個股資料的最新日期(meta 的 last_date)
+    tse = load_tse()
+    print(f'加權指數(TSE)：{len(tse):,} 天，{tse["d"].min()} ~ {tse["d"].max()}')
+    df = pd.concat([df, tse], ignore_index=True)
+    info[TSE] = (TSE_NAME, '指數', None)
     C = chunks(df, ev)
     span = df.groupby('sym')['d'].agg(['min', 'max'])
-    last = df['d'].max()
 
     stmts, new_state = [], {}
     for (s, y), (n, gz, md5) in C.items():
@@ -213,6 +244,8 @@ def main():
             stmts.append('INSERT OR REPLACE INTO symbols (symbol, name, first_date, last_date, delisted, market, capital) VALUES '
                          f'({sql_str(s)}, {sql_str(row[0])}, {sql_str(row[1])}, {sql_str(row[2])}, {row[3]}, {sql_str(row[4])}, '
                          f'{"NULL" if row[5] is None else row[5]});')
+    # 不再列入的股票(例如 SKIP)：從 symbols 表刪掉
+    stmts += [f"DELETE FROM symbols WHERE symbol = {sql_str(k[4:])};" for k in state if k.startswith('sym:') and k not in new_state]
     # 整份股票清單另存成一列(gzip＋base64)：查詢頁每次打開只讀 1 列，不用讀 2,500 多列
     sym_list = [{'symbol': s, 'name': r[0], 'first_date': r[1], 'last_date': r[2], 'delisted': r[3], 'market': r[4], 'capital': r[5]}
                 for s, r in sym_rows]
