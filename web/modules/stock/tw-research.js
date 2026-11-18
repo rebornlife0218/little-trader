@@ -641,9 +641,24 @@
       <td>${st === 'fail' ? mute('開盤跌停不買') : ymd(din)}</td><td>${dout ? ymd(dout) : st === 'hold' || st === 'sell' ? mute('持有中') : '—'}</td>
       <td class="${bias[s] != null ? 'down' : ''}">${bias[s] != null ? W().pct(bias[s], 1) : '—'}</td><td class="${r == null ? '' : W().cls(r)}">${r == null ? '—' : W().pct(r, 2)}</td></tr>`;
     const nWait = live.filter(r => r[6] === 'wait').length;
+    // 最上方：加權指數同一次訊號、同樣進出場(隔天開盤 → 第 h 個交易日收盤，還沒到期用最新收盤)的漲跌，不含成本與股息；20 日乖離 = 訊號日收盤 ÷ 20 日均線 − 1
+    const sig0 = live.map(r => r[2]).sort().pop() || B.current;
+    const X = sig0 ? await LT.loadJSON('indices', 'TAIEX.json').then(r => r.data).catch(() => null) : null;
+    let mktRow = '';
+    if (X && X.d.includes(sig0)) {
+      const i = X.d.indexOf(sig0), e = i + 1, x = e + T0.h - 1;
+      const last = B.live_asof && X.d.includes(B.live_asof) ? X.d.indexOf(B.live_asof) : X.d.length - 1;   // 和個股持有中的報酬算到同一天
+      const ma = i >= 19 ? X.c.slice(i - 19, i + 1).reduce((a, b) => a + b, 0) / 20 : null, b = ma ? X.c[i] / ma - 1 : null;
+      const r = e <= last ? X.c[Math.min(x, last)] / X.o[e] - 1 : null;
+      mktRow = `<tr class="mkt-row"><td>—</td><td>加權指數</td><td>${ymd(sig0)}</td><td>${e <= last ? ymd(X.d[e]) : '—'}</td>
+        <td>${x <= last ? ymd(X.d[x]) : e <= last ? mute('持有中') : '—'}</td><td class="${b == null ? '' : W().cls(b)}">${b == null ? '—' : W().pct(b, 1)}</td>
+        <td class="${r == null ? '' : W().cls(r)}">${r == null ? '—' : W().pct(r, 2)}</td></tr>`;
+    }
     $('#twrRecentNote').textContent = `${T0.name}；最新進場的在最前面。` + (B.live_asof ? `持有中的報酬以 ${ymd(B.live_asof)} 收盤計(扣成本，不含加減碼)。` : '')
-      + (nWait ? `框起來的是 ${ymd(B.current)} 訊號選出、下個交易日開盤要買進的 ${nWait} 檔(開盤跌停的不買)。` : live.some(r => r[6] === 'sell') ? '框起來的是下個交易日收盤要賣出的股票。' : '');
+      + (nWait ? `框起來的是 ${ymd(B.current)} 訊號選出、下個交易日開盤要買進的 ${nWait} 檔(開盤跌停的不買)。` : live.some(r => r[6] === 'sell') ? '框起來的是下個交易日收盤要賣出的股票。' : '')
+      + (mktRow ? `第一列是加權指數同樣進出場的漲跌(不含成本與股息)，方便比較。` : '');
     LT.moreTable($('#twrRecent'), ['代號', '名稱', '訊號日', '買進(開盤)', '賣出(收盤)', '20 日乖離', '報酬'], [
+      ...(mktRow ? [mktRow] : []),
       ...live.slice().sort((a, b) => ORDER[a[6]] - ORDER[b[6]]).map(liveRow),
       ...T0.trades.filter(r => r[4]).reverse().map(r => `<tr><td>${LT.stockLink(r[0])}</td><td>${esc(r[1])}</td><td>${ymd(r[2])}</td><td>${ymd(r[3])}</td>
         <td>${ymd(r[4]) + (r[6] === 'delist' ? ' <small class="mute">下市櫃</small>' : '')}</td><td>—</td><td class="${W().cls(r[5])}">${W().pct(r[5], 2)}</td></tr>`)]);

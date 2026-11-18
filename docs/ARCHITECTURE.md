@@ -36,7 +36,7 @@ web/                                網站(部署時整個資料夾就是網站�
     stock/disposition.js            股票 · 台股：處置股(目錄頁，條列(list: true，同策略頁)：處置股介紹 = 處置條件與處置措施、新制說明、處置期間表現，資料集 disposition；處置期間的 K 棒 = 處置前後五個時點收紅 K / 黑 K 的比例，資料集 tw_research 的 disp_kbar.json，畫面在 LTTWR.dispKbar；處置股策略 = 回測與報告，資料集 tw_research 的 disp.json，畫面在 tw-research.js 的 LTTWR.disp)
     stock/tw.js                     股票 · 台股：隔日沖(建置中)
     stock/tw-strategy.js            股票 · 台股：策略回測(目錄頁：做多、做空分組的策略卡片；做多：低波動選股、融資都沒退，算我輸嗎(需要密碼)；做空：大盤跌個股逆勢漲就是欠踹；一律和 0050 比較；資料集 tw_strategy)；績效統計與圖表函式以 window.LTTW 共用給 tw-research.js
-    stock/tw-research.js            股票 · 台股：其他研究(目錄頁：營收、跳空、因子、事件、機器學習分組的研究卡片；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research，跳空與隔夜報酬用資料集 tw_gap，大跌後抄底選股用資料集 tw_dip)
+    stock/tw-research.js            股票 · 台股：其他研究(目錄頁：營收、跳空、因子、事件、機器學習分組的研究卡片；同一系列同一個顏色；回測結果＋報告 Markdown；資料集 tw_research，跳空與隔夜報酬用資料集 tw_gap，大跌後抄底選股用資料集 tw_dip；它的近期明細第一列是加權指數同一次訊號、同樣進出場的漲跌(indices/TAIEX.json，不含成本與股息，持有中算到 live_asof))
     stock/earnings.js               股票 · 美股：財報行事曆
     stock/us-strategy.js            股票 · 美股：策略(目錄頁)；S&P500 季度換股策略回測(單一策略頁裡選總覽或單一策略；資料集 sp500)
     stock/query.js                  股票 · 台股：股票查詢(不列在側欄，從 LOGO 下方的搜尋框或代號連結進入；K 線圖、法人、融資券、借券、月營收與除權息等事件；api/prices，資料在 Cloudflare D1)
