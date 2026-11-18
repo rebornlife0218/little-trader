@@ -1,5 +1,6 @@
 /* 其他區塊
-   · 好用推薦：外部網站連結與簡介，依 CATS 分類；新增推薦只要在 RECOMMENDS 加一筆(cat 填分類的 key) */
+   · 好用推薦：外部網站連結與簡介，依 CATS 分類；新增推薦只要在 RECOMMENDS 加一筆(cat 填分類的 key)
+   · 近期話題：建置中(只有 name + desc，內容完成後補上 mount) */
 (() => {
   const CATS = [
     { key: 'news', name: '新聞與行事曆', desc: '每天的消息與重要事件的時間' },
@@ -56,4 +57,6 @@
         <div class="note">以上為外部網站，內容與服務條款以各網站為準；部分功能可能需要註冊或付費。</div>`;
     },
   });
+
+  LT.register({ section: 'other', key: 'topics', name: '近期話題', desc: '市場近期討論的話題。' });
 })();

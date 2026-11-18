@@ -47,7 +47,7 @@ web/                                網站(部署時整個資料夾就是網站�
     option/strategy.js              策略損益圖
     stats/basic.js                  初級統計學(章節設定、互動模擬、台股實例；內容在 content/)
     stats/stats.js                  計量(建置中)
-    other/other.js                  好用推薦(依 CATS 分類：新聞與行事曆、研究與分析、工具與追蹤)
+    other/other.js                  好用推薦(依 CATS 分類：新聞與行事曆、研究與分析、工具與追蹤)；近期話題(other/topics，建置中)
   content/stats/basic/              統計學各章 Markdown、圖片、產生圖片的 R 程式
   data/                             本機執行 pipeline 的輸出(不進版控；正式資料在 data 分支)
 
