@@ -77,9 +77,11 @@ COLS = {'open': '開盤價', 'close': '收盤價', 'vol': '成交量', 'o': '還
         'fnet': '外資買賣超', 'sbrk': '賣分價家數', 'mgb': '資買', 'shd': '券增減', 'shb': '券買'}
 if private:
     COLS.update(private.COLS)
+START = '2016-01-01'    # 回測只用 2016 年起的資料(cm.tw_daily 已回補到 2002 年，但策略期間固定從 2016 年開始)
 SQL = f'''COPY (
   SELECT "日期", "股票代號", {", ".join(f'"{c}"' for c in COLS.values())} FROM cm.tw_daily
   WHERE "股票代號" ~ '^([1-9][0-9]{{3}}|0050)$' AND "股票代號" !~ '^91'   -- 91xx 為存託憑證
+    AND "日期" >= '{START}'
 ) TO STDOUT WITH CSV'''
 KDF_ITER = 1_000_000    # 加密策略的 PBKDF2 次數(網頁 tw-strategy.js 讀 JSON 裡的 iter，兩邊不用同步改)
 SQL_NAMES = '''
@@ -164,7 +166,7 @@ def top5_ratio(W):
     with pg_connect() as conn:
         buf = io.BytesIO()
         with conn.cursor().copy('COPY (SELECT "日期", "股票代號", ' + ', '.join(f'"{x}"' for x in B) +
-                                " FROM cm.tw_daily WHERE \"股票代號\" ~ '^[1-9][0-9]{3}$') TO STDOUT WITH CSV") as cp:
+                                " FROM cm.tw_daily WHERE \"股票代號\" ~ '^[1-9][0-9]{3}$'" f" AND \"日期\" >= '{START}') TO STDOUT WITH CSV") as cp:
             for chunk in cp:
                 buf.write(chunk)
     buf.seek(0)

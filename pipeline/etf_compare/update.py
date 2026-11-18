@@ -24,7 +24,7 @@ import yfinance as yf
 from requests.adapters import HTTPAdapter
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from common import dataset_dir, pg_connect, write_json, write_meta  # noqa: E402
+from common import dataset_dir, load_published, pg_connect, write_json, write_meta  # noqa: E402
 
 DATASET = 'etf_compare'
 LPF_URL = 'https://www.blf.gov.tw/49200/49255/49261/49269/49279/73028/post'
@@ -136,13 +136,15 @@ def download(ticker, **kw):
     return fix_unadjusted_splits(df[~((df['Volume'] == 0) & flat)][['Close', 'Adj Close']])
 
 
+DB_START = '2016-01-01'
+
+
 def db_close(codes):
     """cm.tw_daily 的收盤價(排除沒有成交的日子)：({代號: DataFrame[Close]}, 資料庫第一天)，已換算成分割後的單位"""
     with pg_connect() as conn, conn.cursor() as cur:
-        cur.execute('SELECT min("日期") FROM cm.tw_daily')
-        start = pd.Timestamp(cur.fetchone()[0])
+        start = pd.Timestamp(DB_START)   # cm.tw_daily 已回補到 2002 年，仍只用 2016 年起的資料(之前沿用 Yahoo，結果不變)
         cur.execute('SELECT "股票代號", "日期", "收盤價" FROM cm.tw_daily '
-                    'WHERE "股票代號" = ANY(%s) AND "成交量" > 0 AND "收盤價" > 0 ORDER BY 1, 2', (codes,))
+                    'WHERE "股票代號" = ANY(%s) AND "日期" >= %s AND "成交量" > 0 AND "收盤價" > 0 ORDER BY 1, 2', (codes, DB_START))
         rows = pd.DataFrame(cur.fetchall(), columns=['code', 'date', 'Close'])
     rows['date'] = pd.to_datetime(rows['date'])
     rows['Close'] = rows['Close'].astype(float)
@@ -244,9 +246,22 @@ def monthly_0050(daily):
     return {ym: (float(r['c']), float(r['a'])) for ym, r in ret.iterrows()}
 
 
+def lpf_or_published():
+    """勞退基金收益率：下載失敗時改用上一次發佈的 compare.json(每月公告一次，股價仍照常更新)；兩者都沒有才失敗。
+    回傳 (當年度累計收益率, 每月報酬)"""
+    try:
+        ytd = fetch_lpf()
+        return ytd, ytd_to_monthly(ytd)
+    except Exception as e:  # noqa: BLE001
+        old = load_published(DATASET, 'compare.json')
+        if not old or not old.get('months'):
+            raise
+        print(f'{e}，沿用上一次發佈的勞退基金收益率(到 {old["months"][-1]})', file=sys.stderr)
+        return dict(zip(old['months'], old['lpf_ytd'])), dict(zip(old['months'], old['lpf']))
+
+
 def main():
-    ytd = fetch_lpf()
-    lpf = ytd_to_monthly(ytd)
+    ytd, lpf = lpf_or_published()
     first = min(lpf)
     etfs = fetch_etfs()
     etf = monthly_0050(etfs['daily']['0050'])
