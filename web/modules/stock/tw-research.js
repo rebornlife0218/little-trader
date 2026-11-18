@@ -608,7 +608,7 @@
     const C = SERIES.dip.color;
     let k = B.strats[0].key;
     el.innerHTML = `
-      ${LT.brief({ hero: heroOf(B, full), chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
+      ${LT.brief({ hero: heroOf(B, full), updated: 'tw_dip', chart: 'twrBrief', stats: 'twrBriefStats', recent: 'twrRecent', items: [
         ['邏輯', '指數跌深、融資又被大量斷頭砍出的那幾天，挑跌得深、營收還在成長、投信抱著、大跌前融資用得滿的股票，等被錯殺的股票補漲。'],
         ['進出場', '大跌訊號出現的隔天開盤買進(開盤跌停的不買)，持有一段時間後收盤賣出；沒有訊號時持有現金。'],
         ['停利停損', NO_STOP], ['持有期間', '約一季。']] })}
