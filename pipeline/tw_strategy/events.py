@@ -45,6 +45,15 @@
     排除：開盤量創 3 日新低(比前 2 天都低，cm.tw_open_close_vol，2020/3/2 起才有資料)；融券買進 > 20 張
     出場：停利 30%、停損 15%(盤中觸及)，最多持有 10 個交易日，第 10 天收盤賣出
     家數差門檻：原始條件是 20(XQ，連續 2 天都要符合；和 XQ 的交易約 77% 對得上)；測過 10～150，30～70 都比 20 好、100 以上變差，使用者選定 50
+  longma 還敢站上長均啊冰鳥(做空)：股價剛站上長期均線、很多分點在買、當天振幅很大，隔天開盤放空
+    1. 交易所公告股本 > 10 億元(cm.tw_company_info，當年度的股本)
+    2. 站上長均(同 XQ「站上長均」，原始價格)：收盤價 > 120 日均線 × (1 + 0.1%)，而且近 30 個交易日(含當天)收在這個價位之上的天數 ≤ 2
+       (剛站上第 1、2 天)；和 XQ 2021/7～2025/7 的訊號比對，XQ 的訊號 97% 對得上(「近 30 天由下往上穿越 ≤ 2 次」只有 66%)
+    5. 排除爆量：成交量 > 4 日均量(含當天，同 XQ)的 3.5 倍
+    3. 分公司淨買超金額家數 > 300 家：當天買進金額 > 賣出金額的券商分點數(qdata tw.broker_trade，2021/6/30 起，之前沒有訊號)
+    4. 真實範圍波幅 > 5%：(max(最高, 前一天收盤) − min(最低, 前一天收盤)) ÷ 前一天收盤，用原始價格
+    排除：連續 3 天收盤價為漲停價；爆量(第 5 點)
+    出場：停利 20%、停損 8%(盤中觸及)，最多持有 5 個交易日，第 5 天收盤回補
 
 用法：python pipeline/tw_strategy/events.py [策略 ...]   (預設全部；python pipeline/tw_strategy/update.py 也會一起產生)
 """
@@ -238,8 +247,60 @@ def boss_signal(W):
     return sig, cols_
 
 
+LONGMA_N, LONGMA_PCT, LONGMA_WIN, LONGMA_MAX = 120, 0.001, 30, 2   # 站上長均：均線天數、站上幅度、計算期間、期間內最多站上幾次
+NETBUY_TH, CAP_TH, TR_TH, VOLX_N, VOLX = 300, 1_000_000, 0.05, 4, 3.5  # 淨買超金額分點家數、股本(千元)、真實範圍波幅、爆量(前 N 日均量的幾倍)
+QDATA = 'http://100.94.21.43:8123/'
+
+
+def capital(W):
+    """交易所公告股本(千元)：cm.tw_company_info 每年一筆，當年度的交易日都用該年度的股本(下市櫃公司用 tw_delisted_company)"""
+    sql = '''SELECT "年度", "股票代號", "交易所公告股本(千)" FROM cm.tw_company_info
+             UNION ALL SELECT "年度", "股票代號", "交易所公告股本(千)" FROM cm.tw_delisted_company'''
+    with pg_connect() as conn:
+        df = pd.DataFrame(conn.execute(sql).fetchall(), columns=['y', 's', 'cap']).dropna()
+    df['y'] = df['y'].astype(int)
+    cap = df.drop_duplicates(['y', 's']).pivot(index='y', columns='s', values='cap').astype(float)
+    years = W['c'].index.year
+    cap = cap.reindex(sorted(set(years) | set(cap.index))).ffill().bfill()      # 缺的年度沿用前後年
+    out = cap.reindex(years)
+    out.index = W['c'].index
+    return out.reindex(columns=W['c'].columns)
+
+
+def netbuy_brokers(W):
+    """分公司淨買超金額家數：當天買進金額 > 賣出金額的券商分點數(qdata tw.broker_trade，2021/6/30 起；帳密讀環境變數 QDATA_USER、QDATA_PASSWORD)"""
+    sql = (r"SELECT code, date, countIf(buy * ifNull(buy_price, 0) > sell * ifNull(sell_price, 0)) AS n FROM tw.broker_trade "
+           r"WHERE match(code, '^[1-9][0-9]{3}$') GROUP BY code, date FORMAT CSVWithNames")
+    r = requests.post(QDATA, data=sql.encode(), auth=(os.environ['QDATA_USER'], os.environ['QDATA_PASSWORD']), timeout=600)
+    r.raise_for_status()
+    df = pd.read_csv(io.StringIO(r.text), dtype={'code': str}, parse_dates=['date'])
+    return df.pivot(index='date', columns='code', values='n').reindex_like(W['c']).astype(float)
+
+
+def longma_signal(W):
+    """還敢站上長均啊冰鳥(做空)：條件見檔頭說明"""
+    c, close, vol = W['c'], W['close'], W['vol']
+    ma = close.rolling(LONGMA_N).mean()                                          # 用原始價格(同 XQ 的「原始值」)
+    above = (close > ma * (1 + LONGMA_PCT)).astype(float).where(ma.notna())
+    times = above.rolling(LONGMA_WIN, min_periods=LONGMA_WIN).sum()             # 近 30 天(含今天)收在均線之上的天數
+    ratio = close / c                                                           # 還原價格 → 原始價格
+    hi, lo, pc = W['h'] * ratio, W['l'] * ratio, close.shift(1)
+    trp = (np.maximum(hi, pc) - np.minimum(lo, pc)) / pc                         # 真實範圍 ÷ 前一天收盤
+    lu, _ = limits(W)
+    at_up = pd.DataFrame(close.to_numpy() >= lu - EPS, index=c.index, columns=c.columns)
+    up3 = at_up & at_up.shift(1, fill_value=False) & at_up.shift(2, fill_value=False)
+    v4 = vol.rolling(VOLX_N).mean()                                              # 含當天的 4 日均量(同 XQ)
+    nb, cap = netbuy_brokers(W), capital(W)
+    sig = ((vol > 0) & (cap > CAP_TH) & (above == 1) & (times <= LONGMA_MAX) & (nb > NETBUY_TH) & (trp > TR_TH)
+           & ~up3 & ~(vol > v4 * VOLX))
+    cols = [('距 120 日均線', 'chg', close / ma - 1), ('近 30 天站上天數', 'int', times), ('淨買超分點家數', 'int', nb),
+            ('真實範圍波幅', 'chg', trp), ('成交量 ÷ 前 4 日均量', 'num', vol / v4.where(v4 > 0) * 100), ('股本(億元)', 'int', cap / 1e5)]
+    return sig, cols
+
+
 STRATEGIES = [
     {'key': 'against', 'side': 'short', 'signal': against_signal, 'tp': None, 'sl': None, 'hold': 1, 'exit': 'close'},
+    {'key': 'longma', 'side': 'short', 'signal': longma_signal, 'tp': 0.20, 'sl': 0.08, 'hold': 5, 'exit': 'close'},
     {'key': 'rev20', 'side': 'long', 'signal': rev20_signal, 'tp': None, 'sl': 0.15, 'hold': 15, 'exit': 'close'},
     {'key': 'boss', 'side': 'long', 'signal': boss_signal, 'tp': 0.30, 'sl': 0.15, 'hold': 10, 'exit': 'close'},
 ] + (private.STRATEGIES if private else [])
