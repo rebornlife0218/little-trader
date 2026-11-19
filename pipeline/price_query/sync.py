@@ -6,7 +6,8 @@
     ev 事件 [[日期, 種類, 說明, 結束日期]]：rev 月營收公告(年成長)、div 除權息、split 分割或減資(由還原與原始股價的比例變化推算)、
        halt 暫停交易、disp 處置(到結束日期)
   查 10 年只要讀約 11 列，不會用掉 D1 的讀取額度。
-  加權指數用代號 TSE(市場「指數」)：data 分支的 indices/TAIEX.json，只有 d o h l c a(= 收盤) v(成交金額，億元)，沒有法人、融資券與事件。
+  加權指數用代號 TSE(市場「指數」)：data 分支的 indices/TAIEX.json 的 d o h l c a(= 收盤) v(成交金額，億元)；
+    2016 年起另有證交所的大盤統計(twse_market.py)：f 外資、t 投信、p 自營商買賣超(億元)、m 融資餘額(億元)、s 融券餘額(張)；沒有事件與借券。
   股票清單(symbols)：名稱、上市/上櫃/創新板、股本(億元，實收資本額)、資料期間、是否已下市櫃；整份清單另存在 meta 的 symbols_gz(查詢頁只讀這 1 列)。
   每次都在本機重算全部，但只上傳內容有變的(新的交易日、除權息後還原股價整段改變、資料修正)；
   上傳過的內容記在 ~/.cache/little-trader/d1_prices.json，刪掉這個檔就會全部重傳。
@@ -50,8 +51,11 @@ SQL_REVENUE = '''
 SQL_HALT = 'SELECT "股票代號", "暫停交易日期"::date, "恢復交易日期"::date FROM cm.tw_trading_halt'
 SQL_DISP = 'SELECT "股票代號", "處置時間起"::date, "處置時間迄"::date, "處置措施" FROM cm.tw_disposition'
 MARKET = {'1': '上市', '2': '上櫃', '7': '創新板'}
-# 加權指數：代號 TSE，來自 data 分支已發佈的 indices/TAIEX.json(開高低收；v 用成交金額，換成億元)；沒有法人、融資券與事件，還原價 = 收盤
-TSE, TSE_NAME, TSE_KEYS = 'TSE', '加權指數', ('o', 'h', 'l', 'c', 'a', 'v')
+# 加權指數：代號 TSE，來自 data 分支已發佈的 indices/TAIEX.json(開高低收；v 用成交金額，換成億元)；還原價 = 收盤，沒有事件與借券
+# 大盤融資融券與三大法人(2016 年起)：證交所每日統計(twse_market.py 的快取)：
+#   f 外資、t 投信、p 自營商買賣超(億元)，m 融資餘額(融資金額，億元)，s 融券餘額(張)
+TSE, TSE_NAME, TSE_KEYS = 'TSE', '加權指數', ('o', 'h', 'l', 'c', 'a', 'v', 'f', 't', 'p', 'm', 's')
+TSE_DEC = {'f': 2, 't': 2, 'p': 2, 'm': 2}   # 加權指數這幾欄是億元，留 2 位小數
 TSE_START = '2002-01-01'   # 和 cm.tw_daily 的資料起點相同
 # 不放進股票查詢：2002～2014 年間停止交易的封閉型基金(資料庫沒有名稱，查詢頁 2016 年起也查不到)
 SKIP = {'0001', '0015', '0023', '0025', '0029'}
@@ -88,10 +92,21 @@ def load_tse():
     df = df[(df['d'] >= TSE_START) & (df['c'] > 0)].copy()
     df['a'] = df['c']
     df['v'] = df['v'] / 1e8          # 成交金額：元 → 億元
+    # 大盤融資融券與三大法人：補齊快取缺的交易日(每次最多 MAX_PER_RUN 天；下載失敗就先用快取裡有的)
+    import twse_market
+    try:
+        mk = twse_market.update(df['d'].tolist(), limit=twse_market.MAX_PER_RUN)
+    except Exception as e:  # noqa: BLE001
+        print(f'大盤融資與法人下載失敗，先用快取裡有的：{e!r}', file=sys.stderr)
+        mk = twse_market.load()
+    get = lambda key, div: [mk.get(d, {}).get(key, np.nan) / div for d in df['d']]   # noqa: E731
+    df['f'], df['t'], df['p'] = get('f', 1e8), get('t', 1e8), get('p', 1e8)      # 元 → 億元
+    df['m'] = get('mamt', 1e5)                                                     # 仟元 → 億元
+    df['s'] = get('slot', 1)                                                       # 張
     for k in COLS:
         if k not in df:
             df[k] = np.nan
-    return df[['sym', 'd', *COLS]]
+    return df[['sym', 'd', *COLS, 'p']]
 
 
 ETF_NAMES = STATE.with_name('etf_names.json')   # 累積下來的 ETF 名稱與市場：下市後官方清單就查不到，留著繼續用
@@ -161,8 +176,8 @@ def chunks(df, ev):
     out = {}
     for (s, y), g in df.groupby(['sym', 'y'], sort=False):
         obj = {'d': g['d'].tolist()}
-        for k in (TSE_KEYS if s == TSE else COLS):   # 加權指數只放開高低收、還原(= 收盤)與成交金額
-            digits = 4 if k == 'a' else 2 if k in 'ohlc' else 0
+        for k in (TSE_KEYS if s == TSE else COLS):   # 加權指數：價格、成交金額、大盤融資融券與三大法人(p = 自營商，只有加權指數有)
+            digits = 4 if k == 'a' else 2 if k in 'ohlc' else TSE_DEC.get(k, 0) if s == TSE else 0
             obj[k] = [(round(float(x), digits) if digits else int(round(x))) if pd.notna(x) else None for x in g[k]]
         obj['ev'] = [e for e in ev.get(s, []) if e[0][:4] == str(y)]
         raw = json.dumps(obj, separators=(',', ':'), ensure_ascii=False).encode()

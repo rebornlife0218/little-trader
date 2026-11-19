@@ -15,18 +15,22 @@
   const RANGES = [['3m', '3 個月', 3], ['6m', '6 個月', 6], ['1y', '1 年', 12], ['3y', '3 年', 36], ['5y', '5 年', 60], ['all', '全部', 0]];
   const ERRORS = { bad_symbol: '股票代號格式不對', not_found: '查無這檔股票', bad_range: '日期區間不對', not_configured: '股票查詢尚未開放',
                    quota_exceeded: '今天的查詢次數已用完，明天再來', rate_limited: '查詢太頻繁，請稍等一下再查' };
-  const MAS = [5, 20, 60];
-  const MA_WARMUP = 120;     // 多抓 120 個日曆天，讓 60MA 從查詢期間第一天就有值；圖一開始只顯示查詢期間，往左拖可以看到
+  const MAS = [5, 20, 60, 120];
+  const MA_WARMUP = 200;     // 多抓 200 個日曆天(約 130 個交易日)，讓 120MA 從查詢期間第一天就有值；圖一開始只顯示查詢期間，往左拖可以看到
   // 下方的小圖：成交量、法人、融資券、借券(都是張)
   const PANELS = [
     { key: 'v', name: '成交量', kind: 'vol' },
     { key: 'f', name: '外資買賣超', kind: 'net' },
     { key: 't', name: '投信買賣超', kind: 'net' },
+    { key: 'p', name: '自營商買賣超', kind: 'net' },   // 只有加權指數有
     { key: 'm', name: '融資餘額', kind: 'line', color: '--amber' },
     { key: 's', name: '融券餘額', kind: 'line', color: '--blue' },
     { key: 'b', name: '借券賣出餘額', kind: 'line', color: '--dim' },
   ];
   const EV_TAG = { div: '息', split: '分割', halt: '停' };
+  // 單位：個股都是張；加權指數(TSE)的成交金額、法人、融資是億元，融券是張
+  const IDX_UNIT = { v: '億元', f: '億元', t: '億元', p: '億元', m: '億元', s: '張' };
+  const unitOf = (J, k) => J.index ? IDX_UNIT[k] : '張';
   let symbolsP = null;   // 股票清單只載入一次
 
   function loadSymbols() {
@@ -70,7 +74,7 @@
     function draw() {
       const C = k => LT.cssVar(k);
       const dpr = window.devicePixelRatio || 1, W = Math.max(300, wrap.clientWidth);
-      const panels = PANELS.filter(p => (J.index || opts.panels.has(p.key)) && R[p.key]);   // 加權指數沒有隱藏按鈕，成交金額一律顯示
+      const panels = PANELS.filter(p => opts.panels.has(p.key) && R[p.key]);
       const PH = 300, SH = 66, GAP = 8, AX = 18;
       const H = PH + panels.length * (SH + GAP) + AX;
       canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.height = H + 'px';
@@ -153,7 +157,7 @@
           for (let i = s; i <= e; i++) { const v = R[pn.key][i]; if (!Number.isFinite(v)) { on = false; continue; } if (on) g.lineTo(xAt(i), ys(v)); else g.moveTo(xAt(i), ys(v)); on = true; }
           g.strokeStyle = C(pn.color); g.lineWidth = 1.4; g.stroke(); g.lineWidth = 1;
         }
-        g.fillStyle = C('--dim'); g.fillText(J.index && pn.key === 'v' ? '成交金額(億元)' : pn.name + '(張)', padL + 4, t0 + 10);
+        g.fillStyle = C('--dim'); g.fillText(`${J.index && pn.key === 'v' ? '成交金額' : pn.name}(${unitOf(J, pn.key)})`, padL + 4, t0 + 10);
         g.fillStyle = C('--mute'); g.fillText(short(b), 4, t0 + 10); g.fillText(short(a), 4, t0 + SH - 2);
         top += SH + GAP;
       });
@@ -311,7 +315,7 @@
 
       function render(j) {
         const R = j.rows, n = R.d.length;
-        j.index = j.market === '指數';   // 加權指數(TSE)：只有價格與成交金額，沒有法人、融資券、事件；還原價 = 收盤，不顯示切換
+        j.index = j.market === '指數';   // 加權指數(TSE)：價格、成交金額，2016 年起有大盤三大法人與融資券(億元，融券是張)；沒有事件與借券；還原價 = 收盤，不顯示切換
         const tags = [j.market && `<span class="pq-tag">${esc(j.market)}</span>`, j.capital && `<span class="pq-cap">股本 ${num(j.capital)} 億</span>`,
                       j.delisted && '<span class="soon-tag">已下市櫃</span>'].filter(Boolean).join('');
         const title = `<span class="pq-code">${esc(j.symbol)}</span> ${esc(j.name)} ${tags}`;
@@ -320,7 +324,8 @@
         const a0 = R.a[i0], a1 = R.a[last];
         const years = (Date.parse(R.d[last]) - Date.parse(R.d[i0])) / (365.25 * 86400e3);
         const card = (v, l, c = '') => `<div class="stat"><div class="v ${c}">${v}</div><div class="l">${l}</div></div>`;
-        const sum = k => R[k] ? R[k].slice(i0).reduce((s, v) => s + (v || 0), 0) : NaN;
+        const sum = k => R[k] && R[k].slice(i0).some(Number.isFinite) ? R[k].slice(i0).reduce((s, v) => s + (v || 0), 0) : NaN;
+        const yi = v => Number.isFinite(v) ? (v > 0 ? '+' : '') + num(v, 0) + ' 億' : '—';   // 加權指數的法人：億元
         $('#pqOut').innerHTML = `
           <div class="panel">
             <h3 class="pq-title">${title}</h3>
@@ -329,7 +334,8 @@
               ${card(num(R.c[last]), `最新收盤(${R.d[last].slice(5).replace('-', '/')})`)}
               ${card(pct(a1 / a0 - 1), j.index ? '指數漲跌(不含股息)' : '含息報酬(還原股價)', cls(a1 / a0 - 1))}
               ${years >= 1 ? card(pct((a1 / a0) ** (1 / years) - 1), j.index ? '年化漲跌(不含股息)' : '年化含息報酬', cls(a1 / a0 - 1)) : ''}
-              ${j.index ? '' : `${card(sint(sum('f')), '外資累計買賣超(張)', cls(sum('f')))}
+              ${j.index ? [['f', '外資'], ['t', '投信'], ['p', '自營商']].map(([k, t]) => card(yi(sum(k)), `${t}累計買賣超`, cls(sum(k)))).join('')
+                : `${card(sint(sum('f')), '外資累計買賣超(張)', cls(sum('f')))}
               ${card(sint(sum('t')), '投信累計買賣超(張)', cls(sum('t')))}`}
             </div>
             <div class="pq-toolbar">
@@ -337,18 +343,18 @@
               <div class="pq-legend">${MAS.map(p => `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
                 ${j.index ? '' : '<span><b class="up">◆</b><b class="down">◆</b> 月營收公告(年成長 / 衰退)</span><span><b style="color:var(--blue)">息</b> 除權息</span><span><b class="mute">停</b> 暫停交易</span><span><i class="dot" style="background:var(--amber)"></i>處置期間</span>'}</div>
             </div>
-            ${j.index ? '' : `<div class="btnrow-l pq-panels">${PANELS.map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${p.name}</button>`).join('')}</div>`}
+            <div class="btnrow-l pq-panels">${PANELS.filter(p => R[p.key]).map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${j.index && p.key === 'v' ? '成交金額' : p.name}</button>`).join('')}</div>
             <div id="pqInfo" class="ohlc-info pq-info"></div>
             <div id="pqChart" class="pq-chart"></div>
-            <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移${j.index ? '。' : '；上方按鈕可隱藏或顯示下方的小圖。'}
-              ${j.index ? '加權指數(代號 TSE)只有價格與成交金額(億元)，指數不含股息。' : `還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
+            <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移；上方按鈕可隱藏或顯示下方的小圖。
+              ${j.index ? '加權指數(代號 TSE)不含股息；成交金額、三大法人買賣超(外資不含外資自營商，自營商含自行買賣與避險)、融資餘額(融資金額)都是上市市場的億元，融券餘額是張數，法人與融資券 2016 年起。' : `還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
               「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。`}
               ${j.kind === 'member' && j.limit - j.remaining >= 400 ? `今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。` : ''}</p>
           </div>`;
 
         const info = $('#pqInfo');
         const showInfo = (i, price, ma, evs, disps) => {
-          if (i == null) { info.innerHTML = `<span class="mute">${j.index ? '點選 K 棒可查看當天的開高低收、均線與成交金額' : '點選 K 棒可查看當天的價量、法人、融資券與事件'}</span>`; return; }
+          if (i == null) { info.innerHTML = `<span class="mute">${j.index ? '點選 K 棒可查看當天的開高低收、均線、成交金額、三大法人與融資券' : '點選 K 棒可查看當天的價量、法人、融資券與事件'}</span>`; return; }
           const p = price[i], prev = i > 0 ? R.a[i] / R.a[i - 1] - 1 : NaN, f = v => num(v, v >= 1000 ? 0 : 2);
           const arrow = (arr, k) => k > 0 && arr[k] === arr[k] && arr[k - 1] === arr[k - 1] ? (arr[k] > arr[k - 1] ? '<b class="up">↑</b>' : arr[k] < arr[k - 1] ? '<b class="down">↓</b>' : '') : '';
           const mas = MAS.map(m => ma[m][i] === ma[m][i] ? `<span><i class="dot" style="background:var(--ma${m})"></i>${m}MA <em>${f(ma[m][i])}</em>${arrow(ma[m], i)}</span>` : '').join('');
@@ -357,7 +363,9 @@
           info.innerHTML = `<b>${R.d[i]}</b>
             <span>開 <em>${f(p.o)}</em></span><span>高 <em>${f(p.h)}</em></span><span>低 <em>${f(p.l)}</em></span>
             <span>收 <em class="${cls(prev)}">${f(p.c)}</em></span><span class="${cls(prev)}">${pct(prev)}</span>${mas}
-            ${j.index ? `<span>成交金額 <em>${int(at('v'))}</em> 億</span>` : `<span>量 <em>${int(at('v'))}</em></span><span>外資 <em class="${cls(at('f'))}">${sint(at('f'))}</em></span>
+            ${j.index ? `<span>成交金額 <em>${int(at('v'))}</em> 億</span>${[['f', '外資'], ['t', '投信'], ['p', '自營商']].map(([k, t]) =>
+              `<span>${t} <em class="${cls(at(k))}">${Number.isFinite(at(k)) ? (at(k) > 0 ? '+' : '') + num(at(k), 2) : '—'}</em> 億</span>`).join('')}
+              <span>融資 <em>${Number.isFinite(at('m')) ? num(at('m'), 0) : '—'}</em> 億</span><span>融券 <em>${int(at('s'))}</em> 張</span>` : `<span>量 <em>${int(at('v'))}</em></span><span>外資 <em class="${cls(at('f'))}">${sint(at('f'))}</em></span>
             <span>投信 <em class="${cls(at('t'))}">${sint(at('t'))}</em></span><span>融資 <em>${int(at('m'))}</em></span>
             <span>融券 <em>${int(at('s'))}</em></span><span>借券 <em>${int(at('b'))}</em></span>`}
             ${evText.length ? `<span class="pq-ev">${evText.map(esc).join('、')}</span>` : ''}`;
@@ -372,7 +380,7 @@
           el.querySelectorAll('.pq-mode button').forEach(x => x.classList.toggle('active', x === b));
           chart.redraw();
         };
-        if (!j.index) el.querySelector('.pq-panels').onclick = e => {
+        el.querySelector('.pq-panels').onclick = e => {
           const b = e.target.closest('button'); if (!b) return;
           if (opts.panels.has(b.dataset.p)) opts.panels.delete(b.dataset.p); else opts.panels.add(b.dataset.p);
           b.classList.toggle('active', opts.panels.has(b.dataset.p));
