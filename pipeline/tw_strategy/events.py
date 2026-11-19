@@ -249,7 +249,6 @@ def boss_signal(W):
 
 LONGMA_N, LONGMA_PCT, LONGMA_WIN, LONGMA_MAX = 120, 0.001, 30, 2   # 站上長均：均線天數、站上幅度、計算期間、期間內最多站上幾次
 NETBUY_TH, CAP_TH, TR_TH, VOLX_N, VOLX = 300, 1_000_000, 0.05, 4, 3.5  # 淨買超金額分點家數、股本(千元)、真實範圍波幅、爆量(前 N 日均量的幾倍)
-QDATA = 'http://100.94.21.43:8123/'
 
 
 def capital(W):
@@ -268,10 +267,10 @@ def capital(W):
 
 
 def netbuy_brokers(W):
-    """分公司淨買超金額家數：當天買進金額 > 賣出金額的券商分點數(qdata tw.broker_trade，2021/6/30 起；帳密讀環境變數 QDATA_USER、QDATA_PASSWORD)"""
+    """分公司淨買超金額家數：當天買進金額 > 賣出金額的券商分點數(qdata tw.broker_trade，2021/6/30 起；網址與帳密讀環境變數 QDATA_URL、QDATA_USER、QDATA_PASSWORD)"""
     sql = (r"SELECT code, date, countIf(buy * ifNull(buy_price, 0) > sell * ifNull(sell_price, 0)) AS n FROM tw.broker_trade "
            r"WHERE match(code, '^[1-9][0-9]{3}$') GROUP BY code, date FORMAT CSVWithNames")
-    r = requests.post(QDATA, data=sql.encode(), auth=(os.environ['QDATA_USER'], os.environ['QDATA_PASSWORD']), timeout=600)
+    r = requests.post(os.environ['QDATA_URL'], data=sql.encode(), auth=(os.environ['QDATA_USER'], os.environ['QDATA_PASSWORD']), timeout=600)
     r.raise_for_status()
     df = pd.read_csv(io.StringIO(r.text), dtype={'code': str}, parse_dates=['date'])
     return df.pivot(index='date', columns='code', values='n').reindex_like(W['c']).astype(float)
