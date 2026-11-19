@@ -43,6 +43,7 @@ REPORTS = {
     'pipeline/tw_research/reports/disp_kbar.md': 'stock/disposition/kbar',
     'pipeline/tw_research/reports/disp.md': 'stock/disposition/strategy',
     'pipeline/etf_research/reports/etf_follow.md': 'etf/research/etf_follow',
+    'pipeline/topics/reports/nsf10.md': 'other/topics/nsf10',
 }
 LOCKED = {'stock/disposition/strategy': 'disp'}      # 完整報告要密碼的研究：網址 → RESEARCH_PASSWORDS 的鍵
 PW_KEY = 'lt.twPw.'                                  # 網頁存密碼的 sessionStorage 鍵(tw-strategy.js 的 PW_KEY)

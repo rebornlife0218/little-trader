@@ -57,6 +57,8 @@ export const BRIEFS = {
   // 大盤漲跌分析的研究：國安基金進場(indices/nsf.js)的精簡版只有走勢圖；大跌反彈和融資(indices/margin.js)只有重點圖與最近一次訊號日
   index_research: (f, j) => f === 'nsf.json' ? withHero(pick(j, ['asof', 'x', 'paths']), j)
     : f === 'margin.json' ? withHero(pick(j, ['asof', 'key', 'last']), j) : null,
+  // 近期話題(other/topics.js)：國安基金第 10 次護盤的精簡版只有每日淨買圖
+  topics: (f, j) => f === 'nsf10.json' ? withHero(pick(j, ['asof', 'ev0', 'd', 'tw', 'other']), j) : null,
   // A 系列 ETF 跟單(etf/research.js)：精簡版只有「加碼｜全部｜跟單出場」
   etf_research: (f, j) => {
     if (f !== 'etf_follow.json') return null;
