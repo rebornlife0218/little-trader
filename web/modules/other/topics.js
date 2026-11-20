@@ -1,7 +1,7 @@
 /* ==========================================================================
    其他 › 近期話題(目錄頁 LT.catalog，網址 other/topics/<話題>)：市場近期討論的話題，每個話題一份研究報告
-   · 國安基金第 10 次護盤買了什麼(other/topics/nsf10，上半部是決議後累計淨買前 20 大)：資料集 topics 的 nsf10.json(pipeline/topics/update.py)，
-     八大行庫每天的淨買(臺銀證券總公司／其他分點)、決議後累計淨買前 20 大與報告 Markdown；不是回測，沒有淨值
+   · 國安基金第 10 次護盤買了什麼(other/topics/nsf10，上半部是決議後累計淨買前 10 大)：資料集 topics 的 nsf10.json(pipeline/topics/update.py)，
+     八大行庫每天的淨買(臺銀證券總公司／其他分點)、決議後累計淨買前 10 大與報告 Markdown；不是回測，沒有淨值
    上半部(精簡版)公開，下半部(完整報告)要登入(LT.loadReport)
    ========================================================================== */
 window.LTTopics = (() => {
@@ -35,11 +35,11 @@ window.LTTopics = (() => {
     if (legend) legend.innerHTML = html; else div.insertAdjacentHTML('afterend', html);
   }
 
-  // 決議後累計淨買前 20 大(八大行庫所有分點合計)
+  // 決議後累計淨買前 10 大(八大行庫所有分點合計)
   function top(div, B) {
     const T = B.top;
     LTChart.bars(div, { x: T.name, xAll: true, xFmt: v => v.replace(/^\S+ /, ''), height: 280,
-      label: `八大行庫 ${md2(T.from)}～${md2(T.to)} 累計淨買前 20 大`, title: '累計淨買(億元)',
+      label: `八大行庫 ${md2(T.from)}～${md2(T.to)} 累計淨買前 10 大`, title: '累計淨買(億元)',
       yMax: Math.max(...T.v) * 1.15, yFmt: v => Math.round(v).toLocaleString(), series: [{ name: '累計淨買', y: T.v, color: TW }], tipFmt: (sr, v) => yi(v) });
   }
 
@@ -66,7 +66,7 @@ window.LTTopics = (() => {
     el.querySelectorAll('.md-fig [data-fig]').forEach(div => {
       const f = div.dataset.fig.split('/').pop();   // 只看檔名(報告寫成 <報告>/xxx.png，同其他研究)
       if (f === '每日淨買.png') daily(div, B, null);
-      else if (f === '事件期前20大.png') top(div, B);
+      else if (f === '事件期前10大.png') top(div, B);
       else div.parentElement.remove();
     });
   }
