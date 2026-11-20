@@ -25,7 +25,7 @@ from common import dataset_dir, load_published, write_json, write_meta  # noqa: 
 
 NAME = 'topics'
 NSF10_DIR = Path(os.environ.get('NSF10_DIR', Path.home() / 'Desktop/ETF_PANEL/CLAUDE/其他策略/國安基金第10次護盤'))
-SHOW = '20261001'          # 每日淨買的圖從這天開始畫
+SHOW = '20261102'          # 每日淨買的圖從這天開始畫
 EV0 = '20261109'           # 決議後第一個交易日
 
 

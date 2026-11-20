@@ -1,6 +1,6 @@
 /* ==========================================================================
    其他 › 近期話題(目錄頁 LT.catalog，網址 other/topics/<話題>)：市場近期討論的話題，每個話題一份研究報告
-   · 國安基金第 10 次護盤買了什麼(other/topics/nsf10)：資料集 topics 的 nsf10.json(pipeline/topics/update.py)，
+   · 國安基金第 10 次護盤買了什麼(other/topics/nsf10，上半部是決議後累計淨買前 20 大)：資料集 topics 的 nsf10.json(pipeline/topics/update.py)，
      八大行庫每天的淨買(臺銀證券總公司／其他分點)、決議後累計淨買前 20 大與報告 Markdown；不是回測，沒有淨值
    上半部(精簡版)公開，下半部(完整報告)要登入(LT.loadReport)
    ========================================================================== */
@@ -29,7 +29,7 @@ window.LTTopics = (() => {
     const ss = [{ name: '臺銀證券總公司', y: B.tw, color: TW }, { name: '八大行庫其他分點', y: B.other, color: OTHER }];
     const i0 = B.d.indexOf(B.ev0);
     LTChart.bars(div, { x: B.d, xFmt: md2, height: 280, label: '八大行庫每日淨買金額', title: '八大行庫每日淨買金額(億元)',
-      yFmt: v => Math.round(v).toLocaleString(), series: ss, refY: [{ y: 0 }],
+      yMax: Math.max(...B.tw, ...B.other) * 1.15, yFmt: v => Math.round(v).toLocaleString(), series: ss, refY: [{ y: 0 }],
       tipFmt: (sr, v) => yi(v) });
     const html = LTChart.legend(ss) + (i0 >= 0 ? `<p class="note">${md2(B.ev0)} 是國安基金決議後的第一個交易日。</p>` : '');
     if (legend) legend.innerHTML = html; else div.insertAdjacentHTML('afterend', html);
@@ -60,9 +60,8 @@ window.LTTopics = (() => {
         ['怎麼比較', '和大跌前的平常日子比較；買進的股票算到最新收盤的帳面損益，並和同一天、同金額改買 0050 比較。'],
         ['期間', `2026/8 到 ${B.asof.replaceAll('-', '/')}。`]] })}
       ${full ? `<div class="panel"><h3>研究報告</h3><div class="doc">${md(B.report)}</div></div>` : LT.reportLock()}`;
-    const lg = el.querySelector('#nsf10BriefLegend');
-    daily(el.querySelector('#nsf10Brief'), B, lg);
-    lg.insertAdjacentHTML('beforeend', '<p class="note">決議後的第一週，八大行庫沒有明顯多買。之後台股再跌，臺銀證券總公司突然每天大買，而且幾乎只買台積電、聯發科這幾檔權值股，其他分點沒有跟著放大。</p>');
+    top(el.querySelector('#nsf10Brief'), B);
+    el.querySelector('#nsf10BriefLegend').innerHTML = '<p class="note">決議後八大行庫累計買最多的是台積電、聯發科、0050、台達電。台積電、聯發科大多是臺銀證券總公司 11/16 起買的，0050 則主要是其他分點的客戶。</p>';
     if (!full) return;   // 訪客：只有上半部
     el.querySelectorAll('.md-fig [data-fig]').forEach(div => {
       const f = div.dataset.fig.split('/').pop();   // 只看檔名(報告寫成 <報告>/xxx.png，同其他研究)
