@@ -4,7 +4,7 @@
               事件期(決議後)累計淨買前 10 大，以及報告 reports/nsf10.md
 
 研究在本機的研究資料夾計算(預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/國安基金第10次護盤，環境變數 NSF10_DIR 可改)：
-  程式/抓資料.py 在 CM 伺服器直接撈八大行庫的每週與區間累計前 10 大、每日合計，程式/分析.py 輸出 每日淨買.csv、區間前10大.csv 等。
+  程式/抓資料.py 在 CM 伺服器直接撈八大行庫的每週累計前 10 大、區間累計前 20 大、每日合計，程式/分析.py 輸出 每日淨買.csv、區間前20大.csv 等。
 這裡只把研究輸出轉成網頁用的 JSON，不發佈 csv、png 與分點明細。
 報告 reports/nsf10.md 是研究資料夾 README 的網頁版(圖片寫成 nsf10/檔名.png，由網頁依 JSON 重畫，other/topics.js)，
 內文數字與表格都是手寫的，研究數字改變時要同步更新。
@@ -41,8 +41,8 @@ def nsf10():
         return None
     d = pd.read_csv(NSF10_DIR / '每日淨買.csv', dtype={'日期': str}).set_index('日期').sort_index()
     d = d[d.index >= SHOW]
-    r = pd.read_csv(NSF10_DIR / '區間前10大.csv', dtype={'股票代號': str, '起': str, '迄': str})
-    t = r[(r['期間'] == '事件期') & (r['分點'] == '八大行庫')].sort_values('名次')
+    r = pd.read_csv(NSF10_DIR / '區間前20大.csv', dtype={'股票代號': str, '起': str, '迄': str})
+    t = r[(r['期間'] == '事件期') & (r['分點'] == '八大行庫')].sort_values('名次').head(10)   # 圖只畫前 10 大
     ymd = lambda s: f'{s[:4]}-{s[4:6]}-{s[6:]}'  # noqa: E731
     r1 = lambda v: round(float(v), 1)  # noqa: E731
     return {
