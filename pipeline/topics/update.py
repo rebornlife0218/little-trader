@@ -1,6 +1,6 @@
 """
 資料集 topics：其他 › 近期話題的研究報告 → web/data/topics/<話題>.json
-  nsf10.json  國安基金第 10 次護盤買了什麼：八大行庫(所有分點)每天的淨買金額(臺銀證券總公司／其他分點)、
+  nsf10.json  國安基金第 10 次護盤買了什麼：八大行庫總公司每天的淨買金額(臺銀證券總公司／其他七家總公司)、
               事件期(決議後)累計淨買前 10 大，以及報告 reports/nsf10.md
 
 研究在本機的研究資料夾計算(預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/國安基金第10次護盤，環境變數 NSF10_DIR 可改)：
@@ -49,7 +49,7 @@ def nsf10():
         'asof': ymd(d.index[-1]), 'ev0': ymd(EV0),
         'd': [ymd(s) for s in d.index],
         'tw': [r1(v) for v in d['臺銀證券總公司']],                         # 臺銀證券總公司每日淨買(億)
-        'other': [r1(v) for v in d['八大合計'] - d['臺銀證券總公司']],        # 八大行庫其他分點(億)
+        'other': [r1(v) for v in d['其他七家總公司']],                      # 其他七家總公司(億)
         'top': {'from': ymd(t['起'].iloc[0]), 'to': ymd(t['迄'].iloc[0]),
                 'name': [f'{c} {n}' for c, n in zip(t['股票代號'], t['股票名稱'])], 'v': [r1(v) for v in t['淨買億']]},
         'report': report(),
