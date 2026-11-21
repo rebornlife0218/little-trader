@@ -45,7 +45,9 @@
     排除：開盤量創 3 日新低(比前 2 天都低，cm.tw_open_close_vol，2020/3/2 起才有資料)；融券買進 > 20 張
     出場：停利 30%、停損 15%(盤中觸及)，最多持有 10 個交易日，第 10 天收盤賣出
     家數差門檻：原始條件是 20(XQ，連續 2 天都要符合；和 XQ 的交易約 77% 對得上)；測過 10～150，30～70 都比 20 好、100 以上變差，使用者選定 50
-  longma 還敢站上長均啊冰鳥(做空)：股價剛站上長期均線、很多分點在買、當天振幅很大，隔天開盤放空
+  longma 還敢站上長均啊冰鳥(做空，2026-11-21 下架：不在 STRATEGIES，網頁不列出；函式與 tw-strategy.js 的說明保留，重新上架時加回 STRATEGIES 與策略頁目錄；
+    STRATEGIES 那一筆是 {'key': 'longma', 'side': 'short', 'signal': longma_signal, 'tp': 0.20, 'sl': 0.08, 'hold': 5, 'exit': 'close'})：
+    股價剛站上長期均線、很多分點在買、當天振幅很大，隔天開盤放空
     1. 交易所公告股本 > 10 億元(cm.tw_company_info，當年度的股本)
     2. 站上長均(同 XQ「站上長均」，原始價格)：收盤價 > 120 日均線 × (1 + 0.1%)，而且近 30 個交易日(含當天)收在這個價位之上的天數 ≤ 2
        (剛站上第 1、2 天)；和 XQ 2021/7～2025/7 的訊號比對，XQ 的訊號 97% 對得上(「近 30 天由下往上穿越 ≤ 2 次」只有 66%)
@@ -299,7 +301,6 @@ def longma_signal(W):
 
 STRATEGIES = [
     {'key': 'against', 'side': 'short', 'signal': against_signal, 'tp': None, 'sl': None, 'hold': 1, 'exit': 'close'},
-    {'key': 'longma', 'side': 'short', 'signal': longma_signal, 'tp': 0.20, 'sl': 0.08, 'hold': 5, 'exit': 'close'},
     {'key': 'rev20', 'side': 'long', 'signal': rev20_signal, 'tp': None, 'sl': 0.15, 'hold': 15, 'exit': 'close'},
     {'key': 'boss', 'side': 'long', 'signal': boss_signal, 'tp': 0.30, 'sl': 0.15, 'hold': 10, 'exit': 'close'},
 ] + (private.STRATEGIES if private else [])
