@@ -617,16 +617,30 @@ const LT = (() => {
   /* Markdown 轉出來的表格(統計學教材、研究報告)：包進 .tablewrap(放不下就左右捲動)，加上 stattable、md-table 樣式；
      短的格子(看得到的字 ≤ 12 個，名稱、日期、數字、短公式)標 nw 不換行；長的格子內容包一層 .cellw，至少 8 個字寬才換行
      (表格格子的 min-width 瀏覽器不理會，要放在格子裡的區塊上)，手機上就不會幾個字就換行或擠成直排。
-     字數只算畫面上看得到的部分：不算 KaTeX 給螢幕閱讀器的 MathML、零寬字元與空白 */
+     字數只算畫面上看得到的部分：不算 KaTeX 給螢幕閱讀器的 MathML、零寬字元與空白。
+     有格子是一整段說明(看得到的字 > 60 個，例如國安基金報告的「時空背景」)的表格標 md-stack：手機上每一列改成卡片，
+     短的格子(前面加上欄名 data-label)排在第一行，長的說明佔滿整行寬度；電腦版不變 */
   function mdTables(box) {
     box.querySelectorAll('table').forEach(t => {
       t.classList.add('stattable', 'md-table');
-      t.querySelectorAll('td').forEach(td => {
+      const heads = [...t.querySelectorAll('thead th')].map(th => th.textContent.trim());
+      const longCols = new Set();
+      t.querySelectorAll('tbody tr').forEach(tr => [...tr.cells].forEach((td, i) => {
         const c = td.cloneNode(true);
         c.querySelectorAll('.katex-mathml').forEach(m => m.remove());
-        if (c.textContent.replace(/[\s​]/g, '').length <= 12) td.classList.add('nw');
+        const n = c.textContent.replace(/[\s​]/g, '').length;
+        if (n > 60) longCols.add(i);
+        if (n <= 12) td.classList.add('nw');
         else td.innerHTML = `<div class="cellw">${td.innerHTML}</div>`;
-      });
+      }));
+      if (longCols.size) {
+        t.classList.add('md-stack');
+        // 長說明的欄整欄佔滿寬度；只有一欄長說明時不顯示它的欄名(看段落就懂)，其他格子在前面加上欄名
+        t.querySelectorAll('tbody tr').forEach(tr => [...tr.cells].forEach((td, i) => {
+          if (longCols.has(i)) td.classList.add('long');
+          if (heads[i] && !(longCols.has(i) && longCols.size === 1)) td.dataset.label = heads[i];
+        }));
+      }
       t.outerHTML = `<div class="tablewrap">${t.outerHTML}</div>`;
     });
   }

@@ -295,6 +295,19 @@
     .doc table.md-table th, .doc table.md-table td.nw{white-space:nowrap;}
     .doc table.md-table td:first-child:not(.nw){white-space:normal;}
     .doc table.md-table .cellw{min-width:8em;}
+    /* 有一整段說明的表格(LT.mdTables 標 md-stack)：每一列改成卡片，短的格子加欄名排成一行，長的說明佔滿整行 */
+    .doc table.md-table.md-stack, .doc table.md-stack tbody, .doc table.md-stack tr{display:block;width:100%;}
+    .doc table.md-stack thead{display:none;}
+    .doc table.md-stack tr{padding:10px 12px;border-bottom:1px solid var(--grid);}
+    .doc table.md-stack tr:last-child{border-bottom:0;}
+    .doc table.md-stack td{border:0;padding:0;}
+    .doc table.md-stack td:not(.long){display:inline-block;margin:0 14px 6px 0;font-weight:600;white-space:nowrap;}
+    .doc table.md-stack td:not(.long)[data-label]::before{content:attr(data-label);margin-right:6px;font-size:12px;font-weight:400;color:var(--mute);}
+    .doc table.md-stack td.long{display:block;}
+    .doc table.md-stack td.long[data-label]::before{content:attr(data-label);display:block;margin-bottom:2px;font-size:12px;color:var(--mute);}
+    .doc table.md-stack .cellw{min-width:0;}
+    .doc table.md-stack td:not(.long) .cellw{display:inline;}
+    .doc table.md-stack td.long .cellw{line-height:1.75;}
     /* 處置股「新制改了什麼」：長的說明換行，整張表同一種字型 */
     table.stattable.dp-rules td{white-space:normal;text-align:left;font-family:var(--font-body);}
   }

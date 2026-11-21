@@ -314,6 +314,7 @@ LT.register({
 - **策略頁**：低波動選股、事件型策略(tw-strategy.js 的 eventStrat)、S&P500 季度換股也照研究報告的結構(先講結論 → 研究目的 → 資料處理 → 研究方法 → 四、實證結果與分析 → 五、結論；事件型另有六、延伸：最近的訊號)；先講結論與結論由網頁依回測數字產生。章節標題在面板之間用 `<h2 class="sec-h">`。
 - **字型**：用 CSS 變數 `--font-body`(內文，中文優先的 Noto Sans TC)、`--font-display`(標題，Space Grotesk)、`--font-num`(數字)，不要直接寫字型名稱；數字預設等寬(`tabular-nums`)。canvas 圖表的座標字用 IBM Plex Mono。
 - **研究報告**：結構見 CLAUDE.md「研究報告」；報告是 Markdown(資料集的 `report`)時，開頭的 `> ` 引言就是先講結論(樣式 `.doc blockquote`)；直接寫在頁面裡的研究(ARKK、單筆 vs 定期定額)用 `<blockquote>` 與 `<h3 class="md-h2">` 照同樣的結構寫。
+- **報告 Markdown 的表格**(`LT.mdTables`)：包進 `.tablewrap`(放不下就左右捲動)；看得到的字 ≤ 12 個的格子不換行(`nw`)，較長的至少 8 個字寬。有格子是一整段說明(> 60 個字，例如國安基金報告的「時空背景」)的表格標 `md-stack`：**只在手機(≤ 640px)**把每一列改成卡片，短的格子前面加欄名排在上面，長的說明佔滿整行(只有一欄長說明時不顯示它的欄名)；電腦版仍是一般表格。
 - **分享研究**：目錄頁的單一內容(研究、策略)在頁首有「分享」按鈕(app.js 的 `share`；登入的會員才有，要密碼的策略沒有)，呼叫 `POST api/share`(`functions/api/share.ts`)產生專屬連結 `/s/<8 碼代碼>`(同一個人分享同一份報告是同一個連結，存在 D1 的 `share_links`)。手機用系統分享選單，電腦複製連結。
   打開連結(`functions/s/[code].ts`)：點開次數 +1(社群網站抓預覽不算)、存 `lt_ref` cookie(30 天)、轉到報告頁；沒登入的人看得到上半部，完整報告的位置是登入提示。登入後看報告時，`api/track` 依 `lt_ref` 記到 `share_views`(誰、看了幾次；分享的人自己不算)。後台「分享紀錄」列出誰分享了哪份報告、點開次數、登入後看的人與新會員(點了連結才第一次登入)。`_routes.json` 已包含 `/s/*`。
 - **IG 圖卡**：`node scripts/share/make-share.mjs [研究 key …]`，在本機開網站並截出圖卡；新增研究時在 `scripts/share/ig-topics.mjs` 加一筆。
