@@ -20,12 +20,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REPO = 'rebornlife0218/little-trader'
-DATASETS = ['tw_strategy', 'disposition', 'tw_research:disp', 'tw_dip:live', 'etf_compare', 'price_query']
+DATASETS = ['tw_strategy', 'disposition', 'tw_research:disp', 'tw_dip:live', 'etf_compare', 'topics:daily', 'price_query']
 # tw_research:disp 每天只重跑處置股策略(策略頁要列出隔天進場的處置股)，其他台股研究不定期手動執行 run_local.py tw_research；
 # 發佈時仍是整個 web/data/tw_research/ 資料夾(其他研究用本機上次算好的檔案)
 # tw_dip:live 每天只更新大跌後抄底選股近期明細的報酬(研究本身由研究資料夾所在的電腦手動執行 run_local.py tw_dip)
+# topics:daily 國安基金第 10 次護盤每天重跑研究資料夾再發佈，到 pipeline/topics/update.py 的 DAILY_UNTIL 為止；
+# 研究資料夾(NSF10_DIR)不在這台電腦或已過期限就略過，不算失敗
 # price_query 不發佈到 data 分支：pipeline/price_query/sync.py 直接寫進 Cloudflare D1(股票查詢頁)；
 # wrangler.toml 還沒填 D1 的 database_id(尚未建立資料庫)時略過
+TOPICS_DAILY_UNTIL = '2026-12-31'   # 同 pipeline/topics/update.py 的 DAILY_UNTIL
 LOG = Path.home() / '.cache' / 'little-trader' / 'local.log'
 NO_WINDOW = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
 log = logging.getLogger('run_local')
@@ -134,6 +137,11 @@ def main():
                     log.error('price_query 失敗：%s', e)
                     failed.append(ds)
                 continue
+            if ds == 'topics' and 'daily' in args.split(','):
+                nsf10 = Path(os.environ.get('NSF10_DIR', Path.home() / 'Desktop/ETF_PANEL/CLAUDE/其他策略/國安基金第10次護盤'))
+                if time.strftime('%Y-%m-%d') > TOPICS_DAILY_UNTIL or not (nsf10 / '程式' / '抓資料.py').exists():
+                    log.info('topics：研究資料夾不在這台電腦或已過每日更新期限，略過')
+                    continue
             try:
                 out = run([python, str(ROOT / 'pipeline' / ds / 'update.py'), *filter(None, args.split(','))], cwd=ROOT, env=env)[1]
                 log.info('%s：\n%s', ds, out)

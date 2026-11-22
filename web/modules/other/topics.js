@@ -1,7 +1,8 @@
 /* ==========================================================================
-   其他 › 近期話題(目錄頁 LT.catalog，網址 other/topics/<話題>)：市場近期討論的話題，每個話題一份研究報告
+   其他 › 近期話題(目錄頁 LT.catalog，網址 other/topics/<話題>)：跟上時事的金融知識，每個話題一份研究報告
+   · 清單依發布時間排序(新的在前)：新增話題時在 TOPICS 加一筆，date 寫上架日期(YYYY-MM-DD)，卡片右側顯示發布日期
    · 國安基金第 10 次護盤買了什麼(other/topics/nsf10，上半部是決議後累計淨買前 10 大)：資料集 topics 的 nsf10.json(pipeline/topics/update.py)，
-     八大行庫總公司每天的淨買(臺銀證券總公司／其他七家總公司)、決議後累計淨買前 10 大與報告 Markdown；不是回測，沒有淨值
+     八大行庫總公司每天的淨買(臺銀證券總公司／其他七家總公司)、決議後累計淨買前 10 大與報告 Markdown；不是回測，沒有淨值；2026 年底前每天更新
    上半部(精簡版)公開，下半部(完整報告)要登入(LT.loadReport)
    ========================================================================== */
 window.LTTopics = (() => {
@@ -54,7 +55,7 @@ window.LTTopics = (() => {
     }
     if (!ctx.alive()) return;
     el.innerHTML = `
-      ${LT.brief({ hero: full ? '' : (B.hero ? md(B.hero) : ''), chart: 'nsf10Brief', items: [
+      ${LT.brief({ hero: full ? '' : (B.hero ? md(B.hero) : ''), chart: 'nsf10Brief', updated: 'topics', items: [
         ['研究問題', '國安基金決議進場後，哪一天開始真正買進？買了哪些股票、大約多少錢？'],
         ['怎麼看', '國安基金透過八大行庫下單。比較八大行庫每個分點決議前後的買進，找出突然放大的分點與股票。'],
         ['怎麼比較', '和大跌前的平常日子比較；買進的股票算到最新收盤的帳面損益，並和同一天、同金額改買 0050 比較。'],
@@ -71,14 +72,17 @@ window.LTTopics = (() => {
     });
   }
 
+  // 近期話題：依發布時間排序(新的在前)，date 是上架日期
+  const TOPICS = [
+    { key: 'nsf10', name: '國安基金第 10 次護盤買了什麼', report: true, date: '2026-11-19',
+      desc: '從八大行庫的分點進出，推估國安基金哪天開始買、買了哪些股票、買了多少',
+      summary: '決議後沒有馬上買，等台股再跌才大量進場，集中在臺銀證券總公司，幾乎只買台積電、聯發科等少數權值股；目前帳面比同時買 0050 略差。',
+      run: (el, ctx) => nsf10(el, ctx) },
+  ];
   LT.catalog({
-    section: 'other', key: 'topics', name: '近期話題', desc: '市場近期討論的話題，用資料看實際發生了什麼',
-    groups: [{ name: '', items: [
-      { key: 'nsf10', name: '國安基金第 10 次護盤買了什麼', report: true,
-        desc: '從八大行庫的分點進出，推估國安基金哪天開始買、買了哪些股票、買了多少',
-        summary: '決議後沒有馬上買，等台股再跌才大量進場，集中在臺銀證券總公司，幾乎只買台積電、聯發科等少數權值股；目前帳面比同時買 0050 略差。',
-        run: (el, ctx) => nsf10(el, ctx) },
-    ] }],
+    section: 'other', key: 'topics', name: '近期話題', desc: '跟上時事的金融知識：市場近期討論的話題，用資料看實際發生了什麼(新的在前)',
+    groups: [{ name: '', items: [...TOPICS].sort((a, b) => b.date.localeCompare(a.date))
+      .map(x => ({ ...x, tags: `${x.date.replaceAll('-', '/')} 發布` })) }],
   });
   return { nsf10 };
 })();

@@ -8,12 +8,16 @@
 這裡只把研究輸出轉成網頁用的 JSON，不發佈 csv、png 與分點明細。
 報告 reports/nsf10.md 是研究資料夾 README 的網頁版(圖片寫成 nsf10/檔名.png，由網頁依 JSON 重畫，other/topics.js)，
 內文數字與表格都是手寫的，研究數字改變時要同步更新。
-不是回測，沒有淨值；研究不每日更新，研究資料夾重跑後手動執行：
-  python pipeline/run_local.py topics        (轉檔、發佈到 data 分支並重新部署)
+不是回測，沒有淨值。2026 年底前每天更新(run_local.py 的 topics:daily，DAILY_UNTIL 為止)：
+  依序重跑研究資料夾的 程式/抓資料.py、程式/分析.py，再轉檔、發佈到 data 分支並重新部署；
+  研究資料夾不在這台電腦時，run_local.py 直接略過(不發佈、不算失敗)。
+  報告文字(reports/nsf10.md)是手寫的，每日更新只改圖表、決議後累計前 10 大與資料日期。
+手動更新：python pipeline/run_local.py topics
 研究資料夾不在(例如其他電腦)時，圖表資料沿用上一次發佈的 nsf10.json，報告文字仍用 repo 裡最新的 nsf10.md。
 """
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -27,6 +31,7 @@ NAME = 'topics'
 NSF10_DIR = Path(os.environ.get('NSF10_DIR', Path.home() / 'Desktop/ETF_PANEL/CLAUDE/其他策略/國安基金第10次護盤'))
 SHOW = '20261102'          # 每日淨買的圖從這天開始畫
 EV0 = '20261109'           # 決議後第一個交易日
+DAILY_UNTIL = '2026-12-31'  # 每日更新到這天為止(run_local.py 也用同一個日期判斷要不要跑)
 
 
 def report():
@@ -56,7 +61,20 @@ def nsf10():
     }
 
 
+def rerun_research():
+    """每日更新：依序重跑研究資料夾的 程式/抓資料.py、程式/分析.py(在 CM 伺服器撈八大行庫分點、輸出 csv)"""
+    for f in ('抓資料.py', '分析.py'):
+        p = subprocess.run([sys.executable, str(NSF10_DIR / '程式' / f)], cwd=NSF10_DIR / '程式', capture_output=True, text=True,
+                           encoding='utf-8', errors='replace', env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
+        if p.returncode:
+            sys.exit(f'nsf10：{f} 失敗({p.returncode})：{(p.stdout + p.stderr)[-800:]}')
+        print(f'nsf10：{f} 完成')
+
+
 def main():
+    daily = 'daily' in sys.argv[1:]
+    if daily:
+        rerun_research()
     prev = load_published(NAME, 'nsf10.json')          # 先讀回上一次的檔(dataset_dir 會清空本機資料夾)
     out = dataset_dir(NAME)
     B = nsf10() or prev
@@ -64,7 +82,7 @@ def main():
         sys.exit('nsf10：找不到本機研究資料夾，也沒有上一次發佈的 nsf10.json')
     B['report'] = report()                              # 沿用上一次的圖表資料時，報告文字仍用 repo 裡最新的 nsf10.md
     write_json(out / 'nsf10.json', B)
-    write_meta(NAME, '八大行庫分點進出(本機研究資料夾)', '', '不定期(研究更新時手動執行)', asof=B['asof'])
+    write_meta(NAME, '八大行庫分點進出(本機研究資料夾)', '', f'每天(本機排程，到 {DAILY_UNTIL})', asof=B['asof'])
     print(f"nsf10：{len(B['d'])} 天，資料到 {B['asof']}")
 
 
