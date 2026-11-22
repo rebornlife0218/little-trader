@@ -2,6 +2,7 @@
    資料在 Cloudflare D1(本機 pipeline/price_query/sync.py 每天同步)，經 api/prices 查詢；訪客也能用(期間不限，每天的次數比登入 Google 少，functions/_lib/types.ts 的 POLICY)；剩下的次數只在會員今天查超過 400 次後才顯示
    api/prices 回傳欄式資料 rows = {d 日期, o h l c 開高低收(原始價格), a 還原收盤價, v 成交量, f 外資買賣超, t 投信買賣超,
    m 融資餘額, s 融券餘額, b 借券賣出餘額}(單位都是張)與 events = [[日期, 種類, 說明, 結束日期]]
+   加權指數(TSE)另外併入台指期資料(data/options/futures.json)：期現貨價差、轉倉價差、三大法人多方與空方未平倉(口)
    K 線圖：左上角切換原始價、還原價(開高低乘上當天的還原比例 a ÷ c)；點一下出現十字線，滾輪縮放、拖曳平移、← → 移動 */
 (() => {
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -26,11 +27,30 @@
     { key: 'm', name: '融資餘額', kind: 'line', color: '--amber' },
     { key: 's', name: '融券餘額', kind: 'line', color: '--blue' },
     { key: 'b', name: '借券賣出餘額', kind: 'line', color: '--dim' },
+    // 以下只有加權指數(TSE)有：台指期近月的期現貨價差、轉倉價差(次月 − 近月)、三大法人台指期多方與空方未平倉
+    { key: 'bs', name: '台指期現貨價差', kind: 'net' },
+    { key: 'rl', name: '轉倉價差(次月 − 近月)', kind: 'net' },
+    ...[['fi', '外資'], ['it', '投信'], ['dl', '自營商']].map(([k, t]) => (
+      { key: k + '_ls', name: `${t}台指期多方 / 空方未平倉`, kind: 'pair', lines: [[k + '_l', '--up'], [k + '_s', '--down']] })),
   ];
+  const hasPanel = (R, p) => p.lines ? p.lines.every(([k]) => R[k] && R[k].some(Number.isFinite)) : !!R[p.key];
   const EV_TAG = { div: '息', split: '分割', halt: '停' };
-  // 單位：個股都是張；加權指數(TSE)的成交金額、法人、融資是億元，融券是張
-  const IDX_UNIT = { v: '億元', f: '億元', t: '億元', p: '億元', m: '億元', s: '張' };
+  // 單位：個股都是張；加權指數(TSE)的成交金額、法人、融資是億元，融券是張，台指期價差是點，未平倉是口
+  const IDX_UNIT = { v: '億元', f: '億元', t: '億元', p: '億元', m: '億元', s: '張', bs: '點', rl: '點', fi_ls: '口', it_ls: '口', dl_ls: '口' };
   const unitOf = (J, k) => J.index ? IDX_UNIT[k] : '張';
+
+  // 加權指數(TSE)：把台指期資料(data/options/futures.json，隨選擇權資料每天更新)依日期併進 rows
+  async function mergeFutures(J) {
+    const F = await LT.loadJSON('options', 'futures.json').then(r => r.data && r.data.series).catch(() => null);
+    if (!F || !F.d) return;
+    const R = J.rows, at = new Map(F.d.map((d, i) => [d, i])), ok = Number.isFinite;
+    const col = f => R.d.map(d => { const i = at.get(d); if (i == null) return NaN; const v = f(i); return ok(v) ? v : NaN; });
+    R.fc = col(i => F.c[i]);
+    R.bs = R.d.map((_, k) => ok(R.fc[k]) && ok(R.c[k]) ? R.fc[k] - R.c[k] : NaN);
+    R.rl = col(i => ok(F.c2[i]) && ok(F.c[i]) ? F.c2[i] - F.c[i] : NaN);
+    ['fi', 'it', 'dl'].forEach(k => { if (F[k + '_l'] && F[k + '_s']) { R[k + '_l'] = col(i => F[k + '_l'][i]); R[k + '_s'] = col(i => F[k + '_s'][i]); } });
+    J.futFrom = F.d[0];
+  }
   let symbolsP = null;   // 股票清單只載入一次
 
   function loadSymbols() {
@@ -74,7 +94,7 @@
     function draw() {
       const C = k => LT.cssVar(k);
       const dpr = window.devicePixelRatio || 1, W = Math.max(300, wrap.clientWidth);
-      const panels = PANELS.filter(p => opts.panels.has(p.key) && R[p.key]);
+      const panels = PANELS.filter(p => opts.panels.has(p.key) && hasPanel(R, p));
       const PH = 300, SH = 66, GAP = 8, AX = 18;
       const H = PH + panels.length * (SH + GAP) + AX;
       canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.height = H + 'px';
@@ -138,26 +158,28 @@
       // 小圖
       let top = PH + GAP;
       panels.forEach(pn => {
-        const vals = R[pn.key].slice(s, e + 1).filter(Number.isFinite);
-        let a = pn.kind === 'line' ? Math.min(...vals) : Math.min(0, ...vals), b = pn.kind === 'line' ? Math.max(...vals) : Math.max(0, ...vals);
+        const vals = (pn.lines ? pn.lines.flatMap(([k]) => R[k].slice(s, e + 1)) : R[pn.key].slice(s, e + 1)).filter(Number.isFinite);
+        const isLine = pn.kind === 'line' || pn.kind === 'pair';
+        let a = isLine ? Math.min(...vals) : Math.min(0, ...vals), b = isLine ? Math.max(...vals) : Math.max(0, ...vals);
         if (!vals.length) { a = 0; b = 1; }
         if (!(b > a)) b = a + 1;
         const t0 = top, ys = v => t0 + 12 + (SH - 14) * (1 - (v - a) / (b - a));
         g.strokeStyle = C('--grid'); g.strokeRect(padL, t0, plotW, SH);
-        if (pn.kind !== 'line') { g.beginPath(); g.moveTo(padL, ys(0)); g.lineTo(W - padR, ys(0)); g.stroke(); }
+        if (!isLine) { g.beginPath(); g.moveTo(padL, ys(0)); g.lineTo(W - padR, ys(0)); g.stroke(); }
         for (let i = s; i <= e; i++) {
-          const v = R[pn.key][i]; if (!Number.isFinite(v) || pn.kind === 'line') continue;
+          if (isLine) break;
+          const v = R[pn.key][i]; if (!Number.isFinite(v)) continue;
           g.fillStyle = pn.kind === 'vol' ? (price[i].c >= price[i].o ? up : dn) : (v >= 0 ? C('--up') : C('--down'));
           g.globalAlpha = pn.kind === 'vol' ? 0.55 : 0.75;
           g.fillRect(xAt(i) - bw / 2, Math.min(ys(v), ys(0)), bw, Math.max(Math.abs(ys(v) - ys(0)), 0.5));
           g.globalAlpha = 1;
         }
-        if (pn.kind === 'line') {
+        if (isLine) (pn.lines || [[pn.key, pn.color]]).forEach(([k, color]) => {
           g.beginPath(); let on = false;
-          for (let i = s; i <= e; i++) { const v = R[pn.key][i]; if (!Number.isFinite(v)) { on = false; continue; } if (on) g.lineTo(xAt(i), ys(v)); else g.moveTo(xAt(i), ys(v)); on = true; }
-          g.strokeStyle = C(pn.color); g.lineWidth = 1.4; g.stroke(); g.lineWidth = 1;
-        }
-        g.fillStyle = C('--dim'); g.fillText(`${J.index && pn.key === 'v' ? '成交金額' : pn.name}(${unitOf(J, pn.key)})`, padL + 4, t0 + 10);
+          for (let i = s; i <= e; i++) { const v = R[k][i]; if (!Number.isFinite(v)) { on = false; continue; } if (on) g.lineTo(xAt(i), ys(v)); else g.moveTo(xAt(i), ys(v)); on = true; }
+          g.strokeStyle = C(color); g.lineWidth = 1.4; g.stroke(); g.lineWidth = 1;
+        });
+        g.fillStyle = C('--dim'); g.fillText(`${J.index && pn.key === 'v' ? '成交金額' : pn.name}(${unitOf(J, pn.key)}${pn.kind === 'pair' ? '；紅 = 多方、綠 = 空方' : ''})`, padL + 4, t0 + 10);
         g.fillStyle = C('--mute'); g.fillText(short(b), 4, t0 + 10); g.fillText(short(a), 4, t0 + SH - 2);
         top += SH + GAP;
       });
@@ -249,7 +271,7 @@
         ${back ? `<button type="button" class="pq-back acct-link">← 返回${esc(back.name)}</button>` : ''}
         <header class="top"><div>
           <h1>股票查詢</h1>
-          <p>上市櫃股票與 ETF 的價量、外資與投信買賣超、融資券、借券，以及月營收、除權息、暫停交易、處置，2016 年起(含已下市櫃)；加權指數的代號是 TSE</p>
+          <p>上市櫃股票與 ETF 的價量、外資與投信買賣超、融資券、借券，以及月營收、除權息、暫停交易、處置，2016 年起(含已下市櫃)；加權指數的代號是 TSE，另有台指期的期現貨價差、轉倉價差與三大法人多空未平倉</p>
         </div></header>
         <div class="panel">
           <form class="pq-form" autocomplete="off">
@@ -310,6 +332,7 @@
           $('#pqOut').innerHTML = `<div class="panel"><p class="mute">${esc(msg)}</p></div>`; return;
         }
         j.view_from = from;
+        if (j.market === '指數') { await mergeFutures(j); if (!ctx.alive()) return; }
         render(j);
       }
 
@@ -326,6 +349,10 @@
         const card = (v, l, c = '') => `<div class="stat"><div class="v ${c}">${v}</div><div class="l">${l}</div></div>`;
         const sum = k => R[k] && R[k].slice(i0).some(Number.isFinite) ? R[k].slice(i0).reduce((s, v) => s + (v || 0), 0) : NaN;
         const yi = v => Number.isFinite(v) ? (v > 0 ? '+' : '') + num(v, 0) + ' 億' : '—';   // 加權指數的法人：億元
+        const pts = v => Number.isFinite(v) ? sint(v) + ' 點' : '—';
+        const bpct = (v, base) => Number.isFinite(v) && base > 0 ? (v >= 0 ? '+' : '') + (v / base * 100).toFixed(2) + '%' : '';   // 價差占基準的 %
+        let fl = -1;   // 最後一個有台指期資料的交易日
+        if (j.index && R.bs) for (let k = last; k >= i0; k--) if (Number.isFinite(R.bs[k])) { fl = k; break; }
         $('#pqOut').innerHTML = `
           <div class="panel">
             <h3 class="pq-title">${title}</h3>
@@ -335,6 +362,8 @@
               ${card(pct(a1 / a0 - 1), j.index ? '指數漲跌(不含股息)' : '含息報酬(還原股價)', cls(a1 / a0 - 1))}
               ${years >= 1 ? card(pct((a1 / a0) ** (1 / years) - 1), j.index ? '年化漲跌(不含股息)' : '年化含息報酬', cls(a1 / a0 - 1)) : ''}
               ${j.index ? [['f', '外資'], ['t', '投信'], ['p', '自營商']].map(([k, t]) => card(yi(sum(k)), `${t}累計買賣超`, cls(sum(k)))).join('')
+                + (fl >= 0 ? card(pts(R.bs[fl]), `台指期現貨價差(${R.d[fl].slice(5).replace('-', '/')}) ${bpct(R.bs[fl], R.c[fl])}${R.bs[fl] >= 0 ? ' · 正價差' : ' · 逆價差'}`, cls(R.bs[fl]))
+                  + card(pts(R.rl[fl]), `轉倉價差(次月 − 近月) ${bpct(R.rl[fl], R.fc[fl])}`, cls(R.rl[fl])) : '')
                 : `${card(sint(sum('f')), '外資累計買賣超(張)', cls(sum('f')))}
               ${card(sint(sum('t')), '投信累計買賣超(張)', cls(sum('t')))}`}
             </div>
@@ -343,18 +372,21 @@
               <div class="pq-legend">${MAS.map(p => `<span><i class="dot" style="background:var(--ma${p})"></i>${p}MA</span>`).join('')}
                 ${j.index ? '' : '<span><b class="up">◆</b><b class="down">◆</b> 月營收公告(年成長 / 衰退)</span><span><b style="color:var(--blue)">息</b> 除權息</span><span><b class="mute">停</b> 暫停交易</span><span><i class="dot" style="background:var(--amber)"></i>處置期間</span>'}</div>
             </div>
-            <div class="btnrow-l pq-panels">${PANELS.filter(p => R[p.key]).map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${j.index && p.key === 'v' ? '成交金額' : p.name}</button>`).join('')}</div>
+            <div class="btnrow-l pq-panels">${PANELS.filter(p => hasPanel(R, p)).map(p => `<button type="button" data-p="${p.key}" class="${opts.panels.has(p.key) ? 'active' : ''}">${j.index && p.key === 'v' ? '成交金額' : p.name}</button>`).join('')}</div>
             <div id="pqInfo" class="ohlc-info pq-info"></div>
             <div id="pqChart" class="pq-chart"></div>
             <p class="note">點一下圖出現十字線，之後可用鍵盤 ← → 移動、Esc 取消；滾輪縮放、左右拖曳平移；上方按鈕可隱藏或顯示下方的小圖。
-              ${j.index ? '加權指數(代號 TSE)不含股息；成交金額、三大法人買賣超(外資不含外資自營商，自營商含自行買賣與避險)、融資餘額(融資金額)都是上市市場的億元，融券餘額是張數，法人與融資券 2016 年起。' : `還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
+              ${j.index ? `加權指數(代號 TSE)不含股息；成交金額、三大法人買賣超(外資不含外資自營商，自營商含自行買賣與避險)、融資餘額(融資金額)都是上市市場的億元，融券餘額是張數，法人與融資券 2016 年起。
+              台指期(臺股期貨 TX)${j.futFrom ? ` ${esc(j.futFrom)} 起` : ''}：期現貨價差 = 近月收盤 − 加權指數，正的是正價差、負的是逆價差；除權息旺季(6～8 月)期貨會先扣掉預期股利而逆價差，其他時間的大幅逆價差通常代表偏空、避險需求高。
+              轉倉價差 = 次月 − 近月，多單轉倉(賣近買遠)價差為正就要多付這些點數，空單相反；每月第 3 個週三結算前幾天是轉倉高峰。
+              三大法人多方、空方未平倉是所有月份合計的口數，淨部位一樣時多空兩邊可能都很大(同時有避險與投機)，分開看可以知道淨部位的變化是加碼多單還是回補空單；外資的空單有很多是現股的避險。` : `還原價：把除權息與分割調整回去的價格(開高低乘上當天的還原收盤價 ÷ 收盤價)。月營收的菱形標在公告日，紅色是單月營收比去年同期成長、綠色是衰退，點那天可看年成長(%)；
               「息」標在除權息日，點那天可看還原比例的變化(約等於殖利率)。外資、投信、融資券、借券都是張數。`}
               ${j.kind === 'member' && j.limit - j.remaining >= 400 ? `今天還可以查詢 ${j.remaining.toLocaleString()} 次(每天 ${j.limit.toLocaleString()} 次)。` : ''}</p>
           </div>`;
 
         const info = $('#pqInfo');
         const showInfo = (i, price, ma, evs, disps) => {
-          if (i == null) { info.innerHTML = `<span class="mute">${j.index ? '點選 K 棒可查看當天的開高低收、均線、成交金額、三大法人與融資券' : '點選 K 棒可查看當天的價量、法人、融資券與事件'}</span>`; return; }
+          if (i == null) { info.innerHTML = `<span class="mute">${j.index ? '點選 K 棒可查看當天的開高低收、均線、成交金額、三大法人、融資券與台指期價差、法人期貨未平倉' :'點選 K 棒可查看當天的價量、法人、融資券與事件'}</span>`; return; }
           const p = price[i], prev = i > 0 ? R.a[i] / R.a[i - 1] - 1 : NaN, f = v => num(v, v >= 1000 ? 0 : 2);
           const arrow = (arr, k) => k > 0 && arr[k] === arr[k] && arr[k - 1] === arr[k - 1] ? (arr[k] > arr[k - 1] ? '<b class="up">↑</b>' : arr[k] < arr[k - 1] ? '<b class="down">↓</b>' : '') : '';
           const mas = MAS.map(m => ma[m][i] === ma[m][i] ? `<span><i class="dot" style="background:var(--ma${m})"></i>${m}MA <em>${f(ma[m][i])}</em>${arrow(ma[m], i)}</span>` : '').join('');
@@ -365,7 +397,11 @@
             <span>收 <em class="${cls(prev)}">${f(p.c)}</em></span><span class="${cls(prev)}">${pct(prev)}</span>${mas}
             ${j.index ? `<span>成交金額 <em>${int(at('v'))}</em> 億</span>${[['f', '外資'], ['t', '投信'], ['p', '自營商']].map(([k, t]) =>
               `<span>${t} <em class="${cls(at(k))}">${Number.isFinite(at(k)) ? (at(k) > 0 ? '+' : '') + num(at(k), 2) : '—'}</em> 億</span>`).join('')}
-              <span>融資 <em>${Number.isFinite(at('m')) ? num(at('m'), 0) : '—'}</em> 億</span><span>融券 <em>${int(at('s'))}</em> 張</span>` : `<span>量 <em>${int(at('v'))}</em></span><span>外資 <em class="${cls(at('f'))}">${sint(at('f'))}</em></span>
+              <span>融資 <em>${Number.isFinite(at('m')) ? num(at('m'), 0) : '—'}</em> 億</span><span>融券 <em>${int(at('s'))}</em> 張</span>
+              ${Number.isFinite(at('bs')) ? `<span>期現貨價差 <em class="${cls(at('bs'))}">${sint(at('bs'))}</em> 點(${bpct(at('bs'), R.c[i])})</span>` : ''}
+              ${Number.isFinite(at('rl')) ? `<span>轉倉價差 <em class="${cls(at('rl'))}">${sint(at('rl'))}</em> 點</span>` : ''}
+              ${[['fi', '外資'], ['it', '投信'], ['dl', '自營商']].filter(([k]) => Number.isFinite(at(k + '_l'))).map(([k, t]) =>
+                `<span>${t}期貨 多 <em>${int(at(k + '_l'))}</em> / 空 <em>${int(at(k + '_s'))}</em> 口</span>`).join('')}` : `<span>量 <em>${int(at('v'))}</em></span><span>外資 <em class="${cls(at('f'))}">${sint(at('f'))}</em></span>
             <span>投信 <em class="${cls(at('t'))}">${sint(at('t'))}</em></span><span>融資 <em>${int(at('m'))}</em></span>
             <span>融券 <em>${int(at('s'))}</em></span><span>借券 <em>${int(at('b'))}</em></span>`}
             ${evText.length ? `<span class="pq-ev">${evText.map(esc).join('、')}</span>` : ''}`;

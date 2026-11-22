@@ -6,7 +6,7 @@
 const LT = (() => {
   // 側欄區塊(順序即側欄順序)；新增區塊直接在這裡加一筆，desc 顯示在首頁
   const SECTIONS = [
-    { key: 'index', name: '指數', desc: '全球 10 大指數的急跌反彈、均線、週期與 K 棒型態統計；台指期貨的價差、轉倉與法人未平倉' },
+    { key: 'index', name: '指數', desc: '全球 10 大指數的急跌反彈、均線、週期與 K 棒型態統計' },
     { key: 'etf', name: 'ETF', desc: 'ETF大禮包(ETF 介紹與折溢價、怎麼存 ETF、即將發行的新 ETF)與 ETF 研究' },
     { key: 'stock', name: '股票', desc: '台股處置股、策略回測與其他研究；美股財報行事曆與 S&P500 換股策略回測' },
     { key: 'option', name: '選擇權', desc: '臺指選擇權的隱含波動率、P/C ratio、T 字報價與結算日曆；24 種策略損益圖與 Black-Scholes 計算器' },

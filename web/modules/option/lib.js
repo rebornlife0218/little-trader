@@ -1,5 +1,5 @@
 /* 選擇權共用工具(LTOpt)：Black-Scholes 定價與 Greeks、策略定義、資料載入
-   各頁面(市場概況、台指期貨、Black-Scholes 計算器、策略損益圖)都靠這支，要先於它們載入。
+   各頁面(市場概況、Black-Scholes 計算器、策略損益圖)都靠這支，要先於它們載入。
    資料集：data/options/(pipeline/options/update.py：選擇權與台指期、spot.json 加權指數近一年收盤) */
 const LTOpt = (() => {
   const MULT = 50;            // 臺指選擇權每點 50 元
@@ -79,7 +79,7 @@ const LTOpt = (() => {
   const pnl = (legs, S, T, r, v) => legs.reduce((a, l) => a + l.side * (l.qty || 1) * (legValue(l, S, T, r, l.iv || v) - l.entry), 0);
 
   /* ---------- 資料 ---------- */
-  // 選擇權各頁(市場概況、策略損益圖、台指期貨)共用同一份資料：載入一次後留在記憶體 5 分鐘，切換頁面不必重新下載
+  // 選擇權各頁(市場概況、策略損益圖)共用同一份資料：載入一次後留在記憶體 5 分鐘，切換頁面不必重新下載
   let cache = null, cachedAt = 0;
   function load() {
     if (!cache || Date.now() - cachedAt > 5 * 60e3) {

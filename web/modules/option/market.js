@@ -71,7 +71,7 @@
         <div class="panel"><div class="statgrid">
           <div class="stat"><div class="v" style="font-size:18px;">${esc(chain.date)}</div><div class="l">最新交易日</div></div>
           <div class="stat"><div class="v">${spot ? fmt(spot.close, 0) : '—'}</div><div class="l">加權指數收盤${spot ? `(${esc(spot.date)})` : ''}</div></div>
-          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="index/futures">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
+          <div class="stat"><div class="v">${fut ? fmt(fut.price, 0) : '—'}</div><div class="l"><a href="stock/query/TSE">台指期 ${fut ? fut.code.slice(4, 6) + ' 月' : ''}</a> · 選擇權反推遠期 ${fmt(near.fwd, 0)}</div></div>
           <div class="stat"><div class="v">${pct(hist.iv30[n])}</div><div class="l">30 天隱含波動率</div></div>
           <div class="stat"><div class="v">${pct(hv[n])}</div><div class="l">20 日歷史波動率</div></div>
           <div class="stat"><div class="v">${fmt(hist.pcoi[n], 1)}%</div><div class="l">P/C ratio(未平倉)</div></div>
@@ -90,7 +90,7 @@
         <div class="panel">
           <h3>結算日曆</h3>
           ${LTOpt.settlementTable(LTOpt.settlements(D, 10))}
-          <p class="note">臺指選擇權有<b>月選擇權</b>(每月第 3 個週三結算，與台指期同一天)與<b>週選擇權</b>(每週三、週五結算)。週選擇權到期時間短、時間價值流失快(Theta 大)，結算前最後幾天價格對指數變動非常敏感。月結算時期貨部位需要轉倉，見<a href="index/futures">台指期貨</a>。</p>
+          <p class="note">臺指選擇權有<b>月選擇權</b>(每月第 3 個週三結算，與台指期同一天)與<b>週選擇權</b>(每週三、週五結算)。週選擇權到期時間短、時間價值流失快(Theta 大)，結算前最後幾天價格對指數變動非常敏感。月結算時期貨部位需要轉倉，見<a href="stock/query/TSE">股票查詢的加權指數(TSE)</a>。</p>
         </div>
         </div>
         <div class="mk-pane" data-pane="chain" hidden>
