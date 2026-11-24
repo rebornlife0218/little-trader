@@ -62,7 +62,7 @@ window.LTTopics = (() => {
         ['期間', `2026/8 到 ${B.asof.replaceAll('-', '/')}。`]] })}
       ${full ? `<div class="panel"><h3>研究報告</h3><div class="doc">${md(B.report)}</div></div>` : LT.reportLock()}`;
     top(el.querySelector('#nsf10Brief'), B);
-    el.querySelector('#nsf10BriefLegend').innerHTML = `<p class="note">決議後八大行庫累計買最多的是${B.top.name.slice(0, 4).map(v => v.replace(/^\S+ /, '')).join('、')}。台積電、聯發科大多是臺銀證券總公司 11/16 起買的，0050 則主要是其他行庫買的。</p>`;
+    el.querySelector('#nsf10BriefLegend').innerHTML = `<p class="note">決議後八大行庫累計買最多的是${B.top.name.slice(0, 4).map(v => v.replace(/^\S+ /, '')).join('、')}。${esc(B.note || '')}</p>`;
     if (!full) return;   // 訪客：只有上半部
     el.querySelectorAll('.md-fig [data-fig]').forEach(div => {
       const f = div.dataset.fig.split('/').pop();   // 只看檔名(報告寫成 <報告>/xxx.png，同其他研究)
@@ -76,7 +76,7 @@ window.LTTopics = (() => {
   const TOPICS = [
     { key: 'nsf10', name: '國安基金第 10 次護盤買了什麼', report: true, date: '2026-11-19',
       desc: '從八大行庫的分點進出，推估國安基金哪天開始買、買了哪些股票、買了多少',
-      summary: '決議後沒有馬上買，等台股再跌才大量進場，集中在臺銀證券總公司，幾乎只買台積電、聯發科等少數權值股；目前帳面比同時買 0050 略好。',
+      summary: '決議後沒有馬上買，等台股再跌才大量進場，集中在臺銀證券總公司，幾乎只買台積電、聯發科等少數權值股。',
       run: (el, ctx) => nsf10(el, ctx) },
   ];
   LT.catalog({

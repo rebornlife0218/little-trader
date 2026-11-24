@@ -6,14 +6,15 @@
 研究在本機的研究資料夾計算(預設 ~/Desktop/ETF_PANEL/CLAUDE/其他策略/國安基金第10次護盤，環境變數 NSF10_DIR 可改)：
   程式/抓資料.py 在 CM 伺服器直接撈八大行庫的每週累計前 10 大、區間累計前 20 大、每日合計，程式/分析.py 輸出 每日淨買.csv、區間前20大.csv 等。
 這裡只把研究輸出轉成網頁用的 JSON，不發佈 csv、png 與分點明細。
-報告 reports/nsf10.md 是研究資料夾 README 的網頁版(圖片寫成 nsf10/檔名.png，由網頁依 JSON 重畫，other/topics.js)，
-內文數字與表格都是手寫的，研究數字改變時要同步更新。
+報告：研究資料夾的 程式/報告.py 依最新資料把 報告模板.md 填成 README.md(數字、表格、判斷句都由資料產生)，
+這裡把 README 轉成網頁版(readme_md()：圖片寫成 nsf10/檔名.png，由網頁依 JSON 重畫，other/topics.js；刪掉 csv 連結、不提 CM)；
+reports/nsf10.md 是同一份網頁版的存檔，研究資料夾不在(例如其他電腦)時才用它，手動更新時一起 commit。
+精簡版圖下「誰買的」一句讀研究資料夾的 精簡說明.txt(B['note'])。
 不是回測，沒有淨值。2026 年底前每天更新(run_local.py 的 topics:daily，DAILY_UNTIL 為止)：
-  依序重跑研究資料夾的 程式/抓資料.py、程式/分析.py，再轉檔、發佈到 data 分支並重新部署；
-  研究資料夾不在這台電腦時，run_local.py 直接略過(不發佈、不算失敗)。
-  報告文字(reports/nsf10.md)是手寫的，每日更新只改圖表、決議後累計前 10 大與資料日期。
+  依序重跑研究資料夾的 程式/抓資料.py、程式/分析.py、程式/報告.py，再轉檔、發佈到 data 分支並重新部署；
+  抓資料.py 只算到分點資料完整的最後一天；研究資料夾不在這台電腦時，run_local.py 直接略過(不發佈、不算失敗)。
 手動更新：python pipeline/run_local.py topics
-研究資料夾不在(例如其他電腦)時，圖表資料沿用上一次發佈的 nsf10.json，報告文字仍用 repo 裡最新的 nsf10.md。
+研究資料夾不在時，圖表資料沿用上一次發佈的 nsf10.json，報告文字用 repo 裡的 nsf10.md。
 """
 import os
 import re
@@ -34,9 +35,27 @@ EV0 = '20261109'           # 決議後第一個交易日
 DAILY_UNTIL = '2026-12-31'  # 每日更新到這天為止(run_local.py 也用同一個日期判斷要不要跑)
 
 
+def readme_md():
+    """研究資料夾 README.md 的網頁版：圖片改 nsf10/、刪 csv 連結、資料處理不提 CM"""
+    src = (NSF10_DIR / 'README.md').read_text(encoding='utf-8').split('\n## 檔案')[0]
+    out = []
+    for line in src.replace('](圖/', '](nsf10/').split('\n'):
+        if '.csv' in line:
+            continue
+        if line.startswith('- **分點進出**'):
+            line = '- **分點進出**：八大行庫每個分點每天每檔股票的買進、賣出張數與金額，整理成三種表：'
+        elif line.startswith('- **收盤價'):
+            line = '- **股價**：每天的收盤價、漲跌幅與成交金額。'
+        out.append(line)
+    md = '\n'.join(out).rstrip('\n') + '\n'
+    if 'CM' in md or '分公司' in md:
+        sys.exit('nsf10：網頁版報告不該出現「CM」或「分公司」，請檢查研究資料夾的 README.md')
+    return md
+
+
 def report():
-    """reports/nsf10.md 去掉第一行標題"""
-    md = (HERE / 'reports' / 'nsf10.md').read_text(encoding='utf-8')
+    """網頁版報告去掉第一行標題；研究資料夾在就從 README 轉，不在就用 reports/nsf10.md"""
+    md = readme_md() if (NSF10_DIR / 'README.md').exists() else (HERE / 'reports' / 'nsf10.md').read_text(encoding='utf-8')
     return re.sub(r'^# .*\n+', '', md, count=1)
 
 
@@ -57,13 +76,14 @@ def nsf10():
         'other': [r1(v) for v in d['其他七家總公司']],                      # 其他七家總公司(億)
         'top': {'from': ymd(t['起'].iloc[0]), 'to': ymd(t['迄'].iloc[0]),
                 'name': [f'{c} {n}' for c, n in zip(t['股票代號'], t['股票名稱'])], 'v': [r1(v) for v in t['淨買億']]},
+        'note': (NSF10_DIR / '精簡說明.txt').read_text(encoding='utf-8').strip() if (NSF10_DIR / '精簡說明.txt').exists() else '',
         'report': report(),
     }
 
 
 def rerun_research():
-    """每日更新：依序重跑研究資料夾的 程式/抓資料.py、程式/分析.py(在 CM 伺服器撈八大行庫分點、輸出 csv)"""
-    for f in ('抓資料.py', '分析.py'):
+    """每日更新：依序重跑研究資料夾的 程式/抓資料.py、程式/分析.py(在 CM 伺服器撈八大行庫分點、輸出 csv)、程式/報告.py(寫 README)"""
+    for f in ('抓資料.py', '分析.py', '報告.py'):
         p = subprocess.run([sys.executable, str(NSF10_DIR / '程式' / f)], cwd=NSF10_DIR / '程式', capture_output=True, text=True,
                            encoding='utf-8', errors='replace', env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
         if p.returncode:
@@ -80,9 +100,11 @@ def main():
     B = nsf10() or prev
     if not B:
         sys.exit('nsf10：找不到本機研究資料夾，也沒有上一次發佈的 nsf10.json')
-    B['report'] = report()                              # 沿用上一次的圖表資料時，報告文字仍用 repo 裡最新的 nsf10.md
+    B['report'] = report()                              # 沿用上一次的圖表資料時，報告文字用 repo 裡的 nsf10.md
     write_json(out / 'nsf10.json', B)
     write_meta(NAME, '八大行庫分點進出(本機研究資料夾)', '', f'每天(本機排程，到 {DAILY_UNTIL})', asof=B['asof'])
+    if not daily and (NSF10_DIR / 'README.md').exists():   # 手動更新時存一份網頁版報告到 repo(研究資料夾不在的電腦用)；每日更新不動 repo
+        (HERE / 'reports' / 'nsf10.md').write_text(readme_md(), encoding='utf-8', newline='\n')
     print(f"nsf10：{len(B['d'])} 天，資料到 {B['asof']}")
 
 
