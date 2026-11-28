@@ -1,0 +1,12 @@
+{
+  "dataset": "topics",
+  "updated_at": "2026-11-27 08:16",
+  "version": "202611270816",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "八大行庫分點進出(本機研究資料夾)",
+    "url": ""
+  },
+  "schedule": "每天(本機排程，到 2026-12-31)",
+  "asof": "2026-11-26"
+}

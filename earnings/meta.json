@@ -1,0 +1,13 @@
+{
+  "dataset": "earnings",
+  "updated_at": "2026-11-28 12:49",
+  "version": "202611281249",
+  "timezone": "Asia/Taipei",
+  "source": {
+    "name": "Nasdaq Earnings Calendar",
+    "url": "https://www.nasdaq.com/market-activity/earnings"
+  },
+  "schedule": "每天 07:30、20:00(台北時間)",
+  "companies": 705,
+  "updated_utc": "2026-11-28T04:49Z"
+}
